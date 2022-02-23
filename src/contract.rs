@@ -1,14 +1,20 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{attr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint256, Coin, StdError, Storage, CosmosMsg, BankMsg, Uint128};
+use cosmwasm_std::{
+    attr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, Storage, Uint128, Uint256,
+};
 use cw2::set_contract_version;
 use std::convert::TryFrom;
 
 use crate::error::ContractError;
 use crate::mixer_verifier::MixerVerifier;
-use crate::msg::{ ExecuteMsg, InstantiateMsg, QueryMsg, DepositMsg, WithdrawMsg};
+use crate::msg::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg};
 use crate::poseidon::Poseidon;
-use crate::state::{Mixer, MerkleTree, MIXER, save_root, POSEIDON, MIXERVERIFIER, save_subtree, NULLIFIERS};
+use crate::state::{
+    read_root, save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, NULLIFIERS,
+    POSEIDON,
+};
 use crate::zeroes::zeroes;
 
 // version info for migration info
@@ -33,7 +39,7 @@ pub fn instantiate(
     let merkle_tree: MerkleTree = MerkleTree {
         levels: msg.merkletree_levels,
         current_root_index: 0,
-        next_index: 1,
+        next_index: 0,
     };
     // Initialize the Mixer
     let mixer: Mixer = Mixer {
@@ -68,16 +74,24 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Deposit(msg)=> try_deposit(deps, info, msg),
+        ExecuteMsg::Deposit(msg) => try_deposit(deps, info, msg),
         ExecuteMsg::Withdraw(msg) => try_withdraw(deps, info, msg),
     }
 }
 
-pub fn try_deposit(deps: DepsMut, info: MessageInfo, msg: DepositMsg) -> Result<Response, ContractError> {
+pub fn try_deposit(
+    deps: DepsMut,
+    info: MessageInfo,
+    msg: DepositMsg,
+) -> Result<Response, ContractError> {
     let mixer = MIXER.load(deps.storage)?;
 
     // Validation 1. Check if the enough UST are sent.
-    let sent_uusd: Vec<Coin> = info.funds.into_iter().filter(|x| x.denom == "uusd").collect();
+    let sent_uusd: Vec<Coin> = info
+        .funds
+        .into_iter()
+        .filter(|x| x.denom == "uusd")
+        .collect();
     if sent_uusd.len() == 0 || Uint256::from(sent_uusd[0].amount) < mixer.deposit_size {
         return Err(ContractError::InsufficientFunds {});
     }
@@ -86,26 +100,35 @@ pub fn try_deposit(deps: DepsMut, info: MessageInfo, msg: DepositMsg) -> Result<
     if !mixer.initialized {
         return Err(ContractError::NotInitialized {});
     }
-    
+
     if let Some(commitment) = msg.commitment {
         let mut merkle_tree = mixer.merkle_tree;
         let poseidon = POSEIDON.load(deps.storage)?;
         // let poseidon = Poseidon::new();
         let res = merkle_tree.insert(poseidon, commitment, deps.storage)?;
-        MIXER.save(deps.storage, &Mixer {
-            initialized: mixer.initialized,
-            deposit_size: mixer.deposit_size,
-            merkle_tree: merkle_tree,
-        })?;
+        MIXER.save(
+            deps.storage,
+            &Mixer {
+                initialized: mixer.initialized,
+                deposit_size: mixer.deposit_size,
+                merkle_tree: merkle_tree,
+            },
+        )?;
         Ok(Response::new().add_attributes(vec![
-            attr( "method", "try_deposit"),
-            attr( "result", res.to_string(),
-        )]))
+            attr("method", "try_deposit"),
+            attr("result", res.to_string()),
+        ]))
     } else {
-        return Err(ContractError::Std(StdError::NotFound { kind: "Commitment".to_string()}));
+        return Err(ContractError::Std(StdError::NotFound {
+            kind: "Commitment".to_string(),
+        }));
     }
 }
-pub fn try_withdraw(deps: DepsMut, info: MessageInfo, msg: WithdrawMsg) -> Result<Response, ContractError> {
+pub fn try_withdraw(
+    deps: DepsMut,
+    info: MessageInfo,
+    msg: WithdrawMsg,
+) -> Result<Response, ContractError> {
     // Validation 1. Check if the funds are sent.
     if !info.funds.is_empty() {
         return Err(ContractError::UnnecessaryFunds {});
@@ -114,12 +137,18 @@ pub fn try_withdraw(deps: DepsMut, info: MessageInfo, msg: WithdrawMsg) -> Resul
     // Validation 2. Check if the root is known to merkle tree
     let mixer = MIXER.load(deps.storage)?;
     let merkle_tree = mixer.merkle_tree;
+    println!("merkle_tree_root: {:?}", read_root(deps.storage, 1));
+
     if !merkle_tree.is_known_root(msg.root, deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr{ msg: "Root is not known".to_string()}));
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Root is not known".to_string(),
+        }));
     }
 
     if !is_known_nullifier(deps.storage, msg.nullifier_hash) {
-        return Err(ContractError::Std(StdError::GenericErr { msg: "Nullifier is known".to_string()}));
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Nullifier is known".to_string(),
+        }));
     }
 
     let element_encoder = |v: &[u8]| {
@@ -132,7 +161,10 @@ pub fn try_withdraw(deps: DepsMut, info: MessageInfo, msg: WithdrawMsg) -> Resul
     let relayer_bytes = truncate_and_pad(msg.relayer.as_ref());
     let fee_bytes = element_encoder(&msg.fee.to_be_bytes());
     let refund_bytes = element_encoder(&msg.refund.to_be_bytes());
-
+    println!("recipient_bytes: {:?}", recipient_bytes);
+    println!("relayer_bytes: {:?}", relayer_bytes);
+    println!("fee_bytes: {:?}", fee_bytes);
+    println!("refund_bytes: {:?}", refund_bytes);
     // Join the public input bytes
     let mut bytes = Vec::new();
     bytes.extend_from_slice(&msg.nullifier_hash);
@@ -143,10 +175,12 @@ pub fn try_withdraw(deps: DepsMut, info: MessageInfo, msg: WithdrawMsg) -> Resul
     bytes.extend_from_slice(&refund_bytes);
     // Verify the proof
     let verifier = MIXERVERIFIER.load(deps.storage)?;
-    let result =  verify(verifier, bytes, msg.proof_bytes)?;
+    let result = verify(verifier, bytes, msg.proof_bytes)?;
 
     if !result {
-        return Err(ContractError::Std(StdError::GenericErr { msg: "Invalid withdraw proof".to_string()}));
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid withdraw proof".to_string(),
+        }));
     }
 
     // Set used nullifier to true after successful verification
@@ -155,55 +189,71 @@ pub fn try_withdraw(deps: DepsMut, info: MessageInfo, msg: WithdrawMsg) -> Resul
     // Send the funds
     // TODO: Support "ERC20"-like tokens
     let mut msgs: Vec<CosmosMsg> = vec![];
-    
+
     let amt = match Uint128::try_from(mixer.deposit_size - msg.fee) {
         Ok(v) => v,
-        Err(_) => return Err(ContractError::Std(StdError::GenericErr { msg: "Cannot compute amount".to_string() })),
+        Err(_) => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Cannot compute amount".to_string(),
+            }))
+        }
     };
     msgs.push(CosmosMsg::Bank(BankMsg::Send {
         to_address: msg.recipient.clone(),
-        amount: vec![Coin{ 
-            denom: "uusd".to_string(), 
+        amount: vec![Coin {
+            denom: "uusd".to_string(),
             amount: amt,
-        }]
+        }],
     }));
 
     let amt = match Uint128::try_from(msg.fee) {
         Ok(v) => v,
-        Err(_) => return Err(ContractError::Std(StdError::GenericErr { msg: "Cannot compute amount".to_string() })),
+        Err(_) => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Cannot compute amount".to_string(),
+            }))
+        }
     };
     msgs.push(CosmosMsg::Bank(BankMsg::Send {
         to_address: msg.relayer,
-        amount: vec![Coin{ 
-            denom: "uusd".to_string(), 
+        amount: vec![Coin {
+            denom: "uusd".to_string(),
             amount: amt,
-        }]
+        }],
     }));
 
     if msg.refund > Uint256::zero() {
         let amt = match Uint128::try_from(msg.refund) {
             Ok(v) => v,
-            Err(_) => return Err(ContractError::Std(StdError::GenericErr { msg: "Cannot compute amount".to_string() })),
+            Err(_) => {
+                return Err(ContractError::Std(StdError::GenericErr {
+                    msg: "Cannot compute amount".to_string(),
+                }))
+            }
         };
         msgs.push(CosmosMsg::Bank(BankMsg::Send {
             to_address: msg.recipient,
-            amount: vec![Coin{ 
-                denom: "uusd".to_string(), 
+            amount: vec![Coin {
+                denom: "uusd".to_string(),
                 amount: amt,
-            }]
+            }],
         }));
     }
 
-    Ok(Response::new().add_attributes(vec![
-        attr("method", "try_withdraw")
-    ]).add_messages(msgs))
+    Ok(Response::new()
+        .add_attributes(vec![attr("method", "try_withdraw")])
+        .add_messages(msgs))
 }
 
 fn is_known_nullifier(store: &dyn Storage, nullifier: [u8; 32]) -> bool {
     NULLIFIERS.has(store, nullifier.to_vec())
 }
 
-fn verify(verifier: MixerVerifier, public_input: Vec<u8>, proof_bytes: Vec<u8>) -> Result<bool, ContractError> {
+fn verify(
+    verifier: MixerVerifier,
+    public_input: Vec<u8>,
+    proof_bytes: Vec<u8>,
+) -> Result<bool, ContractError> {
     verifier
         .verify(public_input, proof_bytes)
         .map_err(|_| ContractError::VerifyError)
@@ -225,8 +275,32 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ark_bn254::Fr;
+    use ark_crypto_primitives::CRH as CRHTrait;
+    use ark_ff::PrimeField;
+    use ark_ff::{BigInteger, Field};
+    use ark_std::One;
+    use arkworks_gadgets::merkle_tree::simple_merkle::gen_empty_hashes;
+    use arkworks_gadgets::poseidon::CRH;
+    use arkworks_utils::utils::bn254_x5_5::get_poseidon_bn254_x5_5;
+    use arkworks_utils::utils::common::{setup_params_x5_5, Curve};
+    use arkworks_utils::utils::parse_vec;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Uint128, attr};
+    use cosmwasm_std::{attr, coins, Uint128};
+    type PoseidonCRH5 = CRH<Fr>;
+    use arkworks_gadgets::poseidon::field_hasher;
+
+    fn get_empty_hashes(curve: Curve) {
+        let params = setup_params_x5_5::<Fr>(curve);
+        let poseidon = field_hasher::Poseidon::<Fr>::new(params.clone());
+
+        let default_leaf_hex =
+            vec!["0x2fe54c60d3acabf3343a35b6eba15db4821b340f76e741e2249685ed4899af6c"];
+        let default_leaf_scalar: Vec<Fr> = parse_vec(default_leaf_hex);
+        let default_leaf_vec = default_leaf_scalar[0].into_repr().to_bytes_le();
+        let empty_hashes =
+            gen_empty_hashes::<Fr, _, 32usize>(&poseidon, &default_leaf_vec[..]).unwrap();
+    }
 
     #[test]
     fn proper_initialization() {
@@ -242,10 +316,10 @@ mod tests {
         // Should pass this "unwrap" if success.
         let response = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
-        assert_eq!(response.attributes, vec![
-            attr("method", "instantiate"),
-            attr("owner", "anyone"),
-        ]);
+        assert_eq!(
+            response.attributes,
+            vec![attr("method", "instantiate"), attr("owner", "anyone"),]
+        );
     }
 
     #[test]
@@ -256,17 +330,28 @@ mod tests {
         let env = mock_env();
         let info = mock_info("anyone", &[]);
         let instantiate_msg = InstantiateMsg {
-            merkletree_levels: 4,
+            merkletree_levels: 30,
             deposit_size: Uint128::from(1_000_000_u128),
         };
 
         let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
+        // Initialize the mixer
+        let params = get_poseidon_bn254_x5_5();
+        let left_input = Fr::one().into_repr().to_bytes_le();
+        let right_input = Fr::one().double().into_repr().to_bytes_le();
+        let mut input = Vec::new();
+        input.extend_from_slice(&left_input);
+        input.extend_from_slice(&right_input);
+        let res = <PoseidonCRH5 as CRHTrait>::evaluate(&params, &input).unwrap();
+        let mut element: [u8; 32] = [0u8; 32];
+        element.copy_from_slice(&res.into_repr().to_bytes_le());
+
         // Try the deposit with insufficient fund
         let info = mock_info("depositor", &[Coin::new(1_000_u128, "uusd")]);
         let deposit_msg = DepositMsg {
             from: None,
-            commitment: Some([12u8; 32]),
+            commitment: Some(element),
             value: Uint256::from(0_u128),
         };
 
@@ -288,21 +373,140 @@ mod tests {
         let info = mock_info("depositor", &[Coin::new(1_000_000_u128, "uusd")]);
         let deposit_msg = DepositMsg {
             from: None,
-            commitment:  Some([1u8; 32]),
+            commitment: Some(element),
             value: Uint256::from(0_u128),
         };
 
         let response = try_deposit(deps.as_mut(), info, deposit_msg).unwrap();
-        assert_eq!(response.attributes, vec![
-            attr("method", "try_deposit"),
-            attr("result", "0")
-        ]);
+        assert_eq!(
+            response.attributes,
+            vec![attr("method", "try_deposit"), attr("result", "0")]
+        );
     }
 
     #[test]
-    fn test_try_withdraw() {
+    fn test_try_withdraw_wasm_utils() {
+        let curve = Curve::Bn254;
+        let (pk_bytes, _) = crate::test_util::setup_environment(curve);
+        let recipient_bytes = [1u8; 32];
+        let relayer_bytes = [2u8; 32];
+        let fee_value = 0;
+        let refund_value = 0;
+        // Setup zk circuit for withdraw
+        let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
+            crate::test_util::setup_wasm_utils_zk_circuit(
+                curve,
+                recipient_bytes.to_vec(),
+                relayer_bytes.to_vec(),
+                pk_bytes,
+                fee_value,
+                refund_value,
+            );
+        println!("root_element: {:?}", root_element);
         let mut deps = mock_dependencies(&coins(2, "token"));
 
-        // TODO
+        // Initialize the contract
+        let env = mock_env();
+        let info = mock_info("anyone", &[]);
+        let instantiate_msg = InstantiateMsg {
+            merkletree_levels: 30,
+            deposit_size: Uint128::from(1_000_000_u128),
+        };
+
+        let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+
+        // Try the deposit for success
+        let info = mock_info("depositor", &[Coin::new(1_000_000_u128, "uusd")]);
+        let deposit_msg = DepositMsg {
+            from: None,
+            commitment: Some(leaf_element.0),
+            value: Uint256::from(0_u128),
+        };
+
+        let response = try_deposit(deps.as_mut(), info, deposit_msg.clone()).unwrap();
+        assert_eq!(
+            response.attributes,
+            vec![attr("method", "try_deposit"), attr("result", "0")]
+        );
+        println!("deposit_msg: {:?}", deposit_msg);
+
+        let withdraw_msg = WithdrawMsg {
+            proof_bytes: proof_bytes,
+            root: root_element.0,
+            nullifier_hash: nullifier_hash_element.0,
+            recipient: hex::encode(recipient_bytes.to_vec()),
+            relayer: hex::encode(relayer_bytes.to_vec()),
+            fee: cosmwasm_std::Uint256::from(fee_value),
+            refund: cosmwasm_std::Uint256::from(refund_value),
+        };
+        let info = mock_info("withdraw", &[]);
+        let response = try_withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
+        assert_eq!(
+            response.attributes,
+            vec![attr("method", "try_withdraw"), attr("result", "0")]
+        );
+    }
+
+    #[test]
+    fn test_try_withdraw_native() {
+        let curve = Curve::Bn254;
+        let (pk_bytes, _) = crate::test_util::setup_environment(curve);
+        let recipient_bytes = [1u8; 32];
+        let relayer_bytes = [2u8; 32];
+        let fee_value = 0;
+        let refund_value = 0;
+        // Setup zk circuit for withdraw
+        let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
+            crate::test_util::setup_zk_circuit(
+                curve,
+                recipient_bytes.to_vec(),
+                relayer_bytes.to_vec(),
+                pk_bytes,
+                fee_value,
+                refund_value,
+            );
+        println!("root_element: {:?}", root_element);
+        let mut deps = mock_dependencies(&coins(2, "token"));
+
+        // Initialize the contract
+        let env = mock_env();
+        let info = mock_info("anyone", &[]);
+        let instantiate_msg = InstantiateMsg {
+            merkletree_levels: 30,
+            deposit_size: Uint128::from(1_000_000_u128),
+        };
+
+        let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+
+        // Try the deposit for success
+        let info = mock_info("depositor", &[Coin::new(1_000_000_u128, "uusd")]);
+        let deposit_msg = DepositMsg {
+            from: None,
+            commitment: Some(leaf_element.0),
+            value: Uint256::from(0_u128),
+        };
+
+        let response = try_deposit(deps.as_mut(), info, deposit_msg.clone()).unwrap();
+        assert_eq!(
+            response.attributes,
+            vec![attr("method", "try_deposit"), attr("result", "0")]
+        );
+        println!("deposit_msg: {:?}", deposit_msg);
+
+        let withdraw_msg = WithdrawMsg {
+            proof_bytes: proof_bytes,
+            root: root_element.0,
+            nullifier_hash: nullifier_hash_element.0,
+            recipient: hex::encode(recipient_bytes.to_vec()),
+            relayer: hex::encode(relayer_bytes.to_vec()),
+            fee: cosmwasm_std::Uint256::from(fee_value),
+            refund: cosmwasm_std::Uint256::from(refund_value),
+        };
+        let info = mock_info("withdraw", &[]);
+        let response = try_withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
+        assert_eq!(
+            response.attributes,
+            vec![attr("method", "try_withdraw"), attr("result", "0")]
+        );
     }
 }

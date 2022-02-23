@@ -1,45 +1,48 @@
-# cosmwasm-mixer
-Implement the (ink) mixer in cosmwasm
-## How to build & test the "cosmwasm-mixer"
+<h1 align="center">Webb Protocol CosmWasm</h1>
 
-NOTE: All of the following procedures are based on assumption that the user is
-using the Linux(Ubuntu) system or MacOS on the local machine.
-If you are using another OS, please reference the following URL.
-https://docs.terra.money/docs/develop/dapp/smart-contracts/write-smart-contract.html#building-the-contract
+<p align="center">
+    <strong>🕸️  Webb Protocol CosmWasm!  ⧫</strong>
+    <br />
+    <sub> ⚠️ Beta Software ⚠️ </sub>
+</p>
 
-### Prerequisites
+<br />
 
-    - Install Rust & its utils
-        Add the compilation target.
-        ```
-        rustup default stable
-        rustup target add wasm32-unknown-unknown
-        ```
+## Dependencies
+Add the compilation target.
+```
+rustup target add wasm32-unknown-unknown
+```
 
-        Install the utils
-        ```
-        cargo install cargo-generate --features vendored-openssl
-        cargo install cargo-run-script
-        ```
+## Building
+To build the contract, run the following command.
+```
+cargo wasm
+```
+You can see the output wasm file in the "target/wasm32-unknown-unknown/release" dir.
 
-### Build the contract
+For the optimization, run the following command.
+```
+cargo run-script optimize
+```
+Then, you can see the output wasm file in the "artifacts" directory.
 
-    - To build the contract, run the following command.
-        ```
-        cargo wasm
-        ```
-        You can see the output wasm file in the "target/wasm32-unknown-unknown/release" dir.
+## Testing 
+For running the unit tests(written on "src/contract.rs"), run the following command.
+```
+cargo test
+```
 
-    - For the optimization, run the following command.
-        ```
-        cargo run-script optimize
-        ```
-        Then, you can see the output wasm file in the "artifacts" dir.
+## License
 
-### Run the unit tests
+<sup>
+Licensed under <a href="LICENSE">Apache License 2.0</a>.
+</sup>
 
-    - For running the unit tests(written on "src/contract.rs"), run the following command.
-        ```
-        cargo test
-        ```
-        
+<br/>
+
+<sub>
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in this crate by you, as defined in the GPLV3 license, shall
+be licensed as above, without any additional terms or conditions.
+</sub>

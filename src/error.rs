@@ -1,4 +1,4 @@
-use cosmwasm_std::{StdError};
+use cosmwasm_std::StdError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -13,10 +13,9 @@ pub enum ContractError {
     UnnecessaryFunds {},
 
     #[error("Insufficient_funds")]
-    InsufficientFunds {}, 
+    InsufficientFunds {},
     // Add any other custom errors you like here.
     // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.
-
     /// Returned if the mixer is not initialized
     #[error("NotInitialized")]
     NotInitialized,

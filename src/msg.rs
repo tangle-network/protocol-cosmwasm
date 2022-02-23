@@ -11,8 +11,8 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    Deposit (DepositMsg),
-    Withdraw (WithdrawMsg)
+    Deposit(DepositMsg),
+    Withdraw(WithdrawMsg),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -35,7 +35,4 @@ pub struct WithdrawMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum QueryMsg { 
-
-}
-
+pub enum QueryMsg {}

@@ -1,10 +1,10 @@
-pub use self::poseidon::{Poseidon};
+pub use self::poseidon::Poseidon;
 
 mod hasher {
     use ark_crypto_primitives::{Error, CRH as CRHTrait};
     use ark_ff::{BigInteger, PrimeField};
-    use arkworks_gadgets::poseidon::CRH;
     use ark_std::{marker::PhantomData, vec::Vec};
+    use arkworks_gadgets::poseidon::CRH;
     use arkworks_utils::poseidon::PoseidonParameters;
     pub struct ArkworksPoseidonHasher<F: PrimeField>(PhantomData<F>);
 
@@ -22,9 +22,9 @@ mod hasher {
 }
 
 pub mod poseidon {
-    use serde::{Serialize, Deserialize};
+    use serde::{Deserialize, Serialize};
 
-    use crate::poseidon::hasher::{ArkworksPoseidonHasherBn254};
+    use crate::poseidon::hasher::ArkworksPoseidonHasherBn254;
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Poseidon {
@@ -46,12 +46,17 @@ pub mod poseidon {
     pub type Result<T> = core::result::Result<T, Error>;
 
     impl Poseidon {
-        
         pub fn new() -> Self {
             Self {
-                hasher_params_width_3_bytes: arkworks_utils::utils::bn254_x5_3::get_poseidon_bn254_x5_3::<ark_bn254::Fr>().to_bytes(),
-                hasher_params_width_4_bytes: arkworks_utils::utils::bn254_x5_4::get_poseidon_bn254_x5_4::<ark_bn254::Fr>().to_bytes(),
-                hasher_params_width_5_bytes: arkworks_utils::utils::bn254_x5_5::get_poseidon_bn254_x5_5::<ark_bn254::Fr>().to_bytes(),
+                hasher_params_width_3_bytes:
+                    arkworks_utils::utils::bn254_x5_3::get_poseidon_bn254_x5_3::<ark_bn254::Fr>()
+                        .to_bytes(),
+                hasher_params_width_4_bytes:
+                    arkworks_utils::utils::bn254_x5_4::get_poseidon_bn254_x5_4::<ark_bn254::Fr>()
+                        .to_bytes(),
+                hasher_params_width_5_bytes:
+                    arkworks_utils::utils::bn254_x5_5::get_poseidon_bn254_x5_5::<ark_bn254::Fr>()
+                        .to_bytes(),
             }
         }
 
@@ -63,18 +68,28 @@ pub mod poseidon {
             }
 
             let hash_result = match num_inputs {
-                2 => ArkworksPoseidonHasherBn254::hash(&packed_inputs, &self.hasher_params_width_3_bytes),
-                3 => ArkworksPoseidonHasherBn254::hash(&packed_inputs, &self.hasher_params_width_4_bytes),
-                4 => ArkworksPoseidonHasherBn254::hash(&packed_inputs, &self.hasher_params_width_5_bytes),
+                2 => ArkworksPoseidonHasherBn254::hash(
+                    &packed_inputs,
+                    &self.hasher_params_width_3_bytes,
+                ),
+                3 => ArkworksPoseidonHasherBn254::hash(
+                    &packed_inputs,
+                    &self.hasher_params_width_4_bytes,
+                ),
+                4 => ArkworksPoseidonHasherBn254::hash(
+                    &packed_inputs,
+                    &self.hasher_params_width_5_bytes,
+                ),
                 _ => return Err(Error::InvalidHashInputWidth),
             };
 
-            hash_result.map(|h| {
-                let mut hash_result = [0u8; 32];
-                hash_result.copy_from_slice(&h);
-                hash_result
-            })
-            .map_err(|_| Error::HashError)
+            hash_result
+                .map(|h| {
+                    let mut hash_result = [0u8; 32];
+                    hash_result.copy_from_slice(&h);
+                    hash_result
+                })
+                .map_err(|_| Error::HashError)
         }
     }
 }
