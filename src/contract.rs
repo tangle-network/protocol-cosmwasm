@@ -137,7 +137,6 @@ pub fn try_withdraw(
     // Validation 2. Check if the root is known to merkle tree
     let mixer = MIXER.load(deps.storage)?;
     let merkle_tree = mixer.merkle_tree;
-    println!("merkle_tree_root: {:?}", read_root(deps.storage, 1));
 
     if !merkle_tree.is_known_root(msg.root, deps.storage) {
         return Err(ContractError::Std(StdError::GenericErr {
@@ -428,7 +427,8 @@ mod tests {
             response.attributes,
             vec![attr("method", "try_deposit"), attr("result", "0")]
         );
-        println!("deposit_msg: {:?}", deposit_msg);
+        println!("storage root: {:?}", read_root(&deps.storage, 1).unwrap());
+        println!("local root: {:?}", root_element.0);
 
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes,
@@ -492,6 +492,8 @@ mod tests {
             vec![attr("method", "try_deposit"), attr("result", "0")]
         );
         println!("deposit_msg: {:?}", deposit_msg);
+        println!("storage root: {:?}", read_root(&deps.storage, 1).unwrap());
+        println!("local root: {:?}", root_element.0);
 
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes,

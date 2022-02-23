@@ -53,8 +53,8 @@ ark-std = { version = "^0.3.0", default-features = false }
 ark-bn254 = { version = "^0.3.0", default-features = false, features = [ "curve" ] }
 ark-crypto-primitives = { version = "^0.3.0", features = ["r1cs"], default-features = false }
 
-arkworks-gadgets = { version = "0.4.20", default-features = false }
-arkworks-utils = { version = "0.4.20", default-features = false, features = [
+arkworks-gadgets = { version = "0.4.19", default-features = false }
+arkworks-utils = { version = "0.4.19", default-features = false, features = [
     "poseidon_bn254_x5_3",
     "poseidon_bn254_x5_4",
     "poseidon_bn254_x5_5",
@@ -70,4 +70,4 @@ hex = "0.4"
 cosmwasm-schema = { version = "0.16.0" }
 getrandom = { version = "0.2", features = ["js"] }
 wasm-utils = { version = "0.1.2" }
-arkworks-circuits = { version = "0.4.20" }
+arkworks-circuits = { version = "0.4.19" }

@@ -108,9 +108,6 @@ impl MerkleTree {
 
         let new_root_index = (self.current_root_index + 1) % ROOT_HISTORY_SIZE;
         self.current_root_index = new_root_index;
-        // self.roots[&new_root_index] = current_level_hash;
-        println!("Leaf {:?}", leaf);
-        println!("New root {:?}", current_level_hash);
         save_root(store, new_root_index, &current_level_hash)?;
         self.next_index = next_index + 1;
         Ok(next_index)
@@ -122,7 +119,6 @@ impl MerkleTree {
         }
 
         let mut i = self.current_root_index;
-        println!("Checking root {:?}", root);
         for _ in 0..ROOT_HISTORY_SIZE {
             let r = read_root(store, i).unwrap_or([0u8; 32]);
             if r == root {
