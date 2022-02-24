@@ -156,8 +156,10 @@ pub fn try_withdraw(
         output
     };
     // Format the public input bytes
-    let recipient_bytes = truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);
-    let relayer_bytes = truncate_and_pad(&hex::decode(&msg.relayer).map_err(|_| ContractError::DecodeError)?);
+    let recipient_bytes =
+        truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);
+    let relayer_bytes =
+        truncate_and_pad(&hex::decode(&msg.relayer).map_err(|_| ContractError::DecodeError)?);
     let fee_bytes = element_encoder(&msg.fee.to_be_bytes());
     let refund_bytes = element_encoder(&msg.refund.to_be_bytes());
     println!("nullifier_hash: {:?}", msg.nullifier_hash);
@@ -443,10 +445,7 @@ mod tests {
         };
         let info = mock_info("withdraw", &[]);
         let response = try_withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
-        assert_eq!(
-            response.attributes,
-            vec![attr("method", "try_withdraw")]
-        );
+        assert_eq!(response.attributes, vec![attr("method", "try_withdraw")]);
     }
 
     #[test]
@@ -508,9 +507,6 @@ mod tests {
         };
         let info = mock_info("withdraw", &[]);
         let response = try_withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
-        assert_eq!(
-            response.attributes,
-            vec![attr("method", "try_withdraw")]
-        );
+        assert_eq!(response.attributes, vec![attr("method", "try_withdraw")]);
     }
 }

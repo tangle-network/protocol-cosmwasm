@@ -33,5 +33,5 @@ pub enum ContractError {
     VerifyError,
     // Failing to decode a hex string
     #[error("DecodeError")]
-    DecodeError
+    DecodeError,
 }

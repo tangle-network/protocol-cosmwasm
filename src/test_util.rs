@@ -100,7 +100,12 @@ pub fn setup_zk_circuit(
             let nullifier_hash_element = Element::from_bytes(&nullifier_hash_bytes);
             let root_element = Element::from_bytes(&proof.root_raw);
 
-            (proof.proof, root_element, nullifier_hash_element, leaf_element)
+            (
+                proof.proof,
+                root_element,
+                nullifier_hash_element,
+                leaf_element,
+            )
         }
         Curve::Bls381 => {
             unimplemented!()
