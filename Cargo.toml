@@ -47,7 +47,7 @@ cw2 = "0.8.1"
 schemars = "0.8.3"
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.26" }
-
+hex = "0.4"
 ark-ff = { version = "^0.3.0", default-features = false }
 ark-std = { version = "^0.3.0", default-features = false }
 ark-bn254 = { version = "^0.3.0", default-features = false, features = [ "curve" ] }
@@ -66,7 +66,6 @@ ark-serialize = { version = "^0.3.0", default-features = false }
 
 
 [dev-dependencies]
-hex = "0.4"
 cosmwasm-schema = { version = "0.16.0" }
 getrandom = { version = "0.2", features = ["js"] }
 wasm-utils = { version = "0.1.2" }

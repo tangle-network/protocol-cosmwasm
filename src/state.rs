@@ -96,7 +96,7 @@ impl MerkleTree {
             if current_index % 2 == 0 {
                 left = current_level_hash;
                 right = zeroes::zeroes(i);
-                save_subtree(store, i, &current_level_hash)?
+                save_subtree(store, i, &current_level_hash)?;
             } else {
                 left = read_subtree(store, i).map_err(|_| ContractError::HashError)?;
                 right = current_level_hash;

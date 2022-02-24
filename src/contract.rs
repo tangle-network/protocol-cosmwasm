@@ -144,7 +144,7 @@ pub fn try_withdraw(
         }));
     }
 
-    if !is_known_nullifier(deps.storage, msg.nullifier_hash) {
+    if is_known_nullifier(deps.storage, msg.nullifier_hash) {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Nullifier is known".to_string(),
         }));
@@ -156,10 +156,12 @@ pub fn try_withdraw(
         output
     };
     // Format the public input bytes
-    let recipient_bytes = truncate_and_pad(msg.recipient.as_ref());
-    let relayer_bytes = truncate_and_pad(msg.relayer.as_ref());
+    let recipient_bytes = truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);
+    let relayer_bytes = truncate_and_pad(&hex::decode(&msg.relayer).map_err(|_| ContractError::DecodeError)?);
     let fee_bytes = element_encoder(&msg.fee.to_be_bytes());
     let refund_bytes = element_encoder(&msg.refund.to_be_bytes());
+    println!("nullifier_hash: {:?}", msg.nullifier_hash);
+    println!("root: {:?}", msg.root);
     println!("recipient_bytes: {:?}", recipient_bytes);
     println!("relayer_bytes: {:?}", relayer_bytes);
     println!("fee_bytes: {:?}", fee_bytes);
@@ -395,13 +397,12 @@ mod tests {
         let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
             crate::test_util::setup_wasm_utils_zk_circuit(
                 curve,
-                recipient_bytes.to_vec(),
-                relayer_bytes.to_vec(),
+                truncate_and_pad(&recipient_bytes),
+                truncate_and_pad(&relayer_bytes),
                 pk_bytes,
                 fee_value,
                 refund_value,
             );
-        println!("root_element: {:?}", root_element);
         let mut deps = mock_dependencies(&coins(2, "token"));
 
         // Initialize the contract
@@ -427,8 +428,9 @@ mod tests {
             response.attributes,
             vec![attr("method", "try_deposit"), attr("result", "0")]
         );
-        println!("storage root: {:?}", read_root(&deps.storage, 1).unwrap());
-        println!("local root: {:?}", root_element.0);
+        let on_chain_root = read_root(&deps.storage, 1).unwrap();
+        let local_root = root_element.0;
+        assert_eq!(on_chain_root, local_root);
 
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes,
@@ -443,7 +445,7 @@ mod tests {
         let response = try_withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
         assert_eq!(
             response.attributes,
-            vec![attr("method", "try_withdraw"), attr("result", "0")]
+            vec![attr("method", "try_withdraw")]
         );
     }
 
@@ -459,8 +461,8 @@ mod tests {
         let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
             crate::test_util::setup_zk_circuit(
                 curve,
-                recipient_bytes.to_vec(),
-                relayer_bytes.to_vec(),
+                truncate_and_pad(&recipient_bytes),
+                truncate_and_pad(&relayer_bytes),
                 pk_bytes,
                 fee_value,
                 refund_value,
@@ -491,9 +493,9 @@ mod tests {
             response.attributes,
             vec![attr("method", "try_deposit"), attr("result", "0")]
         );
-        println!("deposit_msg: {:?}", deposit_msg);
-        println!("storage root: {:?}", read_root(&deps.storage, 1).unwrap());
-        println!("local root: {:?}", root_element.0);
+        let on_chain_root = read_root(&deps.storage, 1).unwrap();
+        let local_root = root_element.0;
+        assert_eq!(on_chain_root, local_root);
 
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes,
@@ -508,7 +510,7 @@ mod tests {
         let response = try_withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
         assert_eq!(
             response.attributes,
-            vec![attr("method", "try_withdraw"), attr("result", "0")]
+            vec![attr("method", "try_withdraw")]
         );
     }
 }

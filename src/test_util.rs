@@ -74,16 +74,14 @@ pub fn setup_zk_circuit(
 
             let leaves = vec![leaf_bytes.clone()];
             let index = 0;
-            let MixerProof {
-                proof, root_raw, ..
-            } = setup_proof_x5_5::<Bn254, _>(
+            let proof = setup_proof_x5_5::<Bn254, _>(
                 curve,
                 secret_bytes,
                 nullifier_bytes,
                 leaves,
                 index,
-                recipient_bytes,
-                relayer_bytes,
+                recipient_bytes.clone(),
+                relayer_bytes.clone(),
                 fee_value,
                 refund_value,
                 pk_bytes,
@@ -91,11 +89,18 @@ pub fn setup_zk_circuit(
             )
             .unwrap();
 
+            println!("nullifier_hash: {:?}", proof.nullifier_hash_raw);
+            println!("root: {:?}", proof.root_raw);
+            println!("recipient_bytes: {:?}", recipient_bytes);
+            println!("relayer_bytes: {:?}", relayer_bytes);
+            println!("fee_bytes: {:?}", fee_value);
+            println!("refund_bytes: {:?}", refund_value);
+
             let leaf_element = Element::from_bytes(&leaf_bytes);
             let nullifier_hash_element = Element::from_bytes(&nullifier_hash_bytes);
-            let root_element = Element::from_bytes(&root_raw);
+            let root_element = Element::from_bytes(&proof.root_raw);
 
-            (proof, root_element, nullifier_hash_element, leaf_element)
+            (proof.proof, root_element, nullifier_hash_element, leaf_element)
         }
         Curve::Bls381 => {
             unimplemented!()
@@ -138,8 +143,8 @@ pub fn setup_wasm_utils_zk_circuit(
                 backend: Backend::Arkworks,
                 secrets: secret.to_vec(),
                 nullifier: nullifier.to_vec(),
-                recipient: recipient_bytes,
-                relayer: relayer_bytes,
+                recipient: recipient_bytes.clone(),
+                relayer: relayer_bytes.clone(),
                 pk: pk_bytes,
                 refund: refund_value,
                 fee: fee_value,
@@ -151,6 +156,13 @@ pub fn setup_wasm_utils_zk_circuit(
                 inner: ProofInput::Mixer(mixer_proof_input),
             };
             let proof = generate_proof_js(js_proof_inputs).unwrap();
+
+            println!("nullifier_hash: {:?}", proof.nullifier_hash);
+            println!("root: {:?}", proof.root);
+            println!("recipient_bytes: {:?}", recipient_bytes);
+            println!("relayer_bytes: {:?}", relayer_bytes);
+            println!("fee_bytes: {:?}", fee_value);
+            println!("refund_bytes: {:?}", refund_value);
 
             let root_element = Element::from_bytes(&proof.root);
             let nullifier_hash_element = Element::from_bytes(&proof.nullifier_hash);
