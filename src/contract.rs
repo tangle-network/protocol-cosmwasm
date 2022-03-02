@@ -74,12 +74,12 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Deposit(msg) => try_deposit(deps, info, msg),
-        ExecuteMsg::Withdraw(msg) => try_withdraw(deps, info, msg),
+        ExecuteMsg::Deposit(msg) => deposit(deps, info, msg),
+        ExecuteMsg::Withdraw(msg) => withdraw(deps, info, msg),
     }
 }
 
-pub fn try_deposit(
+pub fn deposit(
     deps: DepsMut,
     info: MessageInfo,
     msg: DepositMsg,
@@ -115,7 +115,7 @@ pub fn try_deposit(
             },
         )?;
         Ok(Response::new().add_attributes(vec![
-            attr("method", "try_deposit"),
+            attr("method", "deposit"),
             attr("result", res.to_string()),
         ]))
     } else {
@@ -124,7 +124,7 @@ pub fn try_deposit(
         }));
     }
 }
-pub fn try_withdraw(
+pub fn withdraw(
     deps: DepsMut,
     info: MessageInfo,
     msg: WithdrawMsg,
@@ -244,7 +244,7 @@ pub fn try_withdraw(
     }
 
     Ok(Response::new()
-        .add_attributes(vec![attr("method", "try_withdraw")])
+        .add_attributes(vec![attr("method", "withdraw")])
         .add_messages(msgs))
 }
 
@@ -326,7 +326,7 @@ mod tests {
     }
 
     #[test]
-    fn test_try_deposit() {
+    fn test_deposit() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
         // Initialize the contract
@@ -358,7 +358,7 @@ mod tests {
             value: Uint256::from(0_u128),
         };
 
-        let err = try_deposit(deps.as_mut(), info, deposit_msg).unwrap_err();
+        let err = deposit(deps.as_mut(), info, deposit_msg).unwrap_err();
         assert_eq!(err.to_string(), "Insufficient_funds".to_string());
 
         // Try the deposit with empty commitment
@@ -369,7 +369,7 @@ mod tests {
             value: Uint256::from(0_u128),
         };
 
-        let err = try_deposit(deps.as_mut(), info, deposit_msg).unwrap_err();
+        let err = deposit(deps.as_mut(), info, deposit_msg).unwrap_err();
         assert_eq!(err.to_string(), "Commitment not found".to_string());
 
         // Try the deposit for success
@@ -380,15 +380,15 @@ mod tests {
             value: Uint256::from(0_u128),
         };
 
-        let response = try_deposit(deps.as_mut(), info, deposit_msg).unwrap();
+        let response = deposit(deps.as_mut(), info, deposit_msg).unwrap();
         assert_eq!(
             response.attributes,
-            vec![attr("method", "try_deposit"), attr("result", "0")]
+            vec![attr("method", "deposit"), attr("result", "0")]
         );
     }
 
     #[test]
-    fn test_try_withdraw_wasm_utils() {
+    fn test_withdraw_wasm_utils() {
         let curve = Curve::Bn254;
         let (pk_bytes, _) = crate::test_util::setup_environment(curve);
         let recipient_bytes = [1u8; 32];
@@ -425,10 +425,10 @@ mod tests {
             value: Uint256::from(0_u128),
         };
 
-        let response = try_deposit(deps.as_mut(), info, deposit_msg.clone()).unwrap();
+        let response = deposit(deps.as_mut(), info, deposit_msg.clone()).unwrap();
         assert_eq!(
             response.attributes,
-            vec![attr("method", "try_deposit"), attr("result", "0")]
+            vec![attr("method", "deposit"), attr("result", "0")]
         );
         let on_chain_root = read_root(&deps.storage, 1).unwrap();
         let local_root = root_element.0;
@@ -444,12 +444,12 @@ mod tests {
             refund: cosmwasm_std::Uint256::from(refund_value),
         };
         let info = mock_info("withdraw", &[]);
-        let response = try_withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
-        assert_eq!(response.attributes, vec![attr("method", "try_withdraw")]);
+        let response = withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
+        assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
     }
 
     #[test]
-    fn test_try_withdraw_native() {
+    fn test_withdraw_native() {
         let curve = Curve::Bn254;
         let (pk_bytes, _) = crate::test_util::setup_environment(curve);
         let recipient_bytes = [1u8; 32];
@@ -487,10 +487,10 @@ mod tests {
             value: Uint256::from(0_u128),
         };
 
-        let response = try_deposit(deps.as_mut(), info, deposit_msg.clone()).unwrap();
+        let response = deposit(deps.as_mut(), info, deposit_msg.clone()).unwrap();
         assert_eq!(
             response.attributes,
-            vec![attr("method", "try_deposit"), attr("result", "0")]
+            vec![attr("method", "deposit"), attr("result", "0")]
         );
         let on_chain_root = read_root(&deps.storage, 1).unwrap();
         let local_root = root_element.0;
@@ -506,7 +506,7 @@ mod tests {
             refund: cosmwasm_std::Uint256::from(refund_value),
         };
         let info = mock_info("withdraw", &[]);
-        let response = try_withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
-        assert_eq!(response.attributes, vec![attr("method", "try_withdraw")]);
+        let response = withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
+        assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
     }
 }
