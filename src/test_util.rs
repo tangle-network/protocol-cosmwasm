@@ -89,13 +89,6 @@ pub fn setup_zk_circuit(
             )
             .unwrap();
 
-            println!("nullifier_hash: {:?}", proof.nullifier_hash_raw);
-            println!("root: {:?}", proof.root_raw);
-            println!("recipient_bytes: {:?}", recipient_bytes);
-            println!("relayer_bytes: {:?}", relayer_bytes);
-            println!("fee_bytes: {:?}", fee_value);
-            println!("refund_bytes: {:?}", refund_value);
-
             let leaf_element = Element::from_bytes(&leaf_bytes);
             let nullifier_hash_element = Element::from_bytes(&nullifier_hash_bytes);
             let root_element = Element::from_bytes(&proof.root_raw);
@@ -161,14 +154,6 @@ pub fn setup_wasm_utils_zk_circuit(
                 inner: ProofInput::Mixer(mixer_proof_input),
             };
             let proof = generate_proof_js(js_proof_inputs).unwrap();
-
-            println!("nullifier_hash: {:?}", proof.nullifier_hash);
-            println!("root: {:?}", proof.root);
-            println!("recipient_bytes: {:?}", recipient_bytes);
-            println!("relayer_bytes: {:?}", relayer_bytes);
-            println!("fee_bytes: {:?}", fee_value);
-            println!("refund_bytes: {:?}", refund_value);
-
             let root_element = Element::from_bytes(&proof.root);
             let nullifier_hash_element = Element::from_bytes(&proof.nullifier_hash);
             let leaf_element = Element::from_bytes(&proof.leaf);

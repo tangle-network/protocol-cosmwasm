@@ -92,4 +92,10 @@ pub mod poseidon {
                 .map_err(|_| Error::HashError)
         }
     }
+
+    impl Default for Poseidon {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
 }

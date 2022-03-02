@@ -45,7 +45,7 @@ pub fn instantiate(
     let mixer: Mixer = Mixer {
         initialized: true,
         deposit_size: Uint256::from(msg.deposit_size.u128()),
-        merkle_tree: merkle_tree,
+        merkle_tree,
     };
     MIXER.save(deps.storage, &mixer)?;
 
@@ -92,7 +92,7 @@ pub fn deposit(
         .into_iter()
         .filter(|x| x.denom == "uusd")
         .collect();
-    if sent_uusd.len() == 0 || Uint256::from(sent_uusd[0].amount) < mixer.deposit_size {
+    if sent_uusd.is_empty() || Uint256::from(sent_uusd[0].amount) < mixer.deposit_size {
         return Err(ContractError::InsufficientFunds {});
     }
 
@@ -111,7 +111,7 @@ pub fn deposit(
             &Mixer {
                 initialized: mixer.initialized,
                 deposit_size: mixer.deposit_size,
-                merkle_tree: merkle_tree,
+                merkle_tree,
             },
         )?;
         Ok(Response::new().add_attributes(vec![
@@ -119,9 +119,9 @@ pub fn deposit(
             attr("result", res.to_string()),
         ]))
     } else {
-        return Err(ContractError::Std(StdError::NotFound {
+        Err(ContractError::Std(StdError::NotFound {
             kind: "Commitment".to_string(),
-        }));
+        }))
     }
 }
 pub fn withdraw(
@@ -155,6 +155,7 @@ pub fn withdraw(
         output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
         output
     };
+
     // Format the public input bytes
     let recipient_bytes =
         truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);
@@ -162,12 +163,7 @@ pub fn withdraw(
         truncate_and_pad(&hex::decode(&msg.relayer).map_err(|_| ContractError::DecodeError)?);
     let fee_bytes = element_encoder(&msg.fee.to_be_bytes());
     let refund_bytes = element_encoder(&msg.refund.to_be_bytes());
-    println!("nullifier_hash: {:?}", msg.nullifier_hash);
-    println!("root: {:?}", msg.root);
-    println!("recipient_bytes: {:?}", recipient_bytes);
-    println!("relayer_bytes: {:?}", relayer_bytes);
-    println!("fee_bytes: {:?}", fee_bytes);
-    println!("refund_bytes: {:?}", refund_bytes);
+
     // Join the public input bytes
     let mut bytes = Vec::new();
     bytes.extend_from_slice(&msg.nullifier_hash);
@@ -269,7 +265,7 @@ fn truncate_and_pad(t: &[u8]) -> Vec<u8> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         // TODO
     }
@@ -448,17 +444,17 @@ mod tests {
         };
         let info = mock_info("withdraw", &[]);
         let err = withdraw(deps.as_mut(), info, withdraw_msg).unwrap_err();
-        assert_eq!(err.to_string(), "VerifyError".to_string());
+        assert_eq!(err.to_string(), "Generic error: Invalid withdraw proof".to_string());
 
-        let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
-        crate::test_util::setup_wasm_utils_zk_circuit(
-            curve,
-            truncate_and_pad(&recipient_bytes),
-            truncate_and_pad(&relayer_bytes),
-            pk_bytes,
-            fee_value,
-            refund_value,
-        );
+        let (proof_bytes, root_element, nullifier_hash_element, _leaf_element) =
+            crate::test_util::setup_wasm_utils_zk_circuit(
+                curve,
+                truncate_and_pad(&recipient_bytes),
+                truncate_and_pad(&relayer_bytes),
+                pk_bytes,
+                fee_value,
+                refund_value,
+            );
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes,
             root: root_element.0,
@@ -534,18 +530,20 @@ mod tests {
         };
         let info = mock_info("withdraw", &[]);
         let err = withdraw(deps.as_mut(), info, withdraw_msg).unwrap_err();
-        assert_eq!(err.to_string(), "Generic error: Root is not known".to_string());
-
-        
-        let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
-        crate::test_util::setup_zk_circuit(
-            curve,
-            truncate_and_pad(&recipient_bytes),
-            truncate_and_pad(&relayer_bytes),
-            pk_bytes,
-            fee_value,
-            refund_value,
+        assert_eq!(
+            err.to_string(),
+            "Generic error: Root is not known".to_string()
         );
+
+        let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
+            crate::test_util::setup_zk_circuit(
+                curve,
+                truncate_and_pad(&recipient_bytes),
+                truncate_and_pad(&relayer_bytes),
+                pk_bytes,
+                fee_value,
+                refund_value,
+            );
 
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes,

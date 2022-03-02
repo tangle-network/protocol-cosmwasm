@@ -73,4 +73,10 @@ pub mod mixer_verifier {
                 .map_err(|_| Error::VerifierError)
         }
     }
+
+    impl Default for MixerVerifier {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
 }
