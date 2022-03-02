@@ -396,12 +396,12 @@ mod tests {
         let fee_value = 0;
         let refund_value = 0;
         // Setup zk circuit for withdraw
-        let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
+        let (mut proof_bytes, root_element, nullifier_hash_element, leaf_element) =
             crate::test_util::setup_wasm_utils_zk_circuit(
                 curve,
                 truncate_and_pad(&recipient_bytes),
                 truncate_and_pad(&relayer_bytes),
-                pk_bytes,
+                pk_bytes.clone(),
                 fee_value,
                 refund_value,
             );
@@ -434,6 +434,31 @@ mod tests {
         let local_root = root_element.0;
         assert_eq!(on_chain_root, local_root);
 
+        // Invalid withdraw proof leads to failure result.
+        proof_bytes[0] = 0;
+
+        let withdraw_msg = WithdrawMsg {
+            proof_bytes: proof_bytes,
+            root: root_element.0,
+            nullifier_hash: nullifier_hash_element.0,
+            recipient: hex::encode(recipient_bytes.to_vec()),
+            relayer: hex::encode(relayer_bytes.to_vec()),
+            fee: cosmwasm_std::Uint256::from(fee_value),
+            refund: cosmwasm_std::Uint256::from(refund_value),
+        };
+        let info = mock_info("withdraw", &[]);
+        let err = withdraw(deps.as_mut(), info, withdraw_msg).unwrap_err();
+        assert_eq!(err.to_string(), "VerifyError".to_string());
+
+        let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
+        crate::test_util::setup_wasm_utils_zk_circuit(
+            curve,
+            truncate_and_pad(&recipient_bytes),
+            truncate_and_pad(&relayer_bytes),
+            pk_bytes,
+            fee_value,
+            refund_value,
+        );
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes,
             root: root_element.0,
@@ -457,16 +482,16 @@ mod tests {
         let fee_value = 0;
         let refund_value = 0;
         // Setup zk circuit for withdraw
-        let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
+        let (proof_bytes, mut root_element, nullifier_hash_element, leaf_element) =
             crate::test_util::setup_zk_circuit(
                 curve,
                 truncate_and_pad(&recipient_bytes),
                 truncate_and_pad(&relayer_bytes),
-                pk_bytes,
+                pk_bytes.clone(),
                 fee_value,
                 refund_value,
             );
-        println!("root_element: {:?}", root_element);
+
         let mut deps = mock_dependencies(&coins(2, "token"));
 
         // Initialize the contract
@@ -495,6 +520,32 @@ mod tests {
         let on_chain_root = read_root(&deps.storage, 1).unwrap();
         let local_root = root_element.0;
         assert_eq!(on_chain_root, local_root);
+
+        // Invalid root_element leads to failure.
+        root_element.0[0] = 0;
+        let withdraw_msg = WithdrawMsg {
+            proof_bytes: proof_bytes,
+            root: root_element.0,
+            nullifier_hash: nullifier_hash_element.0,
+            recipient: hex::encode(recipient_bytes.to_vec()),
+            relayer: hex::encode(relayer_bytes.to_vec()),
+            fee: cosmwasm_std::Uint256::from(fee_value),
+            refund: cosmwasm_std::Uint256::from(refund_value),
+        };
+        let info = mock_info("withdraw", &[]);
+        let err = withdraw(deps.as_mut(), info, withdraw_msg).unwrap_err();
+        assert_eq!(err.to_string(), "Generic error: Root is not known".to_string());
+
+        
+        let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
+        crate::test_util::setup_zk_circuit(
+            curve,
+            truncate_and_pad(&recipient_bytes),
+            truncate_and_pad(&relayer_bytes),
+            pk_bytes,
+            fee_value,
+            refund_value,
+        );
 
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes,
