@@ -36,7 +36,6 @@ jobs:
         with:
           command: wasm
           args: --locked
-          submodules: true
         env:
           RUSTFLAGS: "-C link-arg=-s"
 
