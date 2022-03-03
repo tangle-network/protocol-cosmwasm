@@ -506,7 +506,6 @@ dependencies = [
  "protocol-cosmwasm",
  "schemars",
  "serde",
- "thiserror",
  "wasm-utils",
 ]
 
@@ -1038,6 +1037,7 @@ dependencies = [
  "cw20",
  "schemars",
  "serde",
+ "thiserror",
 ]
 
 [[package]]

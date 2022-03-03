@@ -10,13 +10,12 @@ use std::convert::TryFrom;
 use protocol_cosmwasm::mixer::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg};
 use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::mixer_verifier::MixerVerifier;
-
-use crate::error::ContractError;
+use protocol_cosmwasm::zeroes::zeroes;
+use protocol_cosmwasm::error::ContractError;
 
 use crate::state::{
     save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, NULLIFIERS, POSEIDON,
 };
-use crate::zeroes::zeroes;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-mixer";

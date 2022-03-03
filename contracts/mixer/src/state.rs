@@ -6,8 +6,8 @@ use cw_storage_plus::{Item, Map};
 
 use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::mixer_verifier::MixerVerifier;
-
-use crate::{zeroes, ContractError};
+use protocol_cosmwasm::zeroes;
+use protocol_cosmwasm::error::ContractError;
 
 pub const ROOT_HISTORY_SIZE: u32 = 100;
 
