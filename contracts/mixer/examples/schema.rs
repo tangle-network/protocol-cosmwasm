@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use cosmwasm_mixer::msg::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg};
+use protocol_cosmwasm::mixer::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg};
 use cosmwasm_mixer::state::{MerkleTree, Mixer};
 
 fn main() {
