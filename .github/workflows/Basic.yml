@@ -28,7 +28,6 @@ jobs:
         with:
           command: unit-test
           args: --locked
-          submodules: true
         env:
           RUST_BACKTRACE: 1
 
@@ -63,14 +62,12 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
-          submodules: true
 
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
           args: -- -D warnings
-          submodules: true
 
       # TODO: we should check
       # CHANGES_IN_REPO=$(git status --porcelain)

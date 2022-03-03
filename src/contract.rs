@@ -12,8 +12,7 @@ use crate::mixer_verifier::MixerVerifier;
 use crate::msg::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg};
 use crate::poseidon::Poseidon;
 use crate::state::{
-    read_root, save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, NULLIFIERS,
-    POSEIDON,
+    save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, NULLIFIERS, POSEIDON,
 };
 use crate::zeroes::zeroes;
 
@@ -426,7 +425,7 @@ mod tests {
             response.attributes,
             vec![attr("method", "deposit"), attr("result", "0")]
         );
-        let on_chain_root = read_root(&deps.storage, 1).unwrap();
+        let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
         let local_root = root_element.0;
         assert_eq!(on_chain_root, local_root);
 
@@ -513,7 +512,7 @@ mod tests {
             response.attributes,
             vec![attr("method", "deposit"), attr("result", "0")]
         );
-        let on_chain_root = read_root(&deps.storage, 1).unwrap();
+        let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
         let local_root = root_element.0;
         assert_eq!(on_chain_root, local_root);
 

@@ -36,10 +36,11 @@ mod verifier {
     pub type ArkworksVerifierBn254 = ArkworksVerifierGroth16<Bn254>;
 }
 
+#[allow(clippy::all)]
 pub mod mixer_verifier {
     use serde::{Deserialize, Serialize};
 
-    use crate::mixer_verifier::verifier::ArkworksVerifierBn254;
+    use super::verifier::ArkworksVerifierBn254;
 
     #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
     pub struct MixerVerifier {
