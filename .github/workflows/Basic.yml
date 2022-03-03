@@ -12,12 +12,14 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
+        with: 
+          submodules: true
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.51.0
+          toolchain: 1.59.0
           target: wasm32-unknown-unknown
           override: true
 
@@ -26,6 +28,7 @@ jobs:
         with:
           command: unit-test
           args: --locked
+          submodules: true
         env:
           RUST_BACKTRACE: 1
 
@@ -34,6 +37,7 @@ jobs:
         with:
           command: wasm
           args: --locked
+          submodules: true
         env:
           RUSTFLAGS: "-C link-arg=-s"
 
@@ -43,12 +47,14 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
+        with:
+          submodules: true
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.51.0
+          toolchain: 1.59.0
           override: true
           components: rustfmt, clippy
 
@@ -57,12 +63,14 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
+          submodules: true
 
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
           args: -- -D warnings
+          submodules: true
 
       # TODO: we should check
       # CHANGES_IN_REPO=$(git status --porcelain)
