@@ -430,7 +430,7 @@ mod tests {
         assert_eq!(on_chain_root, local_root);
 
         // Invalid withdraw proof leads to failure result.
-        proof_bytes[0] = 0;
+        proof_bytes[0] = 1;
 
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes,
@@ -534,7 +534,7 @@ mod tests {
             "Generic error: Root is not known".to_string()
         );
 
-        let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
+        let (proof_bytes, root_element, nullifier_hash_element, _) =
             crate::test_util::setup_zk_circuit(
                 curve,
                 truncate_and_pad(&recipient_bytes),

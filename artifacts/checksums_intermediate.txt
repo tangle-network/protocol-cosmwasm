@@ -1,1 +1,0 @@
-c99b5529b4e2fcdfc0cf4143f3aa68e1a82415d207f6453a0c3f98f10ccec690  ./target/wasm32-unknown-unknown/release/cosmwasm_mixer.wasm

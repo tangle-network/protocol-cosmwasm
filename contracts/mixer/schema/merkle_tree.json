@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MerkleTree",
+  "type": "object",
+  "required": [
+    "current_root_index",
+    "levels",
+    "next_index"
+  ],
+  "properties": {
+    "current_root_index": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "levels": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "next_index": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    }
+  }
+}
