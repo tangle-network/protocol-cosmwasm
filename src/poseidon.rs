@@ -21,10 +21,11 @@ mod hasher {
     pub type ArkworksPoseidonHasherBn254 = ArkworksPoseidonHasher<Bn254>;
 }
 
+#[allow(clippy::all)]
 pub mod poseidon {
     use serde::{Deserialize, Serialize};
 
-    use crate::poseidon::hasher::ArkworksPoseidonHasherBn254;
+    use super::hasher::ArkworksPoseidonHasherBn254;
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Poseidon {
@@ -90,6 +91,12 @@ pub mod poseidon {
                     hash_result
                 })
                 .map_err(|_| Error::HashError)
+        }
+    }
+
+    impl Default for Poseidon {
+        fn default() -> Self {
+            Self::new()
         }
     }
 }

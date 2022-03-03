@@ -36,10 +36,11 @@ mod verifier {
     pub type ArkworksVerifierBn254 = ArkworksVerifierGroth16<Bn254>;
 }
 
+#[allow(clippy::all)]
 pub mod mixer_verifier {
     use serde::{Deserialize, Serialize};
 
-    use crate::mixer_verifier::verifier::ArkworksVerifierBn254;
+    use super::verifier::ArkworksVerifierBn254;
 
     #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
     pub struct MixerVerifier {
@@ -71,6 +72,12 @@ pub mod mixer_verifier {
         pub fn verify(&self, public_inp_bytes: Vec<u8>, proof_bytes: Vec<u8>) -> Result<bool> {
             ArkworksVerifierBn254::verify(&public_inp_bytes, &proof_bytes, &self.vk_bytes)
                 .map_err(|_| Error::VerifierError)
+        }
+    }
+
+    impl Default for MixerVerifier {
+        fn default() -> Self {
+            Self::new()
         }
     }
 }

@@ -12,8 +12,7 @@ use crate::mixer_verifier::MixerVerifier;
 use crate::msg::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg};
 use crate::poseidon::Poseidon;
 use crate::state::{
-    read_root, save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, NULLIFIERS,
-    POSEIDON,
+    save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, NULLIFIERS, POSEIDON,
 };
 use crate::zeroes::zeroes;
 
@@ -45,7 +44,7 @@ pub fn instantiate(
     let mixer: Mixer = Mixer {
         initialized: true,
         deposit_size: Uint256::from(msg.deposit_size.u128()),
-        merkle_tree: merkle_tree,
+        merkle_tree,
     };
     MIXER.save(deps.storage, &mixer)?;
 
@@ -74,12 +73,12 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Deposit(msg) => try_deposit(deps, info, msg),
-        ExecuteMsg::Withdraw(msg) => try_withdraw(deps, info, msg),
+        ExecuteMsg::Deposit(msg) => deposit(deps, info, msg),
+        ExecuteMsg::Withdraw(msg) => withdraw(deps, info, msg),
     }
 }
 
-pub fn try_deposit(
+pub fn deposit(
     deps: DepsMut,
     info: MessageInfo,
     msg: DepositMsg,
@@ -92,7 +91,7 @@ pub fn try_deposit(
         .into_iter()
         .filter(|x| x.denom == "uusd")
         .collect();
-    if sent_uusd.len() == 0 || Uint256::from(sent_uusd[0].amount) < mixer.deposit_size {
+    if sent_uusd.is_empty() || Uint256::from(sent_uusd[0].amount) < mixer.deposit_size {
         return Err(ContractError::InsufficientFunds {});
     }
 
@@ -111,20 +110,20 @@ pub fn try_deposit(
             &Mixer {
                 initialized: mixer.initialized,
                 deposit_size: mixer.deposit_size,
-                merkle_tree: merkle_tree,
+                merkle_tree,
             },
         )?;
         Ok(Response::new().add_attributes(vec![
-            attr("method", "try_deposit"),
+            attr("method", "deposit"),
             attr("result", res.to_string()),
         ]))
     } else {
-        return Err(ContractError::Std(StdError::NotFound {
+        Err(ContractError::Std(StdError::NotFound {
             kind: "Commitment".to_string(),
-        }));
+        }))
     }
 }
-pub fn try_withdraw(
+pub fn withdraw(
     deps: DepsMut,
     info: MessageInfo,
     msg: WithdrawMsg,
@@ -155,6 +154,7 @@ pub fn try_withdraw(
         output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
         output
     };
+
     // Format the public input bytes
     let recipient_bytes =
         truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);
@@ -162,12 +162,7 @@ pub fn try_withdraw(
         truncate_and_pad(&hex::decode(&msg.relayer).map_err(|_| ContractError::DecodeError)?);
     let fee_bytes = element_encoder(&msg.fee.to_be_bytes());
     let refund_bytes = element_encoder(&msg.refund.to_be_bytes());
-    println!("nullifier_hash: {:?}", msg.nullifier_hash);
-    println!("root: {:?}", msg.root);
-    println!("recipient_bytes: {:?}", recipient_bytes);
-    println!("relayer_bytes: {:?}", relayer_bytes);
-    println!("fee_bytes: {:?}", fee_bytes);
-    println!("refund_bytes: {:?}", refund_bytes);
+
     // Join the public input bytes
     let mut bytes = Vec::new();
     bytes.extend_from_slice(&msg.nullifier_hash);
@@ -244,7 +239,7 @@ pub fn try_withdraw(
     }
 
     Ok(Response::new()
-        .add_attributes(vec![attr("method", "try_withdraw")])
+        .add_attributes(vec![attr("method", "withdraw")])
         .add_messages(msgs))
 }
 
@@ -269,7 +264,7 @@ fn truncate_and_pad(t: &[u8]) -> Vec<u8> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         // TODO
     }
@@ -326,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    fn test_try_deposit() {
+    fn test_deposit() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
         // Initialize the contract
@@ -358,7 +353,7 @@ mod tests {
             value: Uint256::from(0_u128),
         };
 
-        let err = try_deposit(deps.as_mut(), info, deposit_msg).unwrap_err();
+        let err = deposit(deps.as_mut(), info, deposit_msg).unwrap_err();
         assert_eq!(err.to_string(), "Insufficient_funds".to_string());
 
         // Try the deposit with empty commitment
@@ -369,7 +364,7 @@ mod tests {
             value: Uint256::from(0_u128),
         };
 
-        let err = try_deposit(deps.as_mut(), info, deposit_msg).unwrap_err();
+        let err = deposit(deps.as_mut(), info, deposit_msg).unwrap_err();
         assert_eq!(err.to_string(), "Commitment not found".to_string());
 
         // Try the deposit for success
@@ -380,15 +375,15 @@ mod tests {
             value: Uint256::from(0_u128),
         };
 
-        let response = try_deposit(deps.as_mut(), info, deposit_msg).unwrap();
+        let response = deposit(deps.as_mut(), info, deposit_msg).unwrap();
         assert_eq!(
             response.attributes,
-            vec![attr("method", "try_deposit"), attr("result", "0")]
+            vec![attr("method", "deposit"), attr("result", "0")]
         );
     }
 
     #[test]
-    fn test_try_withdraw_wasm_utils() {
+    fn test_withdraw_wasm_utils() {
         let curve = Curve::Bn254;
         let (pk_bytes, _) = crate::test_util::setup_environment(curve);
         let recipient_bytes = [1u8; 32];
@@ -396,12 +391,12 @@ mod tests {
         let fee_value = 0;
         let refund_value = 0;
         // Setup zk circuit for withdraw
-        let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
+        let (mut proof_bytes, root_element, nullifier_hash_element, leaf_element) =
             crate::test_util::setup_wasm_utils_zk_circuit(
                 curve,
                 truncate_and_pad(&recipient_bytes),
                 truncate_and_pad(&relayer_bytes),
-                pk_bytes,
+                pk_bytes.clone(),
                 fee_value,
                 refund_value,
             );
@@ -425,14 +420,17 @@ mod tests {
             value: Uint256::from(0_u128),
         };
 
-        let response = try_deposit(deps.as_mut(), info, deposit_msg.clone()).unwrap();
+        let response = deposit(deps.as_mut(), info, deposit_msg.clone()).unwrap();
         assert_eq!(
             response.attributes,
-            vec![attr("method", "try_deposit"), attr("result", "0")]
+            vec![attr("method", "deposit"), attr("result", "0")]
         );
-        let on_chain_root = read_root(&deps.storage, 1).unwrap();
+        let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
         let local_root = root_element.0;
         assert_eq!(on_chain_root, local_root);
+
+        // Invalid withdraw proof leads to failure result.
+        proof_bytes[0] = 0;
 
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes,
@@ -444,12 +442,34 @@ mod tests {
             refund: cosmwasm_std::Uint256::from(refund_value),
         };
         let info = mock_info("withdraw", &[]);
-        let response = try_withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
-        assert_eq!(response.attributes, vec![attr("method", "try_withdraw")]);
+        let err = withdraw(deps.as_mut(), info, withdraw_msg).unwrap_err();
+        assert_eq!(err.to_string(), "VerifyError".to_string());
+
+        let (proof_bytes, root_element, nullifier_hash_element, _leaf_element) =
+            crate::test_util::setup_wasm_utils_zk_circuit(
+                curve,
+                truncate_and_pad(&recipient_bytes),
+                truncate_and_pad(&relayer_bytes),
+                pk_bytes,
+                fee_value,
+                refund_value,
+            );
+        let withdraw_msg = WithdrawMsg {
+            proof_bytes: proof_bytes,
+            root: root_element.0,
+            nullifier_hash: nullifier_hash_element.0,
+            recipient: hex::encode(recipient_bytes.to_vec()),
+            relayer: hex::encode(relayer_bytes.to_vec()),
+            fee: cosmwasm_std::Uint256::from(fee_value),
+            refund: cosmwasm_std::Uint256::from(refund_value),
+        };
+        let info = mock_info("withdraw", &[]);
+        let response = withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
+        assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
     }
 
     #[test]
-    fn test_try_withdraw_native() {
+    fn test_withdraw_native() {
         let curve = Curve::Bn254;
         let (pk_bytes, _) = crate::test_util::setup_environment(curve);
         let recipient_bytes = [1u8; 32];
@@ -457,6 +477,63 @@ mod tests {
         let fee_value = 0;
         let refund_value = 0;
         // Setup zk circuit for withdraw
+        let (proof_bytes, mut root_element, nullifier_hash_element, leaf_element) =
+            crate::test_util::setup_zk_circuit(
+                curve,
+                truncate_and_pad(&recipient_bytes),
+                truncate_and_pad(&relayer_bytes),
+                pk_bytes.clone(),
+                fee_value,
+                refund_value,
+            );
+
+        let mut deps = mock_dependencies(&coins(2, "token"));
+
+        // Initialize the contract
+        let env = mock_env();
+        let info = mock_info("anyone", &[]);
+        let instantiate_msg = InstantiateMsg {
+            merkletree_levels: 30,
+            deposit_size: Uint128::from(1_000_000_u128),
+        };
+
+        let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+
+        // Try the deposit for success
+        let info = mock_info("depositor", &[Coin::new(1_000_000_u128, "uusd")]);
+        let deposit_msg = DepositMsg {
+            from: None,
+            commitment: Some(leaf_element.0),
+            value: Uint256::from(0_u128),
+        };
+
+        let response = deposit(deps.as_mut(), info, deposit_msg.clone()).unwrap();
+        assert_eq!(
+            response.attributes,
+            vec![attr("method", "deposit"), attr("result", "0")]
+        );
+        let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
+        let local_root = root_element.0;
+        assert_eq!(on_chain_root, local_root);
+
+        // Invalid root_element leads to failure.
+        root_element.0[0] = 0;
+        let withdraw_msg = WithdrawMsg {
+            proof_bytes: proof_bytes,
+            root: root_element.0,
+            nullifier_hash: nullifier_hash_element.0,
+            recipient: hex::encode(recipient_bytes.to_vec()),
+            relayer: hex::encode(relayer_bytes.to_vec()),
+            fee: cosmwasm_std::Uint256::from(fee_value),
+            refund: cosmwasm_std::Uint256::from(refund_value),
+        };
+        let info = mock_info("withdraw", &[]);
+        let err = withdraw(deps.as_mut(), info, withdraw_msg).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Generic error: Root is not known".to_string()
+        );
+
         let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
             crate::test_util::setup_zk_circuit(
                 curve,
@@ -466,35 +543,6 @@ mod tests {
                 fee_value,
                 refund_value,
             );
-        println!("root_element: {:?}", root_element);
-        let mut deps = mock_dependencies(&coins(2, "token"));
-
-        // Initialize the contract
-        let env = mock_env();
-        let info = mock_info("anyone", &[]);
-        let instantiate_msg = InstantiateMsg {
-            merkletree_levels: 30,
-            deposit_size: Uint128::from(1_000_000_u128),
-        };
-
-        let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
-
-        // Try the deposit for success
-        let info = mock_info("depositor", &[Coin::new(1_000_000_u128, "uusd")]);
-        let deposit_msg = DepositMsg {
-            from: None,
-            commitment: Some(leaf_element.0),
-            value: Uint256::from(0_u128),
-        };
-
-        let response = try_deposit(deps.as_mut(), info, deposit_msg.clone()).unwrap();
-        assert_eq!(
-            response.attributes,
-            vec![attr("method", "try_deposit"), attr("result", "0")]
-        );
-        let on_chain_root = read_root(&deps.storage, 1).unwrap();
-        let local_root = root_element.0;
-        assert_eq!(on_chain_root, local_root);
 
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes,
@@ -506,7 +554,7 @@ mod tests {
             refund: cosmwasm_std::Uint256::from(refund_value),
         };
         let info = mock_info("withdraw", &[]);
-        let response = try_withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
-        assert_eq!(response.attributes, vec![attr("method", "try_withdraw")]);
+        let response = withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
+        assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
     }
 }

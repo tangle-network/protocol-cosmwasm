@@ -12,12 +12,14 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
+        with: 
+          submodules: true
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.51.0
+          toolchain: 1.59.0
           target: wasm32-unknown-unknown
           override: true
 
@@ -34,6 +36,7 @@ jobs:
         with:
           command: wasm
           args: --locked
+          submodules: true
         env:
           RUSTFLAGS: "-C link-arg=-s"
 
@@ -43,12 +46,14 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
+        with:
+          submodules: true
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.51.0
+          toolchain: 1.59.0
           override: true
           components: rustfmt, clippy
 

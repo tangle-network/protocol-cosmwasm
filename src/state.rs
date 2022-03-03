@@ -72,7 +72,7 @@ impl MerkleTree {
         right: [u8; 32],
     ) -> Result<[u8; 32], ContractError> {
         let inputs = vec![left, right];
-        hasher.hash(inputs).map_err(|e| ContractError::HashError)
+        hasher.hash(inputs).map_err(|_e| ContractError::HashError)
     }
 
     pub fn insert(
@@ -83,7 +83,7 @@ impl MerkleTree {
     ) -> Result<u32, ContractError> {
         let next_index = self.next_index;
         assert!(
-            next_index != u32::from(2u32.pow(self.levels as u32)),
+            next_index != 2u32.pow(self.levels as u32),
             "Merkle tree is full"
         );
 
@@ -103,7 +103,7 @@ impl MerkleTree {
             }
 
             current_level_hash = self.hash_left_right(hasher.clone(), left, right)?;
-            current_index = current_index / 2;
+            current_index /= 2;
         }
 
         let new_root_index = (self.current_root_index + 1) % ROOT_HISTORY_SIZE;
