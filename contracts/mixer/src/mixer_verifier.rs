@@ -59,8 +59,9 @@ pub mod mixer_verifier {
     impl MixerVerifier {
         /// Constructor that initializes the `bool` value to the given `init_value`.
         pub fn new() -> Self {
-            let vk_bytes =
-                include_bytes!("../protocol-substrate-fixtures/mixer/bn254/x5/verifying_key.bin");
+            let vk_bytes = include_bytes!(
+                "../../../protocol-substrate-fixtures/mixer/bn254/x5/verifying_key.bin"
+            );
             Self {
                 vk_bytes: vk_bytes.to_vec(),
             }
