@@ -31,14 +31,6 @@ jobs:
         env:
           RUST_BACKTRACE: 1
 
-      # - name: Compile WASM contract
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: wasm
-      #     args: --locked
-      #   env:
-      #     RUSTFLAGS: "-C link-arg=-s"
-
   lints:
     name: Lints
     runs-on: ubuntu-latest
@@ -68,11 +60,3 @@ jobs:
           command: clippy
           args: -- -D warnings
 
-      # TODO: we should check
-      # CHANGES_IN_REPO=$(git status --porcelain)
-      # after this, but I don't know how
-      # - name: Generate Schema
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: schema
-      #     args: --locked
