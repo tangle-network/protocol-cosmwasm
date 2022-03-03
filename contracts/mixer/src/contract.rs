@@ -8,10 +8,11 @@ use cw2::set_contract_version;
 use std::convert::TryFrom;
 
 use protocol_cosmwasm::mixer::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg};
+use protocol_cosmwasm::poseidon::Poseidon;
+use protocol_cosmwasm::mixer_verifier::MixerVerifier;
 
 use crate::error::ContractError;
-use crate::mixer_verifier::MixerVerifier;
-use crate::poseidon::Poseidon;
+
 use crate::state::{
     save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, NULLIFIERS, POSEIDON,
 };

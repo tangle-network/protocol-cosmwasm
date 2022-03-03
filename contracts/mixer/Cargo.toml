@@ -53,6 +53,7 @@ arkworks-utils = { version = "0.4.19", default-features = false, features = [
 ark-ec = { version = "^0.3.0", default-features = false }
 ark-groth16 = { version = "^0.3.0", default-features = false }
 ark-serialize = { version = "^0.3.0", default-features = false }
+
 protocol-cosmwasm = { version = "0.1.0", path = "../../packages/protocol_cosmwasm"}
 
 
