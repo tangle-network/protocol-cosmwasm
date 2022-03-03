@@ -444,7 +444,7 @@ mod tests {
         };
         let info = mock_info("withdraw", &[]);
         let err = withdraw(deps.as_mut(), info, withdraw_msg).unwrap_err();
-        assert_eq!(err.to_string(), "Generic error: Invalid withdraw proof".to_string());
+        assert_eq!(err.to_string(), "VerifyError".to_string());
 
         let (proof_bytes, root_element, nullifier_hash_element, _leaf_element) =
             crate::test_util::setup_wasm_utils_zk_circuit(
