@@ -1,3 +1,4 @@
+pub mod anchor_verifier;
 pub mod error;
 pub mod mixer;
 pub mod mixer_verifier;
