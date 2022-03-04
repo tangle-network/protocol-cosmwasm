@@ -170,10 +170,10 @@ impl LinkableMerkleTree {
 // TODO: Anchor should have an ERC20 attached
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Anchor {
-    chain_id: u64,
-    deposit_size: Uint256,
-    merkle_tree: MerkleTree,
-    linkable_tree: LinkableMerkleTree,
+    pub chain_id: u64,
+    pub deposit_size: Uint256,
+    pub merkle_tree: MerkleTree,
+    pub linkable_tree: LinkableMerkleTree,
     // used_nullifiers: Mapping<[u8; 32], bool>,
     // poseidon: PoseidonRef,
     // verifier: AnchorVerifierRef,
