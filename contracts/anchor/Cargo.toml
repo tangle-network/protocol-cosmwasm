@@ -61,3 +61,5 @@ protocol-cosmwasm = { version = "0.1.0", path = "../../packages/protocol_cosmwas
 [dev-dependencies]
 cosmwasm-schema = { version = "0.16.0" }
 getrandom = { version = "0.2", features = ["js"] }
+wasm-utils = { version = "0.1.2" }
+arkworks-circuits = { version = "0.4.19" }

@@ -459,6 +459,7 @@ dependencies = [
  "ark-groth16",
  "ark-serialize",
  "ark-std",
+ "arkworks-circuits",
  "arkworks-gadgets",
  "arkworks-utils",
  "cosmwasm-schema",
@@ -472,6 +473,7 @@ dependencies = [
  "schemars",
  "serde",
  "thiserror",
+ "wasm-utils",
 ]
 
 [[package]]

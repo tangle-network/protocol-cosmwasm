@@ -156,7 +156,7 @@ impl LinkableMerkleTree {
     }
 
     pub fn is_valid_neighbor_roots(&self, roots: &[[u8; 32]], store: &dyn Storage) -> bool {
-        assert!(roots.len() == self.max_edges as usize, "Incorrect roots length");
+        assert!(roots.len() == self.max_edges as usize - 1, "Incorrect roots length");
         for (i, edge) in self.chain_id_list.iter().map(|c_id| read_edge(store, *c_id).unwrap_or_default()).enumerate() {
             if !self.is_known_neighbor_root(edge.chain_id, roots[i], store) {
                 return false;

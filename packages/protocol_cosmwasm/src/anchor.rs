@@ -33,6 +33,7 @@ pub struct WithdrawMsg {
     pub relayer: String,
     pub fee: Uint256,
     pub refund: Uint256,
+    pub commitment: [u8; 32],
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
