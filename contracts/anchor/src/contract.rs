@@ -176,6 +176,8 @@ pub fn withdraw(
 
     // Join the public input bytes
     let mut bytes = Vec::new();
+    // let chain_id_type_bytes = element_encoder(&anchor.chain_id.to_be_bytes());
+    // bytes.extend_from_slice(&chain_id_type_bytes);
     bytes.extend_from_slice(&msg.nullifier_hash);
     bytes.extend_from_slice(&msg.roots[0]);
     bytes.extend_from_slice(&recipient_bytes);
