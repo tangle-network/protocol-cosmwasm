@@ -1,22 +1,28 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{attr, CosmosMsg, BankMsg, Uint128, Storage, StdError, Coin, Uint256, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    attr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, Storage, Uint128, Uint256,
+};
 use cw2::set_contract_version;
 
-use protocol_cosmwasm::zeroes::zeroes;
+use protocol_cosmwasm::anchor::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg};
 use protocol_cosmwasm::anchor_verifier::AnchorVerifier;
-use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::anchor::{ExecuteMsg, InstantiateMsg, QueryMsg, DepositMsg, WithdrawMsg};
+use protocol_cosmwasm::poseidon::Poseidon;
+use protocol_cosmwasm::zeroes::zeroes;
 
-use crate::state::{POSEIDON, ANCHORVERIFIER, NULLIFIERS, save_subtree, save_root, MerkleTree, LinkableMerkleTree, Anchor, ANCHOR};
+use crate::state::{
+    save_root, save_subtree, Anchor, LinkableMerkleTree, MerkleTree, ANCHOR, ANCHORVERIFIER,
+    NULLIFIERS, POSEIDON,
+};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-anchor";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // ChainType info
-const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0];  // 0x0400
+const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -29,7 +35,7 @@ pub fn instantiate(
     if !info.funds.is_empty() {
         return Err(ContractError::UnnecessaryFunds {});
     }
-    
+
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     // Initialize the poseidon hasher
@@ -55,8 +61,8 @@ pub fn instantiate(
     let anchor = Anchor {
         chain_id: msg.chain_id,
         deposit_size: Uint256::from(msg.deposit_size.u128()),
-        merkle_tree: merkle_tree,
         linkable_tree: linkable_merkle_tree,
+        merkle_tree,
     };
     ANCHOR.save(deps.storage, &anchor)?;
 
@@ -87,10 +93,10 @@ pub fn execute(
 pub fn deposit(
     deps: DepsMut,
     info: MessageInfo,
-    msg: DepositMsg
+    msg: DepositMsg,
 ) -> Result<Response, ContractError> {
     let anchor = ANCHOR.load(deps.storage)?;
-    
+
     // Validation 1. Check if the enough UST are sent.
     let sent_uusd: Vec<Coin> = info
         .funds
@@ -104,20 +110,18 @@ pub fn deposit(
     if let Some(commitment) = msg.commitment {
         let mut merkle_tree = anchor.merkle_tree;
         let poseidon = POSEIDON.load(deps.storage)?;
-        let res = merkle_tree.insert(
-            poseidon, 
-            commitment, 
-            deps.storage,
-        ).map_err(|_| ContractError::MerkleTreeIsFull)?;
+        let res = merkle_tree
+            .insert(poseidon, commitment, deps.storage)
+            .map_err(|_| ContractError::MerkleTreeIsFull)?;
 
         ANCHOR.save(
-            deps.storage, 
+            deps.storage,
             &Anchor {
                 chain_id: anchor.chain_id,
                 deposit_size: anchor.deposit_size,
                 linkable_tree: anchor.linkable_tree,
-                merkle_tree: merkle_tree,
-            }
+                merkle_tree,
+            },
         )?;
 
         Ok(Response::new().add_attributes(vec![
@@ -170,7 +174,8 @@ pub fn withdraw(
         output
     };
     // Format the public input bytes
-    let chain_id_type_bytes = element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
+    let chain_id_type_bytes =
+        element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
     let recipient_bytes =
         truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);
     let relayer_bytes =
@@ -263,14 +268,12 @@ pub fn withdraw(
         .add_messages(msgs))
 }
 
-
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         // TODO
     }
 }
-
 
 fn is_known_nullifier(store: &dyn Storage, nullifier: [u8; 32]) -> bool {
     NULLIFIERS.has(store, nullifier.to_vec())
@@ -295,6 +298,7 @@ fn truncate_and_pad(t: &[u8]) -> Vec<u8> {
 fn compute_chain_id_type(chain_id: u64, chain_type: &[u8]) -> u64 {
     let chain_id_value: u32 = chain_id.try_into().unwrap_or_default();
     let mut buf = [0u8; 8];
+    #[allow(clippy::needless_borrow)]
     buf[2..4].copy_from_slice(&chain_type);
     buf[4..8].copy_from_slice(&chain_id_value.to_be_bytes());
     u64::from_be_bytes(buf)
@@ -312,11 +316,10 @@ mod tests {
     use ark_std::One;
     use arkworks_gadgets::poseidon::CRH;
     use arkworks_utils::utils::bn254_x5_5::get_poseidon_bn254_x5_5;
-    use arkworks_utils::utils::common::{Curve};
+    use arkworks_utils::utils::common::Curve;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{attr, coins, Uint128};
     type PoseidonCRH5 = CRH<Fr>;
-
 
     #[test]
     fn proper_initialization() {
@@ -331,13 +334,13 @@ mod tests {
             deposit_size: Uint128::from(1_000_000_u128),
         };
 
-         // Should pass this "unwrap" if success.
-         let response = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+        // Should pass this "unwrap" if success.
+        let response = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
-         assert_eq!(
-             response.attributes,
-             vec![attr("method", "instantiate"), attr("owner", "anyone"),]
-         );
+        assert_eq!(
+            response.attributes,
+            vec![attr("method", "instantiate"), attr("owner", "anyone"),]
+        );
     }
 
     #[test]
@@ -435,7 +438,7 @@ mod tests {
         let env = mock_env();
         let info = mock_info("anyone", &[]);
         let instantiate_msg = InstantiateMsg {
-            max_edges: 2, 
+            max_edges: 2,
             chain_id: 1,
             levels: 30,
             deposit_size: Uint128::from(1_000_000_u128),
@@ -482,13 +485,13 @@ mod tests {
         let info = mock_info("withdraw", &[]);
         let err = withdraw(deps.as_mut(), info, withdraw_msg).unwrap_err();
         assert_eq!(err.to_string(), "VerifyError".to_string());
-        
+
         // Should succeed
         let mut roots = vec![];
         for i in 0..root_elements.len() {
             roots.push(root_elements[i].0);
         }
-        
+
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes,
             roots: roots,
@@ -603,5 +606,4 @@ mod tests {
         let response = withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
         assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
     }
-
 }
