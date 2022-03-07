@@ -16,7 +16,6 @@ pub enum ContractError {
     InsufficientFunds {},
     // Add any other custom errors you like here.
     // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.
-
     /// Returned if the mixer is not initialized
     #[error("NotInitialized")]
     NotInitialized,

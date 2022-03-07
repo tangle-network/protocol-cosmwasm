@@ -1,7 +1,7 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use cosmwasm_std::{StdResult, Storage, Uint256};
 use cw_storage_plus::{Item, Map};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use protocol_cosmwasm::anchor_verifier::AnchorVerifier;
 use protocol_cosmwasm::error::ContractError;
@@ -96,7 +96,7 @@ impl LinkableMerkleTree {
                 edge.latest_leaf_index < leaf_index,
                 "latest leaf index should be greater than the previous one"
             );
-            
+
             save_edge(store, edge.chain_id, edge)?;
 
             let curr_neighbor_root_index =

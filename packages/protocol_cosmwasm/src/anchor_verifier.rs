@@ -37,8 +37,8 @@ mod verifier {
 }
 #[allow(clippy::all)]
 pub mod anchor_verifier {
-    use super::verifier::{ArkworksVerifierBn254};
-    use serde::{Serialize, Deserialize};
+    use super::verifier::ArkworksVerifierBn254;
+    use serde::{Deserialize, Serialize};
 
     #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
     pub struct AnchorVerifier {
