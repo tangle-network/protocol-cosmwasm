@@ -15,6 +15,9 @@ use crate::state::{POSEIDON, ANCHORVERIFIER, NULLIFIERS, save_subtree, save_root
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-anchor";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+// ChainType info
+const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0];  // 0x0400
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -167,6 +170,7 @@ pub fn withdraw(
         output
     };
     // Format the public input bytes
+    let chain_id_type_bytes = element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_be_bytes());
     let recipient_bytes =
         truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);
     let relayer_bytes =
@@ -176,10 +180,11 @@ pub fn withdraw(
 
     // Join the public input bytes
     let mut bytes = Vec::new();
-    // let chain_id_type_bytes = element_encoder(&anchor.chain_id.to_be_bytes());
-    // bytes.extend_from_slice(&chain_id_type_bytes);
+    bytes.extend_from_slice(&chain_id_type_bytes);
     bytes.extend_from_slice(&msg.nullifier_hash);
-    bytes.extend_from_slice(&msg.roots[0]);
+    for root in msg.roots {
+        bytes.extend_from_slice(&root);
+    }
     bytes.extend_from_slice(&recipient_bytes);
     bytes.extend_from_slice(&relayer_bytes);
     bytes.extend_from_slice(&fee_bytes);
@@ -285,6 +290,14 @@ fn truncate_and_pad(t: &[u8]) -> Vec<u8> {
     let mut truncated_bytes = t[..20].to_vec();
     truncated_bytes.extend_from_slice(&[0u8; 12]);
     truncated_bytes
+}
+
+fn compute_chain_id_type(chain_id: u64, chain_type: &[u8]) -> u64 {
+    let chain_id_value: u32 = chain_id.try_into().unwrap_or_default();
+    let mut buf = [0u8; 8];
+    buf[2..4].copy_from_slice(&chain_type);
+    buf[4..8].copy_from_slice(&chain_id_value.to_be_bytes());
+    u64::from_be_bytes(buf)
 }
 
 #[cfg(test)]
@@ -395,7 +408,7 @@ mod tests {
     fn test_withdraw_wasm_utils() {
         let curve = Curve::Bn254;
         let (pk_bytes, _) = crate::test_util::setup_environment(curve);
-        let src_chain_id = 1;
+        let src_chain_id = compute_chain_id_type(1u64, &COSMOS_CHAIN_TYPE);
         let recipient_bytes = [2u8; 32];
         let relayer_bytes = [0u8; 32];
         let fee_value = 0;
@@ -411,7 +424,7 @@ mod tests {
                 truncate_and_pad(&relayer_bytes),
                 commitment_bytes,
                 pk_bytes.clone(),
-                src_chain_id,
+                src_chain_id as u128,
                 fee_value,
                 refund_value,
             );
@@ -499,7 +512,7 @@ mod tests {
         let relayer_bytes = [2u8; 32];
         let fee_value = 0;
         let refund_value = 0;
-        let src_chain_id = 1;
+        let src_chain_id = compute_chain_id_type(1, &COSMOS_CHAIN_TYPE);
         let commitment_bytes = vec![0u8; 32];
         let commit_element = Element::from_bytes(&commitment_bytes);
 
