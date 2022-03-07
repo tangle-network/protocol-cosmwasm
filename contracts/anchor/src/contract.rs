@@ -170,13 +170,13 @@ pub fn withdraw(
         output
     };
     // Format the public input bytes
-    let chain_id_type_bytes = element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_be_bytes());
+    let chain_id_type_bytes = element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
     let recipient_bytes =
         truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);
     let relayer_bytes =
         truncate_and_pad(&hex::decode(&msg.relayer).map_err(|_| ContractError::DecodeError)?);
-    let fee_bytes = element_encoder(&msg.fee.to_be_bytes());
-    let refund_bytes = element_encoder(&msg.refund.to_be_bytes());
+    let fee_bytes = element_encoder(&msg.fee.to_le_bytes());
+    let refund_bytes = element_encoder(&msg.refund.to_le_bytes());
 
     // Join the public input bytes
     let mut bytes = Vec::new();
