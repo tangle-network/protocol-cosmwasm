@@ -1,0 +1,36 @@
+[package]
+name = "protocol-cosmwasm"
+version = "0.1.0"
+authors = ["guorong <dudurong009@gmail.com>"]
+edition = "2021"
+description = "Common helpers for protocol-cosmwasm"
+
+[features]
+# for quicker tests, cargo test --lib
+# for more explicit tests, cargo test --features=backtraces
+backtraces = ["cosmwasm-std/backtraces"]
+
+[dependencies]
+cw20 = "0.8.0"
+cosmwasm-std = { version = "0.16.0", default-features = false, features = ["iterator"] }
+cosmwasm-storage = { version = "0.16.0", default-features = false, features = ["iterator"] }
+cosmwasm-bignumber = "2.2.0"
+schemars = "0.8.1"
+serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+thiserror = { version = "1.0.26" }
+
+ark-ff = { version = "^0.3.0", default-features = false }
+ark-std = { version = "^0.3.0", default-features = false }
+ark-bn254 = { version = "^0.3.0", default-features = false, features = [ "curve" ] }
+ark-crypto-primitives = { version = "^0.3.0", features = ["r1cs"], default-features = false }
+
+arkworks-gadgets = { version = "0.4.19", default-features = false }
+arkworks-utils = { version = "0.4.19", default-features = false, features = [
+    "poseidon_bn254_x5_3",
+    "poseidon_bn254_x5_4",
+    "poseidon_bn254_x5_5",
+]}
+
+ark-ec = { version = "^0.3.0", default-features = false }
+ark-groth16 = { version = "^0.3.0", default-features = false }
+ark-serialize = { version = "^0.3.0", default-features = false }

@@ -4,9 +4,10 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{StdResult, Storage, Uint256};
 use cw_storage_plus::{Item, Map};
 
-use crate::mixer_verifier::MixerVerifier;
-use crate::poseidon::Poseidon;
-use crate::{zeroes, ContractError};
+use protocol_cosmwasm::error::ContractError;
+use protocol_cosmwasm::mixer_verifier::MixerVerifier;
+use protocol_cosmwasm::poseidon::Poseidon;
+use protocol_cosmwasm::zeroes;
 
 pub const ROOT_HISTORY_SIZE: u32 = 100;
 
