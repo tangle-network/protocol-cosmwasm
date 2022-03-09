@@ -24,9 +24,6 @@ pub struct Edge {
 pub struct LinkableMerkleTree {
     pub max_edges: u32,
     pub chain_id_list: Vec<ChainId>,
-    // pub edges: Map<ChainId, Edge>,
-    // pub curr_neighbor_root_index: Mapping<ChainId, u32>,
-    // pub neighbor_roots: Mapping<(ChainId, u32), [u8; 32]>,
 }
 
 // LinkableMerkleTree "edges" map
@@ -199,9 +196,6 @@ pub struct Anchor {
     pub deposit_size: Uint256,
     pub merkle_tree: MerkleTree,
     pub linkable_tree: LinkableMerkleTree,
-    // used_nullifiers: Mapping<[u8; 32], bool>,
-    // poseidon: PoseidonRef,
-    // verifier: AnchorVerifierRef,
 }
 
 pub const ANCHOR: Item<Anchor> = Item::new("anchor");
@@ -221,19 +215,17 @@ pub struct MerkleTree {
     pub levels: u32,
     pub current_root_index: u32,
     pub next_index: u32,
-    // pub filled_subtrees: HashMap<u32, [u8; 32]>,
-    // pub roots: HashMap<u32, [u8; 32]>
 }
 
 // MerkleTree "filled_subtrees" Map
-pub const FILLEDSUBTREES: Map<String, [u8; 32]> = Map::new("filled_subtrees");
+pub const FILLED_SUBTREES: Map<String, [u8; 32]> = Map::new("filled_subtrees");
 
 pub fn save_subtree(store: &mut dyn Storage, k: u32, data: &[u8; 32]) -> StdResult<()> {
-    FILLEDSUBTREES.save(store, k.to_string(), data)
+    FILLED_SUBTREES.save(store, k.to_string(), data)
 }
 
 pub fn read_subtree(store: &dyn Storage, k: u32) -> StdResult<[u8; 32]> {
-    FILLEDSUBTREES.load(store, k.to_string())
+    FILLED_SUBTREES.load(store, k.to_string())
 }
 
 // MerkleTree Roots Map
