@@ -7,8 +7,6 @@ use arkworks_circuits::setup::{
     common::{AnchorProof, Leaf},
 };
 use arkworks_utils::utils::common::{setup_params_x5_3, setup_params_x5_4, Curve};
-
-// wasm-utils dependencies
 use wasm_utils::{
     proof::{generate_proof_js, AnchorProofInput, JsProofInput, ProofInput},
     types::{Backend, Curve as WasmCurve},
