@@ -12,6 +12,7 @@ const ROOT_HISTORY_SIZE: u32 = 100;
 
 pub type ChainId = u64;
 
+// Edge: Directed connection or link between two anchors.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default, Copy)]
 pub struct Edge {
     pub chain_id: ChainId,
@@ -19,14 +20,6 @@ pub struct Edge {
     pub latest_leaf_index: u32,
 }
 
-// LinkableMerkleTree
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct LinkableMerkleTree {
-    pub max_edges: u32,
-    pub chain_id_list: Vec<ChainId>,
-}
-
-// LinkableMerkleTree "edges" map
 pub const EDGES: Map<String, Edge> = Map::new("edges");
 
 pub fn read_edge(store: &dyn Storage, k: ChainId) -> StdResult<Edge> {
@@ -41,7 +34,6 @@ pub fn has_edge(store: &dyn Storage, k: ChainId) -> bool {
     EDGES.has(store, k.to_string())
 }
 
-// LinkableMerkleTree "curr_neighbor_root_index" map
 pub const CURR_NEIGHBOR_ROOT_INDEX: Map<String, u32> = Map::new("curr_neighbor_root_index");
 
 pub fn read_curr_neighbor_root_index(store: &dyn Storage, k: ChainId) -> StdResult<u32> {
@@ -56,7 +48,6 @@ pub fn save_curr_neighbor_root_index(
     CURR_NEIGHBOR_ROOT_INDEX.save(store, k.to_string(), &data)
 }
 
-// LinkableMerkleTree "neighbor_roots" map
 pub const NEIGHBOR_ROOTS: Map<(String, String), [u8; 32]> = Map::new("neighbor_roots");
 
 pub fn read_neighbor_roots(store: &dyn Storage, k: (ChainId, u32)) -> StdResult<[u8; 32]> {
@@ -71,6 +62,13 @@ pub fn save_neighbor_roots(
 ) -> StdResult<()> {
     let (id, num) = k;
     NEIGHBOR_ROOTS.save(store, (id.to_string(), num.to_string()), &data)
+}
+
+// LinkableMerkleTree
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct LinkableMerkleTree {
+    pub max_edges: u32,
+    pub chain_id_list: Vec<ChainId>,
 }
 
 impl LinkableMerkleTree {
@@ -188,7 +186,9 @@ impl LinkableMerkleTree {
     }
 }
 
-// Anchor struct
+// Anchor: Connected instances that contains an on-chain merkle tree and
+//          tracks a set of connected _anchors_ across chains (through edges)
+//          in its local storage.
 // TODO: Anchor should have an ERC20 attached
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Anchor {
@@ -217,7 +217,7 @@ pub struct MerkleTree {
     pub next_index: u32,
 }
 
-// MerkleTree "filled_subtrees" Map
+// MerkleTree "filled_subtrees"
 pub const FILLED_SUBTREES: Map<String, [u8; 32]> = Map::new("filled_subtrees");
 
 pub fn save_subtree(store: &mut dyn Storage, k: u32, data: &[u8; 32]) -> StdResult<()> {
@@ -228,7 +228,7 @@ pub fn read_subtree(store: &dyn Storage, k: u32) -> StdResult<[u8; 32]> {
     FILLED_SUBTREES.load(store, k.to_string())
 }
 
-// MerkleTree Roots Map
+// MerkleTree Roots
 pub const MERKLEROOTS: Map<String, [u8; 32]> = Map::new("merkle_roots");
 
 pub fn save_root(store: &mut dyn Storage, k: u32, data: &[u8; 32]) -> StdResult<()> {

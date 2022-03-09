@@ -66,10 +66,12 @@ pub fn instantiate(
     };
     ANCHOR.save(deps.storage, &anchor)?;
 
+    // Initialize the "FILLED_SUBTREES" with "zero" data.
     for i in 0..msg.levels {
         save_subtree(deps.storage, i as u32, &zeroes(i))?;
     }
 
+    // Initialize the (merkletree) "ROOTS" with "zero" data.
     save_root(deps.storage, 0_u32, &zeroes(msg.levels))?;
 
     Ok(Response::new()
@@ -90,6 +92,10 @@ pub fn execute(
     }
 }
 
+/// User deposits the fund(UST) with its commitment.
+/// It checks the validity of the fund(UST) sent.
+/// It also checks the merkle tree availiability.
+/// It saves the commitment in "merkle tree".
 pub fn deposit(
     deps: DepsMut,
     info: MessageInfo,
@@ -106,7 +112,7 @@ pub fn deposit(
     if sent_uusd.is_empty() || Uint256::from(sent_uusd[0].amount) < anchor.deposit_size {
         return Err(ContractError::InsufficientFunds {});
     }
-
+    // Checks the validity of
     if let Some(commitment) = msg.commitment {
         let mut merkle_tree = anchor.merkle_tree;
         let poseidon = POSEIDON.load(deps.storage)?;
@@ -135,6 +141,12 @@ pub fn deposit(
     }
 }
 
+/// User withdraws the fund(UST) to "recipient" address
+/// by providing the "proof" for the "commitment".
+/// It verifies the "withdraw" by verifying the "proof"
+/// with "commitment" saved in prior.
+/// If success on verify, then it performs "withdraw" action
+/// which sends the fund(UST) to "recipient" & "relayer" address.
 pub fn withdraw(
     deps: DepsMut,
     info: MessageInfo,
@@ -155,6 +167,7 @@ pub fn withdraw(
         }));
     }
 
+    // Validation 3. Check if the roots are valid in linkable tree.
     let linkable_tree = anchor.linkable_tree;
     if !linkable_tree.is_valid_neighbor_roots(&msg.roots[1..], deps.storage) {
         return Err(ContractError::Std(StdError::GenericErr {
@@ -162,6 +175,7 @@ pub fn withdraw(
         }));
     }
 
+    // Checks if the nullifier already used.
     if is_known_nullifier(deps.storage, msg.nullifier_hash) {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Nullifier is known".to_string(),
@@ -173,6 +187,7 @@ pub fn withdraw(
         output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
         output
     };
+
     // Format the public input bytes
     let chain_id_type_bytes =
         element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
@@ -213,6 +228,7 @@ pub fn withdraw(
     // TODO: Support "ERC20"-like tokens
     let mut msgs: Vec<CosmosMsg> = vec![];
 
+    // Send the funds to "recipient"
     let amt = match Uint128::try_from(anchor.deposit_size - msg.fee) {
         Ok(v) => v,
         Err(_) => {
@@ -229,6 +245,7 @@ pub fn withdraw(
         }],
     }));
 
+    // Send the funds to "relayer"
     let amt = match Uint128::try_from(msg.fee) {
         Ok(v) => v,
         Err(_) => {
@@ -245,6 +262,7 @@ pub fn withdraw(
         }],
     }));
 
+    // If "refund" field is non-zero, send the funds to "recipient"
     if msg.refund > Uint256::zero() {
         let amt = match Uint128::try_from(msg.refund) {
             Ok(v) => v,
@@ -275,10 +293,12 @@ pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
+// Check if the "nullifier" is already used or not.
 fn is_known_nullifier(store: &dyn Storage, nullifier: [u8; 32]) -> bool {
     NULLIFIERS.has(store, nullifier.to_vec())
 }
 
+// Using "anchor_verifier", verifies if the "proof" really came from "public_input".
 fn verify(
     verifier: AnchorVerifier,
     public_input: Vec<u8>,
@@ -289,12 +309,18 @@ fn verify(
         .map_err(|_| ContractError::VerifyError)
 }
 
+// Truncate and pad 256 bit slice
 fn truncate_and_pad(t: &[u8]) -> Vec<u8> {
     let mut truncated_bytes = t[..20].to_vec();
     truncated_bytes.extend_from_slice(&[0u8; 12]);
     truncated_bytes
 }
 
+// Computes the combination bytes of "chain_type" and "chain_id".
+// Combination rule: 8 bytes array(00 * 2 bytes + [chain_type] 2 bytes + [chain_id] 4 bytes)
+// Example:
+//  chain_type - 0x0401, chain_id - 0x00000001 (big endian)
+//  Result - [00, 00, 04, 01, 00, 00, 00, 01]
 fn compute_chain_id_type(chain_id: u64, chain_type: &[u8]) -> u64 {
     let chain_id_value: u32 = chain_id.try_into().unwrap_or_default();
     let mut buf = [0u8; 8];

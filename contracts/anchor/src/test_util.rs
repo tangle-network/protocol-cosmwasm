@@ -41,6 +41,7 @@ pub const TREE_DEPTH: usize = 30;
 pub const M: usize = 2;
 pub type AnchorSetup30_2 = AnchorProverSetup<Bn254Fr, M, TREE_DEPTH>;
 
+// Setup the "proving key" and "verifying key" data for the multiple curves.
 pub fn setup_environment(curve: Curve) -> (Vec<u8>, Vec<u8>) {
     match curve {
         Curve::Bn254 => {
@@ -59,6 +60,8 @@ pub fn setup_environment(curve: Curve) -> (Vec<u8>, Vec<u8>) {
     }
 }
 
+/// Create the zk preimage(proof, merkle root, nullifer, merkle leaf)
+/// from the input(curve, recipient, relayer, commitment, proving key, chain_id, fee, refund).
 pub fn setup_zk_circuit(
     curve: Curve,
     recipient_bytes: Vec<u8>,
@@ -121,6 +124,9 @@ pub fn setup_zk_circuit(
         }
     }
 }
+
+/// Create the zk preimage(proof, roots, nullifier, leaf)
+/// with input(curve, recipient, relayer, commitment, proving key, chain_id, fee, refund).
 pub fn setup_wasm_utils_zk_circuit(
     curve: Curve,
     recipient_bytes: Vec<u8>,
