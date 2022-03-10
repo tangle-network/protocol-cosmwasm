@@ -491,7 +491,9 @@ mod tests {
 
         // Invalid withdraw proof leads to failure result.
         let mut false_proof_bytes = proof_bytes.clone();
-        false_proof_bytes[0] = 1;
+        false_proof_bytes[0] = 0;
+        false_proof_bytes[1] = 0;
+        false_proof_bytes[2] = 0;
 
         let mut roots = vec![];
         for i in 0..root_elements.len() {
