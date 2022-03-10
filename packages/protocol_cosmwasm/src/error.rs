@@ -34,4 +34,8 @@ pub enum ContractError {
     // Failing to decode a hex string
     #[error("DecodeError")]
     DecodeError,
+
+    // Returned if a mapping item is not found
+    #[error("Mapping item not found")]
+    ItemNotFound,
 }
