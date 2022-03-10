@@ -1,4 +1,4 @@
-use cosmwasm_std::{StdResult, Storage, Uint256};
+use cosmwasm_std::{StdResult, Storage, Uint256, CanonicalAddr};
 use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -189,13 +189,13 @@ impl LinkableMerkleTree {
 // Anchor: Connected instances that contains an on-chain merkle tree and
 //          tracks a set of connected _anchors_ across chains (through edges)
 //          in its local storage.
-// TODO: Anchor should have an ERC20 attached
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Anchor {
     pub chain_id: u64,
     pub deposit_size: Uint256,
     pub merkle_tree: MerkleTree,
     pub linkable_tree: LinkableMerkleTree,
+    pub cw20_address: CanonicalAddr,
 }
 
 pub const ANCHOR: Item<Anchor> = Item::new("anchor");
