@@ -1,13 +1,15 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Storage, Uint128, Uint256, from_binary, to_binary, WasmMsg,
+    attr, from_binary, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Response, StdError, StdResult, Storage, Uint128, Uint256, WasmMsg,
 };
 use cw2::set_contract_version;
 
-use cw20::{Cw20ReceiveMsg, Cw20ExecuteMsg};
-use protocol_cosmwasm::anchor::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg, Cw20HookMsg};
+use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
+use protocol_cosmwasm::anchor::{
+    Cw20HookMsg, DepositMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg, WithdrawMsg,
+};
 use protocol_cosmwasm::anchor_verifier::AnchorVerifier;
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::poseidon::Poseidon;
@@ -149,12 +151,16 @@ pub fn deposit(
 }
 
 /// User deposits the Cw20 tokens with its commitments.
-/// The deposit starts from executing the hook message 
+/// The deposit starts from executing the hook message
 /// coming from the Cw20 token contract.
 /// /// It checks the validity of the Cw20 tokens sent.
 /// It also checks the merkle tree availiability.
 /// It saves the commitment in "merkle tree".
-pub fn receive_cw20(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Result<Response, ContractError> {
+pub fn receive_cw20(
+    deps: DepsMut,
+    info: MessageInfo,
+    cw20_msg: Cw20ReceiveMsg,
+) -> Result<Response, ContractError> {
     // Only Cw20 token contract can execute this message.
     let anchor: Anchor = ANCHOR.load(deps.storage)?;
     if anchor.cw20_address != deps.api.addr_canonicalize(info.sender.as_str())? {
@@ -174,7 +180,7 @@ pub fn receive_cw20(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) 
                 let res = merkle_tree
                     .insert(poseidon, commitment, deps.storage)
                     .map_err(|_| ContractError::MerkleTreeIsFull)?;
-        
+
                 ANCHOR.save(
                     deps.storage,
                     &Anchor {
@@ -185,7 +191,7 @@ pub fn receive_cw20(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) 
                         merkle_tree,
                     },
                 )?;
-        
+
                 Ok(Response::new().add_attributes(vec![
                     attr("method", "deposit_cw20"),
                     attr("result", res.to_string()),
@@ -195,8 +201,10 @@ pub fn receive_cw20(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) 
                     kind: "Commitment".to_string(),
                 }))
             }
-        },
-        Err(_) => Err(ContractError::Std(StdError::generic_err("invalid cw20 hook msg")))
+        }
+        Err(_) => Err(ContractError::Std(StdError::generic_err(
+            "invalid cw20 hook msg",
+        ))),
     }
 }
 
@@ -324,7 +332,9 @@ pub fn withdraw(
     if let Some(cw20_address) = msg.cw20_address {
         // Validate the "cw20_address".
         if anchor.cw20_address != deps.api.addr_canonicalize(cw20_address.as_str())? {
-            return Err(ContractError::Std(StdError::generic_err("Invalid cw20 address")));
+            return Err(ContractError::Std(StdError::generic_err(
+                "Invalid cw20 address",
+            )));
         }
         let cw20_token_contract = cw20_address;
 
@@ -334,7 +344,7 @@ pub fn withdraw(
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: msg.recipient.clone(),
                 amount: amt_to_recipient,
-            })?
+            })?,
         }));
 
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
@@ -343,10 +353,9 @@ pub fn withdraw(
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: msg.relayer.clone(),
                 amount: amt_to_relayer,
-            })?
+            })?,
         }));
 
-        
         if msg.refund > Uint256::zero() {
             msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: cw20_token_contract,
@@ -354,7 +363,7 @@ pub fn withdraw(
                 msg: to_binary(&Cw20ExecuteMsg::Transfer {
                     recipient: msg.recipient.clone(),
                     amount: amt_refund,
-                })?
+                })?,
             }));
         }
     } else {
@@ -391,10 +400,17 @@ pub fn withdraw(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        // TODO
+        QueryMsg::GetCw20Address {} => to_binary(&get_cw20_address(deps)?),
     }
+}
+
+fn get_cw20_address(deps: Deps) -> StdResult<InfoResponse> {
+    let anchor = ANCHOR.load(deps.storage)?;
+    Ok(InfoResponse {
+        cw20_address: deps.api.addr_humanize(&anchor.cw20_address)?.to_string(),
+    })
 }
 
 // Check if the "nullifier" is already used or not.
