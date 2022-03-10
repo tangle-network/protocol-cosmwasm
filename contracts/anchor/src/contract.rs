@@ -2,11 +2,11 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Storage, Uint128, Uint256, from_binary,
+    StdResult, Storage, Uint128, Uint256, from_binary, to_binary, WasmMsg,
 };
 use cw2::set_contract_version;
 
-use cw20::Cw20ReceiveMsg;
+use cw20::{Cw20ReceiveMsg, Cw20ExecuteMsg};
 use protocol_cosmwasm::anchor::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg, Cw20HookMsg};
 use protocol_cosmwasm::anchor_verifier::AnchorVerifier;
 use protocol_cosmwasm::error::ContractError;
@@ -284,11 +284,10 @@ pub fn withdraw(
     NULLIFIERS.save(deps.storage, msg.nullifier_hash.to_vec(), &true)?;
 
     // Send the funds
-    // TODO: Support "ERC20"-like tokens
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     // Send the funds to "recipient"
-    let amt = match Uint128::try_from(anchor.deposit_size - msg.fee) {
+    let amt_to_recipient = match Uint128::try_from(anchor.deposit_size - msg.fee) {
         Ok(v) => v,
         Err(_) => {
             return Err(ContractError::Std(StdError::GenericErr {
@@ -296,16 +295,9 @@ pub fn withdraw(
             }))
         }
     };
-    msgs.push(CosmosMsg::Bank(BankMsg::Send {
-        to_address: msg.recipient.clone(),
-        amount: vec![Coin {
-            denom: "uusd".to_string(),
-            amount: amt,
-        }],
-    }));
 
     // Send the funds to "relayer"
-    let amt = match Uint128::try_from(msg.fee) {
+    let amt_to_relayer = match Uint128::try_from(msg.fee) {
         Ok(v) => v,
         Err(_) => {
             return Err(ContractError::Std(StdError::GenericErr {
@@ -313,17 +305,11 @@ pub fn withdraw(
             }))
         }
     };
-    msgs.push(CosmosMsg::Bank(BankMsg::Send {
-        to_address: msg.relayer,
-        amount: vec![Coin {
-            denom: "uusd".to_string(),
-            amount: amt,
-        }],
-    }));
 
     // If "refund" field is non-zero, send the funds to "recipient"
+    let mut amt_refund: Uint128 = Uint128::zero();
     if msg.refund > Uint256::zero() {
-        let amt = match Uint128::try_from(msg.refund) {
+        amt_refund = match Uint128::try_from(msg.refund) {
             Ok(v) => v,
             Err(_) => {
                 return Err(ContractError::Std(StdError::GenericErr {
@@ -331,13 +317,72 @@ pub fn withdraw(
                 }))
             }
         };
+    }
+
+    // If the "cw20_address" is set, then send the Cw20 tokens.
+    // Otherwise, send the native tokens.
+    if let Some(cw20_address) = msg.cw20_address {
+        // Validate the "cw20_address".
+        if anchor.cw20_address != deps.api.addr_canonicalize(cw20_address.as_str())? {
+            return Err(ContractError::Std(StdError::generic_err("Invalid cw20 address")));
+        }
+        let cw20_token_contract = cw20_address;
+
+        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: cw20_token_contract.clone(),
+            funds: [].to_vec(),
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: msg.recipient.clone(),
+                amount: amt_to_recipient,
+            })?
+        }));
+
+        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: cw20_token_contract.clone(),
+            funds: [].to_vec(),
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: msg.relayer.clone(),
+                amount: amt_to_relayer,
+            })?
+        }));
+
+        
+        if msg.refund > Uint256::zero() {
+            msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: cw20_token_contract,
+                funds: [].to_vec(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: msg.recipient.clone(),
+                    amount: amt_refund,
+                })?
+            }));
+        }
+    } else {
         msgs.push(CosmosMsg::Bank(BankMsg::Send {
-            to_address: msg.recipient,
+            to_address: msg.recipient.clone(),
             amount: vec![Coin {
                 denom: "uusd".to_string(),
-                amount: amt,
+                amount: amt_to_recipient,
             }],
         }));
+
+        msgs.push(CosmosMsg::Bank(BankMsg::Send {
+            to_address: msg.relayer,
+            amount: vec![Coin {
+                denom: "uusd".to_string(),
+                amount: amt_to_relayer,
+            }],
+        }));
+
+        if msg.refund > Uint256::zero() {
+            msgs.push(CosmosMsg::Bank(BankMsg::Send {
+                to_address: msg.recipient,
+                amount: vec![Coin {
+                    denom: "uusd".to_string(),
+                    amount: amt_refund,
+                }],
+            }));
+        }
     }
 
     Ok(Response::new()
