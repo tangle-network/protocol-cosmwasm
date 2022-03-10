@@ -2,11 +2,12 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Storage, Uint128, Uint256,
+    StdResult, Storage, Uint128, Uint256, from_binary,
 };
 use cw2::set_contract_version;
 
-use protocol_cosmwasm::anchor::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg};
+use cw20::Cw20ReceiveMsg;
+use protocol_cosmwasm::anchor::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg, Cw20HookMsg};
 use protocol_cosmwasm::anchor_verifier::AnchorVerifier;
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::poseidon::Poseidon;
@@ -93,6 +94,7 @@ pub fn execute(
     match msg {
         ExecuteMsg::Deposit(msg) => deposit(deps, info, msg),
         ExecuteMsg::Withdraw(msg) => withdraw(deps, info, msg),
+        ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
     }
 }
 
@@ -130,6 +132,7 @@ pub fn deposit(
                 chain_id: anchor.chain_id,
                 deposit_size: anchor.deposit_size,
                 linkable_tree: anchor.linkable_tree,
+                cw20_address: anchor.cw20_address,
                 merkle_tree,
             },
         )?;
@@ -142,6 +145,58 @@ pub fn deposit(
         Err(ContractError::Std(StdError::NotFound {
             kind: "Commitment".to_string(),
         }))
+    }
+}
+
+/// User deposits the Cw20 tokens with its commitments.
+/// The deposit starts from executing the hook message 
+/// coming from the Cw20 token contract.
+/// /// It checks the validity of the Cw20 tokens sent.
+/// It also checks the merkle tree availiability.
+/// It saves the commitment in "merkle tree".
+pub fn receive_cw20(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Result<Response, ContractError> {
+    // Only Cw20 token contract can execute this message.
+    let anchor: Anchor = ANCHOR.load(deps.storage)?;
+    if anchor.cw20_address != deps.api.addr_canonicalize(info.sender.as_str())? {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let tokens_sent = cw20_msg.amount;
+    match from_binary(&cw20_msg.msg) {
+        Ok(Cw20HookMsg::DepositCw20 { commitment }) => {
+            if Uint256::from(tokens_sent) < anchor.deposit_size {
+                return Err(ContractError::InsufficientFunds {});
+            }
+            // Checks the validity of
+            if let Some(commitment) = commitment {
+                let mut merkle_tree = anchor.merkle_tree;
+                let poseidon = POSEIDON.load(deps.storage)?;
+                let res = merkle_tree
+                    .insert(poseidon, commitment, deps.storage)
+                    .map_err(|_| ContractError::MerkleTreeIsFull)?;
+        
+                ANCHOR.save(
+                    deps.storage,
+                    &Anchor {
+                        chain_id: anchor.chain_id,
+                        deposit_size: anchor.deposit_size,
+                        linkable_tree: anchor.linkable_tree,
+                        cw20_address: anchor.cw20_address,
+                        merkle_tree,
+                    },
+                )?;
+        
+                Ok(Response::new().add_attributes(vec![
+                    attr("method", "deposit_cw20"),
+                    attr("result", res.to_string()),
+                ]))
+            } else {
+                Err(ContractError::Std(StdError::NotFound {
+                    kind: "Commitment".to_string(),
+                }))
+            }
+        },
+        Err(_) => Err(ContractError::Std(StdError::generic_err("invalid cw20 hook msg")))
     }
 }
 
