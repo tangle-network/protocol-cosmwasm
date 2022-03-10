@@ -57,12 +57,16 @@ pub fn instantiate(
         chain_id_list: Vec::new(),
     };
 
+    // Get the "cw20_address"
+    let cw20_address = deps.api.addr_canonicalize(&msg.cw20_address)?;
+
     // Initialize the Anchor
     let anchor = Anchor {
         chain_id: msg.chain_id,
         deposit_size: Uint256::from(msg.deposit_size.u128()),
         linkable_tree: linkable_merkle_tree,
         merkle_tree,
+        cw20_address,
     };
     ANCHOR.save(deps.storage, &anchor)?;
 
@@ -358,6 +362,7 @@ mod tests {
             chain_id: 1,
             levels: 0,
             deposit_size: Uint128::from(1_000_000_u128),
+            cw20_address: "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string(),
         };
 
         // Should pass this "unwrap" if success.
