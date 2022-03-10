@@ -4,6 +4,7 @@
   "type": "object",
   "required": [
     "chain_id",
+    "cw20_address",
     "deposit_size",
     "levels",
     "max_edges"
@@ -13,6 +14,9 @@
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
+    },
+    "cw20_address": {
+      "type": "string"
     },
     "deposit_size": {
       "$ref": "#/definitions/Uint128"

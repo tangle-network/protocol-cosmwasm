@@ -469,7 +469,7 @@ mod tests {
 
     #[test]
     fn proper_initialization() {
-        let cw20_address =  "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
         let mut deps = mock_dependencies(&[]);
         let env = mock_env();
         let info = mock_info("anyone", &[]);
@@ -496,7 +496,7 @@ mod tests {
 
     #[test]
     fn test_deposit() {
-        let cw20_address =  "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
 
         let mut deps = mock_dependencies(&coins(2, "token"));
 
@@ -563,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_deposit_cw20() {
-        let cw20_address =  "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
 
         let mut deps = mock_dependencies(&coins(2, "token"));
 
@@ -593,15 +593,14 @@ mod tests {
 
         // Try the deposit for success
         let info = mock_info(cw20_address.as_str(), &[]);
-        let deposit_cw20_msg = ExecuteMsg::Receive(
-            Cw20ReceiveMsg {
-                sender: cw20_address.clone(),
-                amount: Uint128::from(1_000_000_u128),
-                msg: to_binary(&Cw20HookMsg::DepositCw20 {
-                    commitment: Some(element),
-                }).unwrap(),
-            }
-        );
+        let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender: cw20_address.clone(),
+            amount: Uint128::from(1_000_000_u128),
+            msg: to_binary(&Cw20HookMsg::DepositCw20 {
+                commitment: Some(element),
+            })
+            .unwrap(),
+        });
 
         let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
         assert_eq!(
@@ -635,7 +634,7 @@ mod tests {
                 refund_value,
             );
 
-        let cw20_address =  "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
         let mut deps = mock_dependencies(&coins(2, "token"));
 
         // Initialize the contract
@@ -741,7 +740,7 @@ mod tests {
                 refund_value,
             );
 
-        let cw20_address =  "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
         let mut deps = mock_dependencies(&coins(2, "token"));
 
         // Initialize the contract
@@ -845,7 +844,7 @@ mod tests {
                 refund_value,
             );
 
-        let cw20_address =  "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
 
         let mut deps = mock_dependencies(&coins(2, "token"));
 
@@ -864,15 +863,14 @@ mod tests {
 
         // Try the deposit for success
         let info = mock_info(cw20_address.as_str(), &[]);
-        let deposit_cw20_msg = ExecuteMsg::Receive(
-            Cw20ReceiveMsg {
-                sender: cw20_address.clone(),
-                amount: Uint128::from(1_000_000_u128),
-                msg: to_binary(&Cw20HookMsg::DepositCw20 {
-                    commitment: Some(leaf_element.0),
-                }).unwrap(),
-            }
-        );
+        let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender: cw20_address.clone(),
+            amount: Uint128::from(1_000_000_u128),
+            msg: to_binary(&Cw20HookMsg::DepositCw20 {
+                commitment: Some(leaf_element.0),
+            })
+            .unwrap(),
+        });
 
         let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
         assert_eq!(
@@ -906,14 +904,15 @@ mod tests {
 
         let expected_recipient = hex::encode(recipient_bytes.to_vec());
         let expected_relayer = hex::encode(relayer_bytes.to_vec());
-        let expected_messages:Vec<CosmosMsg> = vec![
+        let expected_messages: Vec<CosmosMsg> = vec![
             CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: cw20_address.clone(),
                 funds: [].to_vec(),
                 msg: to_binary(&Cw20ExecuteMsg::Transfer {
                     recipient: expected_recipient,
                     amount: Uint128::from(1_000_000_u128),
-                }).unwrap(),
+                })
+                .unwrap(),
             }),
             CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: cw20_address.clone(),
@@ -921,8 +920,9 @@ mod tests {
                 msg: to_binary(&Cw20ExecuteMsg::Transfer {
                     recipient: expected_relayer,
                     amount: Uint128::from(0_u128),
-                }).unwrap(),
-            })
+                })
+                .unwrap(),
+            }),
         ];
         assert_eq!(response.messages.len(), expected_messages.len());
     }
