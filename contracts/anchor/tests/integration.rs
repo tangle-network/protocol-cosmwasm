@@ -19,8 +19,11 @@ type PoseidonCRH5 = CRH<Fr>;
 // static WASM: &[u8] = include_bytes!("../../../artifacts/cosmwasm_anchor.wasm");
 
 // You can uncomment this line instead to test productionified build from rust-optimizer
-static WASM: &[u8] =
-    include_bytes!("../../../target/wasm32-unknown-unknown/release/cosmwasm_anchor.wasm");
+// static WASM: &[u8] =
+//     include_bytes!("../../../target/wasm32-unknown-unknown/release/cosmwasm_anchor.wasm");
+
+// For the github CI, we copy the wasm file manually & import here.
+static WASM: &[u8] = include_bytes!("./cosmwasm_anchor.wasm");
 
 #[test]
 fn integration_test_instantiate_anchor() {
