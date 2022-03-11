@@ -41,11 +41,19 @@ pub fn instantiate(
         current_root_index: 0,
         next_index: 0,
     };
+
+    // Check the validity of "cw20_address" if exists.
+    let cw20_address = match msg.cw20_address {
+        Some(addr) => Some(deps.api.addr_canonicalize(addr.as_str())?),
+        None => None
+    };
+
     // Initialize the Mixer
     let mixer: Mixer = Mixer {
         initialized: true,
         deposit_size: Uint256::from(msg.deposit_size.u128()),
         merkle_tree,
+        cw20_address,
     };
     MIXER.save(deps.storage, &mixer)?;
 
