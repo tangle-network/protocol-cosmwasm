@@ -443,8 +443,10 @@ mod tests {
             refund: cosmwasm_std::Uint256::from(refund_value),
         };
         let info = mock_info("withdraw", &[]);
-        let err = withdraw(deps.as_mut(), info, withdraw_msg).unwrap_err();
-        assert_eq!(err.to_string(), "VerifyError".to_string());
+        assert!(
+            withdraw(deps.as_mut(), info, withdraw_msg).is_err(),
+            "Should fail with wrong proof bytes"
+        );
 
         let (proof_bytes, root_element, nullifier_hash_element, _leaf_element) =
             crate::test_util::setup_wasm_utils_zk_circuit(
