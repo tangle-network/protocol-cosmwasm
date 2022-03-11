@@ -438,30 +438,15 @@ mod tests {
     use ark_ff::PrimeField;
     use ark_ff::{BigInteger, Field};
     use ark_std::One;
-    use arkworks_gadgets::merkle_tree::simple_merkle::gen_empty_hashes;
     use arkworks_gadgets::poseidon::CRH;
     use arkworks_utils::utils::bn254_x5_5::get_poseidon_bn254_x5_5;
-    use arkworks_utils::utils::common::{setup_params_x5_5, Curve};
-    use arkworks_utils::utils::parse_vec;
+    use arkworks_utils::utils::common::Curve;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{attr, coins, Uint128};
     type PoseidonCRH5 = CRH<Fr>;
-    use arkworks_gadgets::poseidon::field_hasher;
-
-    fn get_empty_hashes(curve: Curve) {
-        let params = setup_params_x5_5::<Fr>(curve);
-        let poseidon = field_hasher::Poseidon::<Fr>::new(params.clone());
-
-        let default_leaf_hex =
-            vec!["0x2fe54c60d3acabf3343a35b6eba15db4821b340f76e741e2249685ed4899af6c"];
-        let default_leaf_scalar: Vec<Fr> = parse_vec(default_leaf_hex);
-        let default_leaf_vec = default_leaf_scalar[0].into_repr().to_bytes_le();
-        let empty_hashes =
-            gen_empty_hashes::<Fr, _, 32usize>(&poseidon, &default_leaf_vec[..]).unwrap();
-    }
 
     #[test]
-    fn proper_initialization() {
+    fn test_mixer_proper_initialization() {
         let mut deps = mock_dependencies(&[]);
 
         let env = mock_env();
@@ -469,6 +454,7 @@ mod tests {
         let instantiate_msg = InstantiateMsg {
             merkletree_levels: 0,
             deposit_size: Uint128::from(1_000_000_u128),
+            cw20_address: None,
         };
 
         // Should pass this "unwrap" if success.
@@ -481,7 +467,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deposit() {
+    fn test_mixer_deposit_native_token() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
         // Initialize the contract
@@ -490,6 +476,7 @@ mod tests {
         let instantiate_msg = InstantiateMsg {
             merkletree_levels: 30,
             deposit_size: Uint128::from(1_000_000_u128),
+            cw20_address: None,
         };
 
         let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -543,7 +530,53 @@ mod tests {
     }
 
     #[test]
-    fn test_withdraw_wasm_utils() {
+    fn test_mixer_deposit_cw20() {
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
+
+        let mut deps = mock_dependencies(&coins(2, "token"));
+
+        // Initialize the contract
+        let env = mock_env();
+        let info = mock_info("anyone", &[]);
+        let instantiate_msg = InstantiateMsg {
+            merkletree_levels: 30,
+            deposit_size: Uint128::from(1_000_000_u128),
+            cw20_address: Some(cw20_address.clone()),
+        };
+
+        let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+
+        // Initialize the mixer
+        let params = get_poseidon_bn254_x5_5();
+        let left_input = Fr::one().into_repr().to_bytes_le();
+        let right_input = Fr::one().double().into_repr().to_bytes_le();
+        let mut input = Vec::new();
+        input.extend_from_slice(&left_input);
+        input.extend_from_slice(&right_input);
+        let res = <PoseidonCRH5 as CRHTrait>::evaluate(&params, &input).unwrap();
+        let mut element: [u8; 32] = [0u8; 32];
+        element.copy_from_slice(&res.into_repr().to_bytes_le());
+
+        // Try the deposit for success
+        let info = mock_info(cw20_address.as_str(), &[]);
+        let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender: cw20_address.clone(),
+            amount: Uint128::from(1_000_000_u128),
+            msg: to_binary(&Cw20HookMsg::DepositCw20 {
+                commitment: Some(element),
+            })
+            .unwrap(),
+        });
+
+        let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
+        assert_eq!(
+            response.attributes,
+            vec![attr("method", "deposit_cw20"), attr("result", "0")]
+        );
+    }
+
+    #[test]
+    fn test_mixer_withdraw_native_wasm_utils() {
         let curve = Curve::Bn254;
         let (pk_bytes, _) = crate::test_util::setup_environment(curve);
         let recipient_bytes = [1u8; 32];
@@ -568,6 +601,7 @@ mod tests {
         let instantiate_msg = InstantiateMsg {
             merkletree_levels: 30,
             deposit_size: Uint128::from(1_000_000_u128),
+            cw20_address: None,
         };
 
         let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -600,6 +634,7 @@ mod tests {
             relayer: hex::encode(relayer_bytes.to_vec()),
             fee: cosmwasm_std::Uint256::from(fee_value),
             refund: cosmwasm_std::Uint256::from(refund_value),
+            cw20_address: None,
         };
         let info = mock_info("withdraw", &[]);
         assert!(
@@ -624,6 +659,7 @@ mod tests {
             relayer: hex::encode(relayer_bytes.to_vec()),
             fee: cosmwasm_std::Uint256::from(fee_value),
             refund: cosmwasm_std::Uint256::from(refund_value),
+            cw20_address: None,
         };
         let info = mock_info("withdraw", &[]);
         let response = withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
@@ -631,7 +667,7 @@ mod tests {
     }
 
     #[test]
-    fn test_withdraw_native() {
+    fn test_mixer_withdraw_native() {
         let curve = Curve::Bn254;
         let (pk_bytes, _) = crate::test_util::setup_environment(curve);
         let recipient_bytes = [1u8; 32];
@@ -657,6 +693,7 @@ mod tests {
         let instantiate_msg = InstantiateMsg {
             merkletree_levels: 30,
             deposit_size: Uint128::from(1_000_000_u128),
+            cw20_address: None,
         };
 
         let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -688,6 +725,7 @@ mod tests {
             relayer: hex::encode(relayer_bytes.to_vec()),
             fee: cosmwasm_std::Uint256::from(fee_value),
             refund: cosmwasm_std::Uint256::from(refund_value),
+            cw20_address: None,
         };
         let info = mock_info("withdraw", &[]);
         let err = withdraw(deps.as_mut(), info, withdraw_msg).unwrap_err();
@@ -714,9 +752,105 @@ mod tests {
             relayer: hex::encode(relayer_bytes.to_vec()),
             fee: cosmwasm_std::Uint256::from(fee_value),
             refund: cosmwasm_std::Uint256::from(refund_value),
+            cw20_address: None,
         };
         let info = mock_info("withdraw", &[]);
         let response = withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
         assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
+    }
+
+    #[test]
+    fn test_mixer_withdraw_cw20() {
+        let curve = Curve::Bn254;
+        let (pk_bytes, _) = crate::test_util::setup_environment(curve);
+        let recipient_bytes = [1u8; 32];
+        let relayer_bytes = [2u8; 32];
+        let fee_value = 0;
+        let refund_value = 0;
+        // Setup zk circuit for withdraw
+        let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
+            crate::test_util::setup_zk_circuit(
+                curve,
+                truncate_and_pad(&recipient_bytes),
+                truncate_and_pad(&relayer_bytes),
+                pk_bytes.clone(),
+                fee_value,
+                refund_value,
+            );
+
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
+
+        let mut deps = mock_dependencies(&coins(2, "token"));
+
+        // Initialize the contract
+        let env = mock_env();
+        let info = mock_info("anyone", &[]);
+        let instantiate_msg = InstantiateMsg {
+            merkletree_levels: 30,
+            deposit_size: Uint128::from(1_000_000_u128),
+            cw20_address: Some(cw20_address.clone()),
+        };
+
+        let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+
+        // Try the deposit for success
+        let info = mock_info(cw20_address.as_str(), &[]);
+        let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender: cw20_address.clone(),
+            amount: Uint128::from(1_000_000_u128),
+            msg: to_binary(&Cw20HookMsg::DepositCw20 {
+                commitment: Some(leaf_element.0),
+            })
+            .unwrap(),
+        });
+
+        let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
+        assert_eq!(
+            response.attributes,
+            vec![attr("method", "deposit_cw20"), attr("result", "0")]
+        );
+
+        let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
+        let local_root = root_element.0;
+        assert_eq!(on_chain_root, local_root);
+
+        // Withdraw should succeed
+        let withdraw_msg = WithdrawMsg {
+            proof_bytes: proof_bytes,
+            root: root_element.0,
+            nullifier_hash: nullifier_hash_element.0,
+            recipient: hex::encode(recipient_bytes.to_vec()),
+            relayer: hex::encode(relayer_bytes.to_vec()),
+            fee: cosmwasm_std::Uint256::from(fee_value),
+            refund: cosmwasm_std::Uint256::from(refund_value),
+            cw20_address: None,
+        };
+        let info = mock_info("withdraw", &[]);
+        let response = withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
+        assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
+
+        let expected_recipient = hex::encode(recipient_bytes.to_vec());
+        let expected_relayer = hex::encode(relayer_bytes.to_vec());
+        let expected_messages: Vec<CosmosMsg> = vec![
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: cw20_address.clone(),
+                funds: [].to_vec(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: expected_recipient,
+                    amount: Uint128::from(1_000_000_u128),
+                })
+                .unwrap(),
+            }),
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: cw20_address.clone(),
+                funds: [].to_vec(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: expected_relayer,
+                    amount: Uint128::from(0_u128),
+                })
+                .unwrap(),
+            }),
+        ];
+        assert_eq!(response.messages.len(), expected_messages.len());
     }
 }
