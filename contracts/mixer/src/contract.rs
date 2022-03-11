@@ -8,7 +8,7 @@ use cw2::set_contract_version;
 use std::convert::TryFrom;
 
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::mixer::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg, Cw20HookMsg};
+use protocol_cosmwasm::mixer::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg, Cw20HookMsg, InfoResponse};
 use protocol_cosmwasm::mixer_verifier::MixerVerifier;
 use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::zeroes::zeroes;
@@ -411,10 +411,23 @@ fn truncate_and_pad(t: &[u8]) -> Vec<u8> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        // TODO
+        QueryMsg::GetCw20Address {} => to_binary(&get_cw20_address(deps)?),
     }
+}
+
+fn get_cw20_address(deps: Deps) -> StdResult<InfoResponse> {
+    let mixer = MIXER.load(deps.storage)?;
+    
+    let cw20_address = match mixer.cw20_address {
+        Some(cw20_address) => deps.api.addr_humanize(&cw20_address)?.to_string(),
+        None => "".to_string(),
+    };
+
+    Ok(InfoResponse {
+        cw20_address, 
+    })
 }
 
 #[cfg(test)]
