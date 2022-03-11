@@ -1,20 +1,22 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    from_binary, attr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
     StdResult, Storage, Uint128, Uint256,
 };
 use cw2::set_contract_version;
 use std::convert::TryFrom;
 
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::mixer::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg};
+use protocol_cosmwasm::mixer::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg, Cw20HookMsg};
 use protocol_cosmwasm::mixer_verifier::MixerVerifier;
 use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::zeroes::zeroes;
 
+use cw20::Cw20ReceiveMsg;
+
 use crate::state::{
-    save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, NULLIFIERS, POSEIDON,
+    save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, USED_NULLIFIERS, POSEIDON,
 };
 
 // version info for migration info
@@ -148,6 +150,70 @@ pub fn deposit(
         }))
     }
 }
+
+/// User deposits the Cw20 tokens with its commitments.
+/// The deposit starts from executing the hook message
+/// coming from the Cw20 token contract.
+/// It checks the validity of the Cw20 tokens sent.
+/// It also checks the merkle tree availiability.
+/// It saves the commitment in "merkle tree".
+pub fn receive_cw20(
+    deps: DepsMut,
+    info: MessageInfo,
+    cw20_msg: Cw20ReceiveMsg,
+) -> Result<Response, ContractError> {
+    // Only Cw20 token contract can execute this message.
+    let mixer: Mixer = MIXER.load(deps.storage)?;
+    let cw20_address = mixer.cw20_address.clone();
+    if cw20_address.is_none() {
+        return Err(ContractError::Std(StdError::generic_err("This mixer is for native(UST) token")));
+    }
+
+    if cw20_address.unwrap() != deps.api.addr_canonicalize(info.sender.as_str())? {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let tokens_sent = cw20_msg.amount;
+    match from_binary(&cw20_msg.msg) {
+        Ok(Cw20HookMsg::DepositCw20 { commitment }) => {
+            if Uint256::from(tokens_sent) < mixer.deposit_size {
+                return Err(ContractError::InsufficientFunds {});
+            }
+            // Checks the validity of
+            if let Some(commitment) = commitment {
+                let mut merkle_tree = mixer.merkle_tree;
+                let poseidon = POSEIDON.load(deps.storage)?;
+                let res = merkle_tree
+                    .insert(poseidon, commitment, deps.storage)
+                    .map_err(|_| ContractError::MerkleTreeIsFull)?;
+
+                MIXER.save(
+                    deps.storage,
+                    &Mixer {
+                        initialized: mixer.initialized,
+                        deposit_size: mixer.deposit_size,
+                        cw20_address: mixer.cw20_address,
+                        merkle_tree,
+                    },
+                )?;
+
+                Ok(Response::new().add_attributes(vec![
+                    attr("method", "deposit_cw20"),
+                    attr("result", res.to_string()),
+                ]))
+            } else {
+                Err(ContractError::Std(StdError::NotFound {
+                    kind: "Commitment".to_string(),
+                }))
+            }
+        }
+        Err(_) => Err(ContractError::Std(StdError::generic_err(
+            "invalid cw20 hook msg",
+        ))),
+    }
+}
+
+
 pub fn withdraw(
     deps: DepsMut,
     info: MessageInfo,
@@ -207,7 +273,7 @@ pub fn withdraw(
     }
 
     // Set used nullifier to true after successful verification
-    NULLIFIERS.save(deps.storage, msg.nullifier_hash.to_vec(), &true)?;
+    USED_NULLIFIERS.save(deps.storage, msg.nullifier_hash.to_vec(), &true)?;
 
     // Send the funds
     // TODO: Support "ERC20"-like tokens
@@ -269,7 +335,7 @@ pub fn withdraw(
 }
 
 fn is_known_nullifier(store: &dyn Storage, nullifier: [u8; 32]) -> bool {
-    NULLIFIERS.has(store, nullifier.to_vec())
+    USED_NULLIFIERS.has(store, nullifier.to_vec())
 }
 
 fn verify(

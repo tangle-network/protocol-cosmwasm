@@ -599,6 +599,7 @@ dependencies = [
  "cosmwasm-storage",
  "cw-storage-plus",
  "cw2",
+ "cw20",
  "hex",
  "protocol-cosmwasm",
  "schemars",
