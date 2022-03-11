@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    from_binary, attr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Storage, Uint128, Uint256,
+    to_binary, from_binary, attr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, Storage, Uint128, Uint256, WasmMsg
 };
 use cw2::set_contract_version;
 use std::convert::TryFrom;
@@ -13,7 +13,7 @@ use protocol_cosmwasm::mixer_verifier::MixerVerifier;
 use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::zeroes::zeroes;
 
-use cw20::Cw20ReceiveMsg;
+use cw20::{Cw20ReceiveMsg, Cw20ExecuteMsg};
 
 use crate::state::{
     save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, USED_NULLIFIERS, POSEIDON,
@@ -213,7 +213,14 @@ pub fn receive_cw20(
     }
 }
 
-
+/// User withdraws the native(UST) token or CW20 token 
+/// to "recipient" address by providing the "proof" for 
+/// the "commitment".
+/// It verifies the "withdraw" by verifying the "proof"
+/// with "commitment" saved in prior.
+/// If success on verify, then it performs "withdraw" action
+/// which sends the native(UST) token or CW20 token 
+/// to "recipient" & "relayer" address.
 pub fn withdraw(
     deps: DepsMut,
     info: MessageInfo,
@@ -251,8 +258,8 @@ pub fn withdraw(
         truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);
     let relayer_bytes =
         truncate_and_pad(&hex::decode(&msg.relayer).map_err(|_| ContractError::DecodeError)?);
-    let fee_bytes = element_encoder(&msg.fee.to_be_bytes());
-    let refund_bytes = element_encoder(&msg.refund.to_be_bytes());
+    let fee_bytes = element_encoder(&msg.fee.to_le_bytes());
+    let refund_bytes = element_encoder(&msg.refund.to_le_bytes());
 
     // Join the public input bytes
     let mut bytes = Vec::new();
@@ -276,10 +283,10 @@ pub fn withdraw(
     USED_NULLIFIERS.save(deps.storage, msg.nullifier_hash.to_vec(), &true)?;
 
     // Send the funds
-    // TODO: Support "ERC20"-like tokens
     let mut msgs: Vec<CosmosMsg> = vec![];
 
-    let amt = match Uint128::try_from(mixer.deposit_size - msg.fee) {
+   // Send the funds to "recipient"
+   let amt_to_recipient = match Uint128::try_from(mixer.deposit_size - msg.fee) {
         Ok(v) => v,
         Err(_) => {
             return Err(ContractError::Std(StdError::GenericErr {
@@ -287,15 +294,9 @@ pub fn withdraw(
             }))
         }
     };
-    msgs.push(CosmosMsg::Bank(BankMsg::Send {
-        to_address: msg.recipient.clone(),
-        amount: vec![Coin {
-            denom: "uusd".to_string(),
-            amount: amt,
-        }],
-    }));
 
-    let amt = match Uint128::try_from(msg.fee) {
+    // Send the funds to "relayer"
+    let amt_to_relayer = match Uint128::try_from(msg.fee) {
         Ok(v) => v,
         Err(_) => {
             return Err(ContractError::Std(StdError::GenericErr {
@@ -303,16 +304,11 @@ pub fn withdraw(
             }))
         }
     };
-    msgs.push(CosmosMsg::Bank(BankMsg::Send {
-        to_address: msg.relayer,
-        amount: vec![Coin {
-            denom: "uusd".to_string(),
-            amount: amt,
-        }],
-    }));
 
+    // If "refund" field is non-zero, send the funds to "recipient"
+    let mut amt_refund: Uint128 = Uint128::zero();
     if msg.refund > Uint256::zero() {
-        let amt = match Uint128::try_from(msg.refund) {
+        amt_refund = match Uint128::try_from(msg.refund) {
             Ok(v) => v,
             Err(_) => {
                 return Err(ContractError::Std(StdError::GenericErr {
@@ -320,13 +316,73 @@ pub fn withdraw(
                 }))
             }
         };
+    }
+
+    // If the "cw20_address" is set, then send the Cw20 tokens.
+    // Otherwise, send the native tokens.
+    if let Some(cw20_address) = msg.cw20_address {
+        // Validate the "cw20_address".
+        if mixer.cw20_address.unwrap() != deps.api.addr_canonicalize(cw20_address.as_str())? {
+            return Err(ContractError::Std(StdError::generic_err(
+                "Invalid cw20 address",
+            )));
+        }
+        let cw20_token_contract = cw20_address;
+
+        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: cw20_token_contract.clone(),
+            funds: [].to_vec(),
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: msg.recipient.clone(),
+                amount: amt_to_recipient,
+            })?,
+        }));
+
+        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: cw20_token_contract.clone(),
+            funds: [].to_vec(),
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: msg.relayer.clone(),
+                amount: amt_to_relayer,
+            })?,
+        }));
+
+        if msg.refund > Uint256::zero() {
+            msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: cw20_token_contract,
+                funds: [].to_vec(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: msg.recipient.clone(),
+                    amount: amt_refund,
+                })?,
+            }));
+        }
+    } else {
         msgs.push(CosmosMsg::Bank(BankMsg::Send {
-            to_address: msg.recipient,
+            to_address: msg.recipient.clone(),
             amount: vec![Coin {
                 denom: "uusd".to_string(),
-                amount: amt,
+                amount: amt_to_recipient,
             }],
         }));
+
+        msgs.push(CosmosMsg::Bank(BankMsg::Send {
+            to_address: msg.relayer,
+            amount: vec![Coin {
+                denom: "uusd".to_string(),
+                amount: amt_to_relayer,
+            }],
+        }));
+
+        if msg.refund > Uint256::zero() {
+            msgs.push(CosmosMsg::Bank(BankMsg::Send {
+                to_address: msg.recipient,
+                amount: vec![Coin {
+                    denom: "uusd".to_string(),
+                    amount: amt_refund,
+                }],
+            }));
+        }
     }
 
     Ok(Response::new()
