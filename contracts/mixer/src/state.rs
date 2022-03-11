@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{StdResult, Storage, Uint256, CanonicalAddr};
+use cosmwasm_std::{CanonicalAddr, StdResult, Storage, Uint256};
 use cw_storage_plus::{Item, Map};
 
 use protocol_cosmwasm::error::ContractError;
@@ -22,7 +22,7 @@ pub struct Mixer {
 
 pub const MIXER: Item<Mixer> = Item::new("mixer");
 
-// "used nullifier" which stores if the "nullifier" is used or not. 
+// "used nullifier" which stores if the "nullifier" is used or not.
 pub const USED_NULLIFIERS: Map<Vec<u8>, bool> = Map::new("used_nullifers");
 
 // "Poseidon hasher"

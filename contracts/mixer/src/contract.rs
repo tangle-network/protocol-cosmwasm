@@ -1,22 +1,24 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, from_binary, attr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Storage, Uint128, Uint256, WasmMsg
+    attr, from_binary, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Response, StdError, StdResult, Storage, Uint128, Uint256, WasmMsg,
 };
 use cw2::set_contract_version;
 use std::convert::TryFrom;
 
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::mixer::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg, Cw20HookMsg, InfoResponse};
+use protocol_cosmwasm::mixer::{
+    Cw20HookMsg, DepositMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg, WithdrawMsg,
+};
 use protocol_cosmwasm::mixer_verifier::MixerVerifier;
 use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::zeroes::zeroes;
 
-use cw20::{Cw20ReceiveMsg, Cw20ExecuteMsg};
+use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use crate::state::{
-    save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, USED_NULLIFIERS, POSEIDON,
+    save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, POSEIDON, USED_NULLIFIERS,
 };
 
 // version info for migration info
@@ -27,7 +29,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// IMPORTANT:
 ///     Every individual mixer is for either native(UST) token or CW20 token.
 ///     For example, when instantiating:
-///         If the "cw20_address" field is empty, then the mixer is for native(UST) token. 
+///         If the "cw20_address" field is empty, then the mixer is for native(UST) token.
 ///         If the "cw20_address" field is set,   then the mixer is for CW20 token.
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -53,7 +55,7 @@ pub fn instantiate(
     // Check the validity of "cw20_address" if exists.
     let cw20_address = match msg.cw20_address {
         Some(addr) => Some(deps.api.addr_canonicalize(addr.as_str())?),
-        None => None
+        None => None,
     };
 
     // Initialize the Mixer
@@ -124,7 +126,9 @@ pub fn deposit(
 
     // Validation 3. Check if the mixer is for native(UST) token.
     if mixer.cw20_address.is_some() {
-        return Err(ContractError::Std(StdError::generic_err("This mixer is for CW20 token")));
+        return Err(ContractError::Std(StdError::generic_err(
+            "This mixer is for CW20 token",
+        )));
     }
 
     if let Some(commitment) = msg.commitment {
@@ -166,7 +170,9 @@ pub fn receive_cw20(
     let mixer: Mixer = MIXER.load(deps.storage)?;
     let cw20_address = mixer.cw20_address.clone();
     if cw20_address.is_none() {
-        return Err(ContractError::Std(StdError::generic_err("This mixer is for native(UST) token")));
+        return Err(ContractError::Std(StdError::generic_err(
+            "This mixer is for native(UST) token",
+        )));
     }
 
     if cw20_address.unwrap() != deps.api.addr_canonicalize(info.sender.as_str())? {
@@ -213,13 +219,13 @@ pub fn receive_cw20(
     }
 }
 
-/// User withdraws the native(UST) token or CW20 token 
-/// to "recipient" address by providing the "proof" for 
+/// User withdraws the native(UST) token or CW20 token
+/// to "recipient" address by providing the "proof" for
 /// the "commitment".
 /// It verifies the "withdraw" by verifying the "proof"
 /// with "commitment" saved in prior.
 /// If success on verify, then it performs "withdraw" action
-/// which sends the native(UST) token or CW20 token 
+/// which sends the native(UST) token or CW20 token
 /// to "recipient" & "relayer" address.
 pub fn withdraw(
     deps: DepsMut,
@@ -285,8 +291,8 @@ pub fn withdraw(
     // Send the funds
     let mut msgs: Vec<CosmosMsg> = vec![];
 
-   // Send the funds to "recipient"
-   let amt_to_recipient = match Uint128::try_from(mixer.deposit_size - msg.fee) {
+    // Send the funds to "recipient"
+    let amt_to_recipient = match Uint128::try_from(mixer.deposit_size - msg.fee) {
         Ok(v) => v,
         Err(_) => {
             return Err(ContractError::Std(StdError::GenericErr {
@@ -419,15 +425,13 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 fn get_cw20_address(deps: Deps) -> StdResult<InfoResponse> {
     let mixer = MIXER.load(deps.storage)?;
-    
+
     let cw20_address = match mixer.cw20_address {
         Some(cw20_address) => deps.api.addr_humanize(&cw20_address)?.to_string(),
         None => "".to_string(),
     };
 
-    Ok(InfoResponse {
-        cw20_address, 
-    })
+    Ok(InfoResponse { cw20_address })
 }
 
 #[cfg(test)]
