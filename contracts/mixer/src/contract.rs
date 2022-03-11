@@ -21,6 +21,12 @@ use crate::state::{
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-mixer";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// User instantiates the "mixer" contract.
+/// IMPORTANT:
+///     Every individual mixer is for either native(UST) token or CW20 token.
+///     For example, when instantiating:
+///         If the "cw20_address" field is empty, then the mixer is for native(UST) token. 
+///         If the "cw20_address" field is set,   then the mixer is for CW20 token.
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -84,9 +90,14 @@ pub fn execute(
     match msg {
         ExecuteMsg::Deposit(msg) => deposit(deps, info, msg),
         ExecuteMsg::Withdraw(msg) => withdraw(deps, info, msg),
+        ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
     }
 }
 
+/// User deposits the fund(UST) with its commitment.
+/// It checks the validity of the fund(UST) sent.
+/// It also checks the merkle tree availiability.
+/// It saves the commitment in "merkle tree".
 pub fn deposit(
     deps: DepsMut,
     info: MessageInfo,
@@ -109,16 +120,21 @@ pub fn deposit(
         return Err(ContractError::NotInitialized {});
     }
 
+    // Validation 3. Check if the mixer is for native(UST) token.
+    if mixer.cw20_address.is_some() {
+        return Err(ContractError::Std(StdError::generic_err("This mixer is for CW20 token")));
+    }
+
     if let Some(commitment) = msg.commitment {
         let mut merkle_tree = mixer.merkle_tree;
         let poseidon = POSEIDON.load(deps.storage)?;
-        // let poseidon = Poseidon::new();
         let res = merkle_tree.insert(poseidon, commitment, deps.storage)?;
         MIXER.save(
             deps.storage,
             &Mixer {
                 initialized: mixer.initialized,
                 deposit_size: mixer.deposit_size,
+                cw20_address: mixer.cw20_address,
                 merkle_tree,
             },
         )?;
