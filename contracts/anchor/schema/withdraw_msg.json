@@ -4,6 +4,7 @@
   "type": "object",
   "required": [
     "commitment",
+    "cw20_address",
     "fee",
     "nullifier_hash",
     "proof_bytes",
@@ -24,10 +25,7 @@
       "minItems": 32
     },
     "cw20_address": {
-      "type": [
-        "string",
-        "null"
-      ]
+      "type": "string"
     },
     "fee": {
       "$ref": "#/definitions/Uint256"

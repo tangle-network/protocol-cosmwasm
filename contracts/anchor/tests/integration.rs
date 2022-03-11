@@ -1,12 +1,12 @@
 //! This integration test tries to run and call the generated wasm.
 
-use cosmwasm_std::{attr, from_binary, to_binary, Coin, Response, Uint128, Uint256};
+use cosmwasm_std::{attr, from_binary, to_binary, Response, Uint128};
 use cosmwasm_vm::testing::{
     execute, instantiate, mock_env, mock_info, mock_instance_with_gas_limit, query,
 };
 use cw20::Cw20ReceiveMsg;
 use protocol_cosmwasm::anchor::{
-    Cw20HookMsg, DepositMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg,
+    Cw20HookMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg,
 };
 
 use ark_bn254::Fr;
@@ -54,51 +54,6 @@ fn integration_test_instantiate_anchor() {
     let query = query(&mut deps, mock_env(), QueryMsg::GetCw20Address {}).unwrap();
     let info: InfoResponse = from_binary(&query).unwrap();
     assert_eq!(info.cw20_address, cw20_address);
-}
-
-#[test]
-fn integration_test_anchor_success_workflow() {
-    let mut deps = mock_instance_with_gas_limit(WASM, 200_000_000);
-
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
-
-    // Initialize the contract
-    let env = mock_env();
-    let info = mock_info("anyone", &[]);
-    let instantiate_msg = InstantiateMsg {
-        max_edges: 2,
-        chain_id: 1,
-        levels: 30,
-        deposit_size: Uint128::from(1_000_000_u128),
-        cw20_address: cw20_address.clone(),
-    };
-
-    let _res: Response = instantiate(&mut deps, env, info, instantiate_msg).unwrap();
-
-    // Initialize the mixer
-    let params = get_poseidon_bn254_x5_5();
-    let left_input = Fr::one().into_repr().to_bytes_le();
-    let right_input = Fr::one().double().into_repr().to_bytes_le();
-    let mut input = Vec::new();
-    input.extend_from_slice(&left_input);
-    input.extend_from_slice(&right_input);
-    let res = <PoseidonCRH5 as CRHTrait>::evaluate(&params, &input).unwrap();
-    let mut element: [u8; 32] = [0u8; 32];
-    element.copy_from_slice(&res.into_repr().to_bytes_le());
-
-    // Try the deposit for success
-    let info = mock_info("depositor", &[Coin::new(1_000_000_u128, "uusd")]);
-    let deposit_msg = ExecuteMsg::Deposit(DepositMsg {
-        from: None,
-        commitment: Some(element),
-        value: Uint256::from(0_u128),
-    });
-
-    let response: Response = execute(&mut deps, mock_env(), info, deposit_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit"), attr("result", "0")]
-    );
 }
 
 #[test]

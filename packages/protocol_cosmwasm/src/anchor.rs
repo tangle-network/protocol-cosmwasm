@@ -15,17 +15,10 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    Deposit(DepositMsg),
     Withdraw(WithdrawMsg),
     Receive(Cw20ReceiveMsg),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct DepositMsg {
-    pub from: Option<String>,
-    pub commitment: Option<[u8; 32]>,
-    pub value: Uint256,
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -44,7 +37,7 @@ pub struct WithdrawMsg {
     pub fee: Uint256,
     pub refund: Uint256,
     pub commitment: [u8; 32],
-    pub cw20_address: Option<String>,
+    pub cw20_address: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
