@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Response, StdError, StdResult, Storage, Uint128, Uint256, WasmMsg,
+    attr, from_binary, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response,
+    StdError, StdResult, Storage, Uint128, Uint256, WasmMsg,
 };
 use cw2::set_contract_version;
 
@@ -381,7 +381,7 @@ mod tests {
     type PoseidonCRH5 = CRH<Fr>;
 
     #[test]
-    fn proper_initialization() {
+    fn test_anchor_proper_initialization() {
         let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
         let mut deps = mock_dependencies(&[]);
         let env = mock_env();
@@ -407,9 +407,8 @@ mod tests {
         assert_eq!(info.cw20_address, cw20_address);
     }
 
-
     #[test]
-    fn test_deposit_cw20() {
+    fn test_anchor_deposit_cw20() {
         let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
 
         let mut deps = mock_dependencies(&coins(2, "token"));
@@ -438,7 +437,7 @@ mod tests {
         let mut element: [u8; 32] = [0u8; 32];
         element.copy_from_slice(&res.into_repr().to_bytes_le());
 
-        // Try the deposit for success
+        // Should "deposit" cw20 tokens with success.
         let info = mock_info(cw20_address.as_str(), &[]);
         let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: cw20_address.clone(),
@@ -457,7 +456,7 @@ mod tests {
     }
 
     #[test]
-    fn test_withdraw_cw20_wasm_utils() {
+    fn test_anchor_withdraw_cw20_wasm_utils() {
         let curve = Curve::Bn254;
         let (pk_bytes, _) = crate::test_util::setup_environment(curve);
         let src_chain_id = compute_chain_id_type(1u64, &COSMOS_CHAIN_TYPE);
@@ -497,7 +496,7 @@ mod tests {
 
         let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
-        // Try the deposit for success
+        // Should "deposit" cw20 tokens with success.
         let info = mock_info(cw20_address.as_str(), &[]);
         let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: cw20_address.clone(),
@@ -544,6 +543,7 @@ mod tests {
             "Should fail with wrong proof bytes"
         );
 
+        // Should "withdraw" cw20 tokens with success.
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes,
             roots: roots,
@@ -585,7 +585,7 @@ mod tests {
     }
 
     #[test]
-    fn test_withdraw_cw20_native() {
+    fn test_anchor_withdraw_cw20_native() {
         let curve = Curve::Bn254;
         let (pk_bytes, _) = crate::test_util::setup_environment(curve);
         let recipient_bytes = [1u8; 32];
@@ -625,7 +625,7 @@ mod tests {
 
         let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
-        // Try the deposit for success
+        // Should "deposit" cw20 tokens with success.
         let info = mock_info(cw20_address.as_str(), &[]);
         let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: cw20_address.clone(),
@@ -671,7 +671,7 @@ mod tests {
             "Generic error: Root is not known".to_string()
         );
 
-        // Withdraw should succeed
+        // Should "withdraw" cw20 tokens with success.
         let mut roots = vec![];
         for elem in root_elements {
             roots.push(elem.0);

@@ -5,9 +5,7 @@ use cosmwasm_vm::testing::{
     execute, instantiate, mock_env, mock_info, mock_instance_with_gas_limit, query,
 };
 use cw20::Cw20ReceiveMsg;
-use protocol_cosmwasm::anchor::{
-    Cw20HookMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg,
-};
+use protocol_cosmwasm::anchor::{Cw20HookMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg};
 
 use ark_bn254::Fr;
 use ark_crypto_primitives::CRH as CRHTrait;
@@ -86,7 +84,7 @@ fn test_deposit_cw20() {
     let mut element: [u8; 32] = [0u8; 32];
     element.copy_from_slice(&res.into_repr().to_bytes_le());
 
-    // Try the deposit for success
+    // Should "deposit" cw20 tokens with success.
     let info = mock_info(cw20_address.as_str(), &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: cw20_address.clone(),
