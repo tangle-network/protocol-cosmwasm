@@ -668,10 +668,8 @@ mod tests {
         assert_eq!(on_chain_root, local_root);
 
         // Invalid withdraw proof leads to failure result.
-        let mut false_proof_bytes = proof_bytes.clone();
-        false_proof_bytes[0] = 0;
-        false_proof_bytes[1] = 0;
-        false_proof_bytes[2] = 0;
+        let mut wrong_proof_bytes = proof_bytes.clone();
+        wrong_proof_bytes[0] = 0;
 
         let mut roots = vec![];
         for i in 0..root_elements.len() {
@@ -679,7 +677,7 @@ mod tests {
         }
 
         let withdraw_msg = WithdrawMsg {
-            proof_bytes: false_proof_bytes,
+            proof_bytes: wrong_proof_bytes,
             roots: roots,
             nullifier_hash: nullifier_hash_element.0,
             recipient: hex::encode(recipient_bytes.to_vec()),
@@ -690,8 +688,10 @@ mod tests {
             cw20_address: None,
         };
         let info = mock_info("withdraw", &[]);
-        let err = withdraw(deps.as_mut(), info, withdraw_msg).unwrap_err();
-        assert_eq!(err.to_string(), "VerifyError".to_string());
+        assert!(
+            withdraw(deps.as_mut(), info, withdraw_msg).is_err(),
+            "Should fail with wrong proof bytes"
+        );
 
         // Should succeed
         let mut roots = vec![];
