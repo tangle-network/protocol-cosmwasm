@@ -26,7 +26,7 @@ library = []
 optimize = """docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/rust-optimizer:0.12.3
+  cosmwasm/rust-optimizer:0.12.5
 """
 
 [dependencies]
@@ -34,6 +34,7 @@ cosmwasm-std = { version = "0.16.2" }
 cosmwasm-storage = { version = "0.16.0" }
 cw-storage-plus = "0.8.0"
 cw2 = "0.8.1"
+cw20 = "0.8.1"
 schemars = "0.8.3"
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.26" }

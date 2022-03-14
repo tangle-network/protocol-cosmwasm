@@ -1,12 +1,15 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Storage, Uint128, Uint256,
+    attr, from_binary, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response,
+    StdError, StdResult, Storage, Uint128, Uint256, WasmMsg,
 };
 use cw2::set_contract_version;
 
-use protocol_cosmwasm::anchor::{DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg};
+use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
+use protocol_cosmwasm::anchor::{
+    Cw20HookMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg, WithdrawMsg,
+};
 use protocol_cosmwasm::anchor_verifier::AnchorVerifier;
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::poseidon::Poseidon;
@@ -57,12 +60,16 @@ pub fn instantiate(
         chain_id_list: Vec::new(),
     };
 
+    // Get the "cw20_address"
+    let cw20_address = deps.api.addr_canonicalize(&msg.cw20_address)?;
+
     // Initialize the Anchor
     let anchor = Anchor {
         chain_id: msg.chain_id,
         deposit_size: Uint256::from(msg.deposit_size.u128()),
         linkable_tree: linkable_merkle_tree,
         merkle_tree,
+        cw20_address,
     };
     ANCHOR.save(deps.storage, &anchor)?;
 
@@ -87,66 +94,75 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Deposit(msg) => deposit(deps, info, msg),
         ExecuteMsg::Withdraw(msg) => withdraw(deps, info, msg),
+        ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
     }
 }
 
-/// User deposits the fund(UST) with its commitment.
-/// It checks the validity of the fund(UST) sent.
+/// User deposits the Cw20 tokens with its commitments.
+/// The deposit starts from executing the hook message
+/// coming from the Cw20 token contract.
+/// It checks the validity of the Cw20 tokens sent.
 /// It also checks the merkle tree availiability.
 /// It saves the commitment in "merkle tree".
-pub fn deposit(
+pub fn receive_cw20(
     deps: DepsMut,
     info: MessageInfo,
-    msg: DepositMsg,
+    cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
-    let anchor = ANCHOR.load(deps.storage)?;
-
-    // Validation 1. Check if the enough UST are sent.
-    let sent_uusd: Vec<Coin> = info
-        .funds
-        .into_iter()
-        .filter(|x| x.denom == "uusd")
-        .collect();
-    if sent_uusd.is_empty() || Uint256::from(sent_uusd[0].amount) < anchor.deposit_size {
-        return Err(ContractError::InsufficientFunds {});
+    // Only Cw20 token contract can execute this message.
+    let anchor: Anchor = ANCHOR.load(deps.storage)?;
+    if anchor.cw20_address != deps.api.addr_canonicalize(info.sender.as_str())? {
+        return Err(ContractError::Unauthorized {});
     }
-    // Checks the validity of
-    if let Some(commitment) = msg.commitment {
-        let mut merkle_tree = anchor.merkle_tree;
-        let poseidon = POSEIDON.load(deps.storage)?;
-        let res = merkle_tree
-            .insert(poseidon, commitment, deps.storage)
-            .map_err(|_| ContractError::MerkleTreeIsFull)?;
 
-        ANCHOR.save(
-            deps.storage,
-            &Anchor {
-                chain_id: anchor.chain_id,
-                deposit_size: anchor.deposit_size,
-                linkable_tree: anchor.linkable_tree,
-                merkle_tree,
-            },
-        )?;
+    let tokens_sent = cw20_msg.amount;
+    match from_binary(&cw20_msg.msg) {
+        Ok(Cw20HookMsg::DepositCw20 { commitment }) => {
+            if Uint256::from(tokens_sent) < anchor.deposit_size {
+                return Err(ContractError::InsufficientFunds {});
+            }
+            // Checks the validity of
+            if let Some(commitment) = commitment {
+                let mut merkle_tree = anchor.merkle_tree;
+                let poseidon = POSEIDON.load(deps.storage)?;
+                let res = merkle_tree
+                    .insert(poseidon, commitment, deps.storage)
+                    .map_err(|_| ContractError::MerkleTreeIsFull)?;
 
-        Ok(Response::new().add_attributes(vec![
-            attr("method", "deposit"),
-            attr("result", res.to_string()),
-        ]))
-    } else {
-        Err(ContractError::Std(StdError::NotFound {
-            kind: "Commitment".to_string(),
-        }))
+                ANCHOR.save(
+                    deps.storage,
+                    &Anchor {
+                        chain_id: anchor.chain_id,
+                        deposit_size: anchor.deposit_size,
+                        linkable_tree: anchor.linkable_tree,
+                        cw20_address: anchor.cw20_address,
+                        merkle_tree,
+                    },
+                )?;
+
+                Ok(Response::new().add_attributes(vec![
+                    attr("method", "deposit_cw20"),
+                    attr("result", res.to_string()),
+                ]))
+            } else {
+                Err(ContractError::Std(StdError::NotFound {
+                    kind: "Commitment".to_string(),
+                }))
+            }
+        }
+        Err(_) => Err(ContractError::Std(StdError::generic_err(
+            "invalid cw20 hook msg",
+        ))),
     }
 }
 
-/// User withdraws the fund(UST) to "recipient" address
+/// User withdraws the CW20 tokens to "recipient" address
 /// by providing the "proof" for the "commitment".
 /// It verifies the "withdraw" by verifying the "proof"
 /// with "commitment" saved in prior.
 /// If success on verify, then it performs "withdraw" action
-/// which sends the fund(UST) to "recipient" & "relayer" address.
+/// which sends the CW20 tokens to "recipient" & "relayer" address.
 pub fn withdraw(
     deps: DepsMut,
     info: MessageInfo,
@@ -224,12 +240,19 @@ pub fn withdraw(
     // Set used nullifier to true after successful verification
     NULLIFIERS.save(deps.storage, msg.nullifier_hash.to_vec(), &true)?;
 
+    // Validate the "cw20_address".
+    let cw20_address = msg.cw20_address;
+    if anchor.cw20_address != deps.api.addr_canonicalize(cw20_address.as_str())? {
+        return Err(ContractError::Std(StdError::generic_err(
+            "Invalid cw20 address",
+        )));
+    }
+
     // Send the funds
-    // TODO: Support "ERC20"-like tokens
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     // Send the funds to "recipient"
-    let amt = match Uint128::try_from(anchor.deposit_size - msg.fee) {
+    let amt_to_recipient = match Uint128::try_from(anchor.deposit_size - msg.fee) {
         Ok(v) => v,
         Err(_) => {
             return Err(ContractError::Std(StdError::GenericErr {
@@ -237,16 +260,17 @@ pub fn withdraw(
             }))
         }
     };
-    msgs.push(CosmosMsg::Bank(BankMsg::Send {
-        to_address: msg.recipient.clone(),
-        amount: vec![Coin {
-            denom: "uusd".to_string(),
-            amount: amt,
-        }],
+    msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: cw20_address.clone(),
+        funds: [].to_vec(),
+        msg: to_binary(&Cw20ExecuteMsg::Transfer {
+            recipient: msg.recipient.clone(),
+            amount: amt_to_recipient,
+        })?,
     }));
 
     // Send the funds to "relayer"
-    let amt = match Uint128::try_from(msg.fee) {
+    let amt_to_relayer = match Uint128::try_from(msg.fee) {
         Ok(v) => v,
         Err(_) => {
             return Err(ContractError::Std(StdError::GenericErr {
@@ -254,17 +278,18 @@ pub fn withdraw(
             }))
         }
     };
-    msgs.push(CosmosMsg::Bank(BankMsg::Send {
-        to_address: msg.relayer,
-        amount: vec![Coin {
-            denom: "uusd".to_string(),
-            amount: amt,
-        }],
+    msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: cw20_address.clone(),
+        funds: [].to_vec(),
+        msg: to_binary(&Cw20ExecuteMsg::Transfer {
+            recipient: msg.relayer.clone(),
+            amount: amt_to_relayer,
+        })?,
     }));
 
     // If "refund" field is non-zero, send the funds to "recipient"
     if msg.refund > Uint256::zero() {
-        let amt = match Uint128::try_from(msg.refund) {
+        let amt_refund = match Uint128::try_from(msg.refund) {
             Ok(v) => v,
             Err(_) => {
                 return Err(ContractError::Std(StdError::GenericErr {
@@ -272,12 +297,13 @@ pub fn withdraw(
                 }))
             }
         };
-        msgs.push(CosmosMsg::Bank(BankMsg::Send {
-            to_address: msg.recipient,
-            amount: vec![Coin {
-                denom: "uusd".to_string(),
-                amount: amt,
-            }],
+        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: cw20_address,
+            funds: [].to_vec(),
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: msg.recipient.clone(),
+                amount: amt_refund,
+            })?,
         }));
     }
 
@@ -287,10 +313,17 @@ pub fn withdraw(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        // TODO
+        QueryMsg::GetCw20Address {} => to_binary(&get_cw20_address(deps)?),
     }
+}
+
+fn get_cw20_address(deps: Deps) -> StdResult<InfoResponse> {
+    let anchor = ANCHOR.load(deps.storage)?;
+    Ok(InfoResponse {
+        cw20_address: deps.api.addr_humanize(&anchor.cw20_address)?.to_string(),
+    })
 }
 
 // Check if the "nullifier" is already used or not.
@@ -348,9 +381,9 @@ mod tests {
     type PoseidonCRH5 = CRH<Fr>;
 
     #[test]
-    fn proper_initialization() {
+    fn test_anchor_proper_initialization() {
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
         let mut deps = mock_dependencies(&[]);
-
         let env = mock_env();
         let info = mock_info("anyone", &[]);
         let instantiate_msg = InstantiateMsg {
@@ -358,6 +391,7 @@ mod tests {
             chain_id: 1,
             levels: 0,
             deposit_size: Uint128::from(1_000_000_u128),
+            cw20_address: cw20_address.clone(),
         };
 
         // Should pass this "unwrap" if success.
@@ -367,10 +401,16 @@ mod tests {
             response.attributes,
             vec![attr("method", "instantiate"), attr("owner", "anyone"),]
         );
+
+        let query = query(deps.as_ref(), mock_env(), QueryMsg::GetCw20Address {}).unwrap();
+        let info: InfoResponse = from_binary(&query).unwrap();
+        assert_eq!(info.cw20_address, cw20_address);
     }
 
     #[test]
-    fn test_deposit() {
+    fn test_anchor_deposit_cw20() {
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
+
         let mut deps = mock_dependencies(&coins(2, "token"));
 
         // Initialize the contract
@@ -381,6 +421,7 @@ mod tests {
             chain_id: 1,
             levels: 30,
             deposit_size: Uint128::from(1_000_000_u128),
+            cw20_address: cw20_address.clone(),
         };
 
         let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -396,45 +437,26 @@ mod tests {
         let mut element: [u8; 32] = [0u8; 32];
         element.copy_from_slice(&res.into_repr().to_bytes_le());
 
-        // Try the deposit with insufficient fund
-        let info = mock_info("depositor", &[Coin::new(1_000_u128, "uusd")]);
-        let deposit_msg = DepositMsg {
-            from: None,
-            commitment: Some(element),
-            value: Uint256::from(0_u128),
-        };
+        // Should "deposit" cw20 tokens with success.
+        let info = mock_info(cw20_address.as_str(), &[]);
+        let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender: cw20_address.clone(),
+            amount: Uint128::from(1_000_000_u128),
+            msg: to_binary(&Cw20HookMsg::DepositCw20 {
+                commitment: Some(element),
+            })
+            .unwrap(),
+        });
 
-        let err = deposit(deps.as_mut(), info, deposit_msg).unwrap_err();
-        assert_eq!(err.to_string(), "Insufficient_funds".to_string());
-
-        // Try the deposit with empty commitment
-        let info = mock_info("depositor", &[Coin::new(1_000_000_u128, "uusd")]);
-        let deposit_msg = DepositMsg {
-            from: None,
-            commitment: None,
-            value: Uint256::from(0_u128),
-        };
-
-        let err = deposit(deps.as_mut(), info, deposit_msg).unwrap_err();
-        assert_eq!(err.to_string(), "Commitment not found".to_string());
-
-        // Try the deposit for success
-        let info = mock_info("depositor", &[Coin::new(1_000_000_u128, "uusd")]);
-        let deposit_msg = DepositMsg {
-            from: None,
-            commitment: Some(element),
-            value: Uint256::from(0_u128),
-        };
-
-        let response = deposit(deps.as_mut(), info, deposit_msg).unwrap();
+        let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
         assert_eq!(
             response.attributes,
-            vec![attr("method", "deposit"), attr("result", "0")]
+            vec![attr("method", "deposit_cw20"), attr("result", "0")]
         );
     }
 
     #[test]
-    fn test_withdraw_wasm_utils() {
+    fn test_anchor_withdraw_cw20_wasm_utils() {
         let curve = Curve::Bn254;
         let (pk_bytes, _) = crate::test_util::setup_environment(curve);
         let src_chain_id = compute_chain_id_type(1u64, &COSMOS_CHAIN_TYPE);
@@ -458,6 +480,7 @@ mod tests {
                 refund_value,
             );
 
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
         let mut deps = mock_dependencies(&coins(2, "token"));
 
         // Initialize the contract
@@ -468,32 +491,35 @@ mod tests {
             chain_id: 1,
             levels: 30,
             deposit_size: Uint128::from(1_000_000_u128),
+            cw20_address: cw20_address.clone(),
         };
 
         let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
-        // Try the deposit for success
-        let info = mock_info("depositor", &[Coin::new(1_000_000_u128, "uusd")]);
-        let deposit_msg = DepositMsg {
-            from: None,
-            commitment: Some(leaf_element.0),
-            value: Uint256::from(0_u128),
-        };
+        // Should "deposit" cw20 tokens with success.
+        let info = mock_info(cw20_address.as_str(), &[]);
+        let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender: cw20_address.clone(),
+            amount: Uint128::from(1_000_000_u128),
+            msg: to_binary(&Cw20HookMsg::DepositCw20 {
+                commitment: Some(leaf_element.0),
+            })
+            .unwrap(),
+        });
 
-        let response = deposit(deps.as_mut(), info, deposit_msg.clone()).unwrap();
+        let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
         assert_eq!(
             response.attributes,
-            vec![attr("method", "deposit"), attr("result", "0")]
+            vec![attr("method", "deposit_cw20"), attr("result", "0")]
         );
+
         let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
         let local_root = root_elements[0].0;
         assert_eq!(on_chain_root, local_root);
 
         // Invalid withdraw proof leads to failure result.
-        let mut false_proof_bytes = proof_bytes.clone();
-        false_proof_bytes[0] = 0;
-        false_proof_bytes[1] = 0;
-        false_proof_bytes[2] = 0;
+        let mut wrong_proof_bytes = proof_bytes.clone();
+        wrong_proof_bytes[0] = 0;
 
         let mut roots = vec![];
         for i in 0..root_elements.len() {
@@ -501,25 +527,23 @@ mod tests {
         }
 
         let withdraw_msg = WithdrawMsg {
-            proof_bytes: false_proof_bytes,
-            roots: roots,
+            proof_bytes: wrong_proof_bytes,
+            roots: roots.clone(),
             nullifier_hash: nullifier_hash_element.0,
             recipient: hex::encode(recipient_bytes.to_vec()),
             relayer: hex::encode(relayer_bytes.to_vec()),
             fee: cosmwasm_std::Uint256::from(fee_value),
             refund: cosmwasm_std::Uint256::from(refund_value),
             commitment: commitment_element.0,
+            cw20_address: cw20_address.clone(),
         };
         let info = mock_info("withdraw", &[]);
-        let err = withdraw(deps.as_mut(), info, withdraw_msg).unwrap_err();
-        assert_eq!(err.to_string(), "VerifyError".to_string());
+        assert!(
+            withdraw(deps.as_mut(), info, withdraw_msg).is_err(),
+            "Should fail with wrong proof bytes"
+        );
 
-        // Should succeed
-        let mut roots = vec![];
-        for i in 0..root_elements.len() {
-            roots.push(root_elements[i].0);
-        }
-
+        // Should "withdraw" cw20 tokens with success.
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes,
             roots: roots,
@@ -529,14 +553,39 @@ mod tests {
             fee: cosmwasm_std::Uint256::from(fee_value),
             refund: cosmwasm_std::Uint256::from(refund_value),
             commitment: commitment_element.0,
+            cw20_address: cw20_address.clone(),
         };
         let info = mock_info("withdraw", &[]);
         let response = withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
         assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
+
+        let expected_recipient = hex::encode(recipient_bytes.to_vec());
+        let expected_relayer = hex::encode(relayer_bytes.to_vec());
+        let expected_messages: Vec<CosmosMsg> = vec![
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: cw20_address.clone(),
+                funds: [].to_vec(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: expected_recipient,
+                    amount: Uint128::from(1_000_000_u128),
+                })
+                .unwrap(),
+            }),
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: cw20_address.clone(),
+                funds: [].to_vec(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: expected_relayer,
+                    amount: Uint128::from(0_u128),
+                })
+                .unwrap(),
+            }),
+        ];
+        assert_eq!(response.messages.len(), expected_messages.len());
     }
 
     #[test]
-    fn test_withdraw_native() {
+    fn test_anchor_withdraw_cw20_native() {
         let curve = Curve::Bn254;
         let (pk_bytes, _) = crate::test_util::setup_environment(curve);
         let recipient_bytes = [1u8; 32];
@@ -560,6 +609,7 @@ mod tests {
                 refund_value,
             );
 
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
         let mut deps = mock_dependencies(&coins(2, "token"));
 
         // Initialize the contract
@@ -570,43 +620,49 @@ mod tests {
             chain_id: 1,
             levels: 30,
             deposit_size: Uint128::from(1_000_000_u128),
+            cw20_address: cw20_address.clone(),
         };
 
         let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
-        // Try the deposit for success
-        let info = mock_info("depositor", &[Coin::new(1_000_000_u128, "uusd")]);
-        let deposit_msg = DepositMsg {
-            from: None,
-            commitment: Some(leaf_element.0),
-            value: Uint256::from(0_u128),
-        };
+        // Should "deposit" cw20 tokens with success.
+        let info = mock_info(cw20_address.as_str(), &[]);
+        let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender: cw20_address.clone(),
+            amount: Uint128::from(1_000_000_u128),
+            msg: to_binary(&Cw20HookMsg::DepositCw20 {
+                commitment: Some(leaf_element.0),
+            })
+            .unwrap(),
+        });
 
-        let response = deposit(deps.as_mut(), info, deposit_msg.clone()).unwrap();
+        let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
         assert_eq!(
             response.attributes,
-            vec![attr("method", "deposit"), attr("result", "0")]
+            vec![attr("method", "deposit_cw20"), attr("result", "0")]
         );
+
         let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
         let local_root = root_elements[0].0;
         assert_eq!(on_chain_root, local_root);
 
         // Invalid root_element leads to failure.
-        let mut false_roots = vec![];
+        let mut wrong_roots = vec![];
         for i in 0..root_elements.len() {
-            false_roots.push(root_elements[i].0);
+            wrong_roots.push(root_elements[i].0);
         }
-        false_roots[0][0] = 0;
+        wrong_roots[0][0] = 0;
 
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes.clone(),
-            roots: false_roots,
+            roots: wrong_roots,
             nullifier_hash: nullifier_hash_element.0,
             recipient: hex::encode(recipient_bytes.to_vec()),
             relayer: hex::encode(relayer_bytes.to_vec()),
             fee: cosmwasm_std::Uint256::from(fee_value),
             refund: cosmwasm_std::Uint256::from(refund_value),
             commitment: commit_element.0,
+            cw20_address: cw20_address.clone(),
         };
         let info = mock_info("withdraw", &[]);
         let err = withdraw(deps.as_mut(), info, withdraw_msg).unwrap_err();
@@ -615,7 +671,7 @@ mod tests {
             "Generic error: Root is not known".to_string()
         );
 
-        // Should succeed
+        // Should "withdraw" cw20 tokens with success.
         let mut roots = vec![];
         for elem in root_elements {
             roots.push(elem.0);
@@ -629,9 +685,34 @@ mod tests {
             fee: cosmwasm_std::Uint256::from(fee_value),
             refund: cosmwasm_std::Uint256::from(refund_value),
             commitment: commit_element.0,
+            cw20_address: cw20_address.clone(),
         };
         let info = mock_info("withdraw", &[]);
         let response = withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
         assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
+
+        let expected_recipient = hex::encode(recipient_bytes.to_vec());
+        let expected_relayer = hex::encode(relayer_bytes.to_vec());
+        let expected_messages: Vec<CosmosMsg> = vec![
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: cw20_address.clone(),
+                funds: [].to_vec(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: expected_recipient,
+                    amount: Uint128::from(1_000_000_u128),
+                })
+                .unwrap(),
+            }),
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: cw20_address.clone(),
+                funds: [].to_vec(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: expected_relayer,
+                    amount: Uint128::from(0_u128),
+                })
+                .unwrap(),
+            }),
+        ];
+        assert_eq!(response.messages.len(), expected_messages.len());
     }
 }

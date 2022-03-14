@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Cw20HookMsg",
+  "oneOf": [
+    {
+      "description": "Depcosit Cw20 tokens",
+      "type": "object",
+      "required": [
+        "deposit_cw20"
+      ],
+      "properties": {
+        "deposit_cw20": {
+          "type": "object",
+          "properties": {
+            "commitment": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "integer",
+                "format": "uint8",
+                "minimum": 0.0
+              },
+              "maxItems": 32,
+              "minItems": 32
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

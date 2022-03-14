@@ -1,4 +1,5 @@
 use cosmwasm_std::{Uint128, Uint256};
+use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -8,20 +9,21 @@ pub struct InstantiateMsg {
     pub chain_id: u64,
     pub levels: u32,
     pub deposit_size: Uint128,
+    pub cw20_address: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    Deposit(DepositMsg),
     Withdraw(WithdrawMsg),
+    Receive(Cw20ReceiveMsg),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct DepositMsg {
-    pub from: Option<String>,
-    pub commitment: Option<[u8; 32]>,
-    pub value: Uint256,
+#[serde(rename_all = "snake_case")]
+pub enum Cw20HookMsg {
+    /// Depcosit Cw20 tokens
+    DepositCw20 { commitment: Option<[u8; 32]> },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -34,8 +36,17 @@ pub struct WithdrawMsg {
     pub fee: Uint256,
     pub refund: Uint256,
     pub commitment: [u8; 32],
+    pub cw20_address: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum QueryMsg {}
+pub enum QueryMsg {
+    GetCw20Address {},
+}
+
+// We define a custom struct for each query response
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct InfoResponse {
+    pub cw20_address: String,
+}
