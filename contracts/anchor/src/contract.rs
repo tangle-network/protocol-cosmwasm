@@ -102,7 +102,7 @@ pub fn execute(
 /// User deposits the Cw20 tokens with its commitments.
 /// The deposit starts from executing the hook message
 /// coming from the Cw20 token contract.
-/// /// It checks the validity of the Cw20 tokens sent.
+/// It checks the validity of the Cw20 tokens sent.
 /// It also checks the merkle tree availiability.
 /// It saves the commitment in "merkle tree".
 pub fn receive_cw20(
