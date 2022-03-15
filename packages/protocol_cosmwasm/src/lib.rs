@@ -4,5 +4,6 @@ pub mod error;
 pub mod mixer;
 pub mod mixer_verifier;
 pub mod poseidon;
+pub mod vanchor;
 pub mod verifier;
 pub mod zeroes;

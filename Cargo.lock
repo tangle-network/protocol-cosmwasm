@@ -645,6 +645,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "cosmwasm-vanchor"
+version = "0.1.0"
+dependencies = [
+ "ark-bn254",
+ "ark-crypto-primitives",
+ "ark-ec",
+ "ark-ff",
+ "ark-groth16",
+ "ark-serialize",
+ "ark-std",
+ "arkworks-circuits",
+ "arkworks-gadgets",
+ "arkworks-utils",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cosmwasm-vm",
+ "cw-storage-plus",
+ "cw2",
+ "hex",
+ "protocol-cosmwasm",
+ "schemars",
+ "serde",
+ "thiserror",
+ "wasm-utils",
+]
+
+[[package]]
 name = "cosmwasm-vm"
 version = "0.16.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
