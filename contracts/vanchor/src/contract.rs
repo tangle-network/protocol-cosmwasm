@@ -55,10 +55,11 @@ pub fn instantiate(
 
     // Initialize the VAnchor
     let anchor = VAnchor {
-        owner: deps.api.addr_canonicalize(info.sender.as_str())?,
+        creator: deps.api.addr_canonicalize(info.sender.as_str())?,
         max_deposit_amt: msg.max_deposit_amt,
         min_withdraw_amt: msg.min_withdraw_amt,
         max_ext_amt: msg.max_ext_amt,
+        max_fee: msg.max_fee,
         linkable_tree: linkable_merkle_tree,
         merkle_tree,
         cw20_address,
@@ -114,6 +115,7 @@ mod tests {
             max_deposit_amt: Uint256::zero(),
             min_withdraw_amt: Uint256::zero(),
             max_ext_amt: Uint256::zero(),
+            max_fee: Uint256::zero(),
             cw20_address: cw20_address,
         };
         let info = mock_info("creator", &[]);

@@ -189,13 +189,14 @@ impl LinkableMerkleTree {
 // VAnchor: (TODO: Add the description)
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct VAnchor {
-    pub owner: CanonicalAddr,
+    pub creator: CanonicalAddr,
     pub merkle_tree: MerkleTree,
     pub linkable_tree: LinkableMerkleTree,
     pub cw20_address: CanonicalAddr,
     pub max_deposit_amt: Uint256,
     pub min_withdraw_amt: Uint256,
     pub max_ext_amt: Uint256,
+    pub max_fee: Uint256,
 }
 
 pub const VANCHOR: Item<VAnchor> = Item::new("vanchor");
