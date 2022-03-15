@@ -1,9 +1,9 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{to_binary, attr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use cw2::set_contract_version;
 
-use protocol_cosmwasm::vanchor::{InstantiateMsg, ExecuteMsg, QueryMsg};
+use protocol_cosmwasm::vanchor::{InstantiateMsg, ExecuteMsg, QueryMsg, UpdateConfigMsg};
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::vanchor_verifier::VAnchorVerifier;
 use protocol_cosmwasm::poseidon::Poseidon;
@@ -87,8 +87,44 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        // TODO
+        ExecuteMsg::UpdateConfig(msg) => update_vanchor_config(deps, info, msg),
     }
+}
+
+fn update_vanchor_config(deps: DepsMut, info: MessageInfo, msg: UpdateConfigMsg) -> Result<Response, ContractError> {
+    // Validation 1. Check if any funds are sent with this message.
+    if !info.funds.is_empty() {
+        return Err(ContractError::UnnecessaryFunds {  });
+    }
+
+    let mut vanchor = VANCHOR.load(deps.storage)?;
+    // Validation 2. Check if the msg sender is "creator".
+    if vanchor.creator != deps.api.addr_canonicalize(info.sender.as_str())? {
+        return Err(ContractError::Unauthorized {  });
+    }
+
+    // Update the vanchor config.
+    if let Some(max_deposit_amt) = msg.max_deposit_amt {
+        vanchor.max_deposit_amt = max_deposit_amt;
+    }
+
+    if let Some(min_withdraw_amt) = msg.min_withdraw_amt {
+        vanchor.min_withdraw_amt = min_withdraw_amt;
+    }
+
+    if let Some(max_ext_amt) = msg.max_ext_amt {
+        vanchor.max_ext_amt = max_ext_amt;
+    }
+
+    if let Some(max_fee) = msg.max_fee {
+        vanchor.max_fee = max_fee;
+    }
+
+    VANCHOR.save(deps.storage, &vanchor)?;
+
+    Ok(Response::new().add_attributes(vec![
+        attr("method", "update_vanchor_config"),
+    ]))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -125,4 +161,46 @@ mod tests {
         assert_eq!(0, res.messages.len());
     }
 
+    #[test]
+    fn test_vanchor_update_config() {
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
+        let mut deps = mock_dependencies(&[]);
+
+        let msg = InstantiateMsg {
+            max_edges: 0,
+            levels: 0,
+            max_deposit_amt: Uint256::zero(),
+            min_withdraw_amt: Uint256::zero(),
+            max_ext_amt: Uint256::zero(),
+            max_fee: Uint256::zero(),
+            cw20_address: cw20_address,
+        };
+        let info = mock_info("creator", &[]);
+
+        // we can just call .unwrap() to assert this was a success
+        let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        // Fail to update the config with "unauthorized" error.
+        let update_config_msg = UpdateConfigMsg {
+            max_deposit_amt: Some(Uint256::from(1u128)),
+            min_withdraw_amt: Some(Uint256::from(1u128)),
+            max_ext_amt: Some(Uint256::from(1u128)),
+            max_fee: Some(Uint256::from(1u128)),
+        };
+        let info = mock_info("intruder", &[]);
+        assert!(
+            execute(deps.as_mut(), mock_env(), info, ExecuteMsg::UpdateConfig(update_config_msg)).is_err(),
+            "Should fail with unauthorized",
+        );
+
+        // We can just call .unwrap() to assert "execute" was success
+        let update_config_msg = UpdateConfigMsg {
+            max_deposit_amt: Some(Uint256::from(1u128)),
+            min_withdraw_amt: Some(Uint256::from(1u128)),
+            max_ext_amt: Some(Uint256::from(1u128)),
+            max_fee: Some(Uint256::from(1u128)),
+        };
+        let info = mock_info("creator", &[]);
+        let _ = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::UpdateConfig(update_config_msg)).unwrap();
+    }
 }

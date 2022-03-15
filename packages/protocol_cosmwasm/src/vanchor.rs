@@ -16,7 +16,15 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    // TODO
+    UpdateConfig(UpdateConfigMsg),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct UpdateConfigMsg {
+    pub max_deposit_amt: Option<Uint256>,
+    pub min_withdraw_amt: Option<Uint256>,
+    pub max_ext_amt: Option<Uint256>,
+    pub max_fee: Option<Uint256>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
