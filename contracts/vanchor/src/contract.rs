@@ -1,9 +1,10 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, attr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{from_binary, to_binary, attr, StdError, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Storage};
 use cw2::set_contract_version;
 
-use protocol_cosmwasm::vanchor::{InstantiateMsg, ExecuteMsg, QueryMsg, UpdateConfigMsg};
+use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
+use protocol_cosmwasm::vanchor::{InstantiateMsg, ExecuteMsg, QueryMsg, UpdateConfigMsg, Cw20HookMsg, ProofData, ExtData};
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::vanchor_verifier::VAnchorVerifier;
 use protocol_cosmwasm::poseidon::Poseidon;
@@ -88,6 +89,7 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::UpdateConfig(msg) => update_vanchor_config(deps, info, msg),
+        ExecuteMsg::Receive(msg) => transact(deps, info, msg),
     }
 }
 
@@ -126,6 +128,79 @@ fn update_vanchor_config(deps: DepsMut, info: MessageInfo, msg: UpdateConfigMsg)
         attr("method", "update_vanchor_config"),
     ]))
 }
+
+fn transact(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Result<Response, ContractError> {
+    // Only Cw20 token contract can execute this message.
+    let vanchor: VAnchor = VANCHOR.load(deps.storage)?;
+    if vanchor.cw20_address != deps.api.addr_canonicalize(info.sender.as_str())? {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let transactor = cw20_msg.sender;
+    let cw20_token_amt = cw20_msg.amount;
+
+    match from_binary(&cw20_msg.msg) {
+        Ok(Cw20HookMsg::Transact { proof_data, ext_data }) =>{
+            // Validation 1. Double check the number of roots.
+            assert!(vanchor.linkable_tree.max_edges == proof_data.roots.len() as u32, "Max edges not matched");
+
+            // Validation 2. Check if the root is known to merkle tree
+            if !vanchor.merkle_tree.is_known_root(proof_data.roots[0], deps.storage) {
+                return Err(ContractError::Std(StdError::GenericErr {
+                    msg: "Root is not known".to_string(),
+                }));
+            }
+
+            // Validation 3. Check if the roots are valid in linkable tree.
+            let linkable_tree = vanchor.linkable_tree;
+            if !linkable_tree.is_valid_neighbor_roots(&proof_data.roots[1..], deps.storage) {
+                return Err(ContractError::Std(StdError::GenericErr {
+                    msg: "Neighbor roots are not valid".to_string(),
+                }));
+            }
+
+            // Check nullifier and add or return `InvalidNullifier`
+            for nullifier in &proof_data.input_nullifiers {
+                if is_known_nullifier(deps.storage, *nullifier) {
+                    return Err(ContractError::Std(StdError::GenericErr {
+                        msg: "Nullifier is known".to_string(),
+                    }));
+                }
+            }
+
+            // Compute hash of abi encoded ext_data, reduced into field from config
+
+            // Ensure that the passed external data hash matches the computed one
+
+            // Making sure that public amount and fee are correct
+
+            // Public amounnt can also be negative, in which
+            // case it would wrap around the field, so we should check if FIELD_SIZE -
+            // public_amount == proof_data.public_amount, in case of a negative ext_amount
+
+            // Construct public inputs
+
+            // Flag nullifiers as used
+
+            // Deposit or Withdraw
+
+            // If fee exists, handle it
+
+            // Insert output commitments into the tree
+
+            return Ok(Response::new());
+        }
+        Err(_) => Err(ContractError::Std(StdError::generic_err(
+            "invalid cw20 hook msg",
+        ))),
+    }
+}
+
+// Check if the "nullifier" is already used or not.
+fn is_known_nullifier(store: &dyn Storage, nullifier: [u8; 32]) -> bool {
+    NULLIFIERS.has(store, nullifier.to_vec())
+}
+
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
