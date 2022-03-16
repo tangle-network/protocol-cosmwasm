@@ -72,8 +72,7 @@ pub struct LinkableMerkleTree {
 }
 
 impl LinkableMerkleTree {
-    #[allow(dead_code)]
-    fn has_edge(&self, chain_id: ChainId, store: &dyn Storage) -> bool {
+    pub fn has_edge(&self, chain_id: ChainId, store: &dyn Storage) -> bool {
         has_edge(store, chain_id)
     }
 

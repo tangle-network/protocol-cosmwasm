@@ -11,8 +11,8 @@ use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::zeroes::zeroes;
 
 use crate::state::{
-    save_root, save_subtree, VAnchor, LinkableMerkleTree, MerkleTree, VANCHOR, VANCHORVERIFIER,
-    NULLIFIERS, POSEIDON
+    save_root, save_subtree, read_curr_neighbor_root_index, save_curr_neighbor_root_index, save_neighbor_roots, save_edge,
+    VAnchor, LinkableMerkleTree, MerkleTree, VANCHOR, VANCHORVERIFIER, NULLIFIERS, POSEIDON, Edge
 };
 
 // version info for migration info
@@ -21,6 +21,9 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // ChainType info
 const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
+
+// History length for the "Curr_neighbor_root_index".
+const HISTORY_LENGTH: u32 = 30;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -94,6 +97,8 @@ pub fn execute(
     match msg {
         ExecuteMsg::UpdateConfig(msg) => update_vanchor_config(deps, info, msg),
         ExecuteMsg::Receive(msg) => transact(deps, info, msg),
+        ExecuteMsg::AddEdge { src_chain_id, root, latest_leaf_index } => add_edge(deps, info, src_chain_id, root, latest_leaf_index),
+        ExecuteMsg::UpdateEdge { src_chain_id, root, latest_leaf_index } => update_edge(deps, info, src_chain_id, root, latest_leaf_index),
     }
 }
 
@@ -317,6 +322,64 @@ fn transact(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Resul
             "invalid cw20 hook msg",
         ))),
     }
+}
+
+fn add_edge(deps: DepsMut, info: MessageInfo, src_chain_id: u64, root: [u8; 32], latest_leaf_index: u32) -> Result<Response, ContractError> {
+    // Validation 1. Check if any funds are sent with this message.
+    if !info.funds.is_empty() {
+        return Err(ContractError::UnnecessaryFunds {  });
+    }
+
+    let vanchor = VANCHOR.load(deps.storage)?;
+    let linkable_tree = vanchor.linkable_tree;
+    if linkable_tree.has_edge(src_chain_id, deps.storage) {
+        return Err(ContractError::Std(StdError::GenericErr { msg: "Edge already exists".to_string() }));
+    }
+
+    let curr_length = linkable_tree.get_latest_neighbor_edges(deps.storage).len();
+    if curr_length > linkable_tree.max_edges as usize {
+        return Err(ContractError::Std(StdError::GenericErr { msg: "Too many edges".to_string() }));
+    }
+
+    // craft edge
+    let edge: Edge = Edge { chain_id: src_chain_id, root, latest_leaf_index };
+
+    // update historical neighbor list for this edge's root
+    let curr_neighbor_root_idx = read_curr_neighbor_root_index(deps.storage, src_chain_id)?;
+    save_curr_neighbor_root_index(deps.storage, src_chain_id, (curr_neighbor_root_idx + 1) % HISTORY_LENGTH )?;
+
+    save_neighbor_roots(deps.storage, (src_chain_id, curr_neighbor_root_idx), root)?;
+
+    // Append new edge to the end of the edge list for the given tree
+    save_edge(deps.storage, src_chain_id, edge)?;
+    
+    Ok(Response::new().add_attributes(vec![
+        attr("method", "add_edge"),
+    ]))
+}
+
+fn update_edge(deps: DepsMut, info: MessageInfo, src_chain_id: u64, root: [u8; 32], latest_leaf_index: u32) -> Result<Response, ContractError> {
+    // Validation 1. Check if any funds are sent with this message.
+    if !info.funds.is_empty() {
+        return Err(ContractError::UnnecessaryFunds {  });
+    }
+
+    let vanchor = VANCHOR.load(deps.storage)?;
+    let linkable_tree = vanchor.linkable_tree;
+    if !linkable_tree.has_edge(src_chain_id, deps.storage) {
+        return Err(ContractError::Std(StdError::GenericErr { msg: "Edge does not exist".to_string() }));
+    }
+
+    let edge: Edge = Edge { chain_id: src_chain_id, root, latest_leaf_index };
+    let neighbor_root_idx = (read_curr_neighbor_root_index(deps.storage, src_chain_id)? + 1) % HISTORY_LENGTH;
+    save_curr_neighbor_root_index(deps.storage, src_chain_id, neighbor_root_idx)?;
+    save_neighbor_roots(deps.storage, (src_chain_id, neighbor_root_idx), root)?;
+
+    save_edge(deps.storage, src_chain_id, edge)?;
+    
+    Ok(Response::new().add_attributes(vec![
+        attr("method", "udpate_edge")
+    ]))
 }
 
 // Check if the "nullifier" is already used or not.

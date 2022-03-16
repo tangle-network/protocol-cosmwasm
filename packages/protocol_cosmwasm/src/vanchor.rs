@@ -20,6 +20,8 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     UpdateConfig(UpdateConfigMsg),
     Receive(Cw20ReceiveMsg),
+    AddEdge { src_chain_id: u64 , root: [u8; 32], latest_leaf_index: u32 },
+    UpdateEdge { src_chain_id: u64, root: [u8; 32], latest_leaf_index: u32 }, 
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
