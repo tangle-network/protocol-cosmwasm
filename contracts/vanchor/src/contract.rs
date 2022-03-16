@@ -145,7 +145,7 @@ fn transact(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Resul
     let cw20_address = info.sender.to_string();
 
     match from_binary(&cw20_msg.msg) {
-        Ok(Cw20HookMsg::Transact { proof_data, ext_data }) =>{
+        Ok(Cw20HookMsg::Transact { proof_data, ext_data, is_deposit }) =>{
             // Validation 1. Double check the number of roots.
             assert!(vanchor.linkable_tree.max_edges == proof_data.roots.len() as u32, "Max edges not matched");
 
@@ -246,7 +246,6 @@ fn transact(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Resul
 
             // Deposit or Withdraw
             let mut msgs: Vec<CosmosMsg> = vec![];
-            let is_deposit = ext_data.is_deposit;
             let ext_amt = ext_data.ext_amount;
             if is_deposit {
                 assert!(ext_amt <= vanchor.max_deposit_amt, "Invalid deposit amount");
@@ -367,8 +366,24 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sp_core::hashing::keccak_256;
+    use ark_bn254::Fr;
+    use ark_crypto_primitives::CRH as CRHTrait;
+    use ark_ff::PrimeField;
+    use ark_ff::{BigInteger, Field};
+    use ark_std::One;
+    use arkworks_gadgets::poseidon::CRH;
+    use arkworks_utils::utils::bn254_x5_5::get_poseidon_bn254_x5_5;
+    use arkworks_utils::utils::common::Curve;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, Uint256};
+    use cosmwasm_std::{attr, coins, Uint128};
+    type PoseidonCRH5 = CRH<Fr>;
+
+    fn element_encoder (v: &[u8]) -> [u8; 32] {
+        let mut output = [0u8; 32];
+        output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
+        output
+    }
 
     #[test]
     fn proper_initialization() {
@@ -435,4 +450,123 @@ mod tests {
         let info = mock_info("creator", &[]);
         let _ = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::UpdateConfig(update_config_msg)).unwrap();
     }
+
+    #[test]
+    fn test_vanchor_transact_deposit_cw20() {
+        // Instantiate the "vanchor" contract.
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
+        let mut deps = mock_dependencies(&[]);
+
+        let msg = InstantiateMsg {
+            chain_id: 1,
+            max_edges: 2,
+            levels: 30,
+            max_deposit_amt: Uint256::from(10u128),
+            min_withdraw_amt: Uint256::from(10u128),
+            max_ext_amt: Uint256::from(10u128),
+            max_fee: Uint256::from(10u128),
+            cw20_address: cw20_address.clone(),
+        };
+        let info = mock_info("creator", &[]);
+
+        // we can just call .unwrap() to assert this was a success
+        let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+
+        // Initialize the vanchor
+        let (pk_bytes, _) = crate::test_util::setup_environment(Curve::Bn254);
+        let transactor = [1u8; 32];
+        let recipient_bytes = [2u8; 32];
+        let relayer_bytes = [0u8; 32];
+        let ext_amount = 10;
+        let fee = 0;
+        
+        let public_amount = 10;
+
+        let chain_type = [2, 0];
+        let chain_id = compute_chain_id_type(1, &chain_type);
+        let in_chain_ids = [chain_id; 2];
+        let in_amounts = [0, 0];
+        let in_indices = [0, 1];
+        let out_chain_ids = [chain_id; 2];
+        let out_amounts = [10, 0];
+
+        let in_utxos = crate::test_util::setup_utxos(in_chain_ids, in_amounts, Some(in_indices));
+        // We are adding indices to out utxos, since they will be used as an input utxos in next
+        // transaction
+        let out_utxos = crate::test_util::setup_utxos(out_chain_ids, out_amounts, Some(in_indices));
+
+        let output1 = out_utxos[0].commitment.into_repr().to_bytes_le();
+        let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
+
+        let ext_data = ExtData {
+            recipient: hex::encode(recipient_bytes),
+            relayer: hex::encode(relayer_bytes),
+            ext_amount: Uint256::from(ext_amount as u128),
+            fee: Uint256::from(fee as u128),
+            encrypted_output1: element_encoder(&output1),
+            encrypted_output2: element_encoder(&output2),
+        };
+
+        let mut ext_data_args = Vec::new();
+        let recipient_bytes =
+            element_encoder(&hex::decode(&ext_data.recipient).unwrap());
+        let relayer_bytes =
+            element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+        let fee_bytes = element_encoder(&ext_data.fee.to_le_bytes());
+        let ext_amt_bytes = element_encoder(&ext_data.ext_amount.to_le_bytes());
+        ext_data_args.extend_from_slice(&recipient_bytes);
+        ext_data_args.extend_from_slice(&relayer_bytes);
+        ext_data_args.extend_from_slice(&ext_amt_bytes);
+        ext_data_args.extend_from_slice(&fee_bytes);
+        ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
+        ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
+
+
+        let ext_data_hash = keccak_256(&ext_data_args);
+
+        let custom_roots = Some([[0u8; 32]; 2].map(|x| x.to_vec()));
+        let (proof, public_inputs) = crate::test_util::setup_zk_circuit(
+            public_amount,
+            ext_data_hash.to_vec(),
+            in_utxos,
+            out_utxos,
+            custom_roots,
+            &pk_bytes,
+        );
+
+        // Deconstructing public inputs
+        let (_chain_id, public_amount, root_set, nullifiers, commitments, ext_data_hash) =
+        crate::test_util::deconstruct_public_inputs_el(&public_inputs);
+
+        // Constructing proof data
+        let root_set = root_set.into_iter().map(|v| v.0).collect();
+        let nullifiers = nullifiers.into_iter().map(|v| v.0).collect();
+        let commitments = commitments.into_iter().map(|v| v.0).collect();
+        let proof_data = 
+        ProofData::new(proof, Uint256::from(10u128), root_set, nullifiers, commitments, ext_data_hash.0);
+
+        // Should "transact" with success.
+        let info = mock_info(cw20_address.as_str(), &[]);
+        let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender: cw20_address.clone(),
+            amount: Uint128::from(10u128),
+            msg: to_binary(&Cw20HookMsg::Transact {
+                proof_data: proof_data,
+                ext_data: ext_data,
+                is_deposit: true,
+            }).unwrap(),
+        });
+
+        let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
+        assert_eq!(
+            response.attributes,
+            vec![
+                attr("method", "transact"),
+                attr("deposit", "true"),
+                attr("withdraw", "false"),
+                attr("ext_amt", "10"),
+            ]
+        );
+    }   
 }
