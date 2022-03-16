@@ -1,6 +1,6 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{from_binary, to_binary, attr, StdError, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Storage};
+use cosmwasm_std::{from_binary, to_binary, attr, CosmosMsg, StdError, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Storage, Uint256, Uint128, WasmMsg};
 use cw2::set_contract_version;
 
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
@@ -18,6 +18,9 @@ use crate::state::{
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-vanchor";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+// ChainType info
+const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -56,6 +59,7 @@ pub fn instantiate(
 
     // Initialize the VAnchor
     let anchor = VAnchor {
+        chain_id: msg.chain_id,
         creator: deps.api.addr_canonicalize(info.sender.as_str())?,
         max_deposit_amt: msg.max_deposit_amt,
         min_withdraw_amt: msg.min_withdraw_amt,
@@ -136,8 +140,9 @@ fn transact(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Resul
         return Err(ContractError::Unauthorized {});
     }
 
-    let transactor = cw20_msg.sender;
+    // let transactor = cw20_msg.sender;
     let cw20_token_amt = cw20_msg.amount;
+    let cw20_address = info.sender.to_string();
 
     match from_binary(&cw20_msg.msg) {
         Ok(Cw20HookMsg::Transact { proof_data, ext_data }) =>{
@@ -168,27 +173,146 @@ fn transact(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Resul
                 }
             }
 
-            // Compute hash of abi encoded ext_data, reduced into field from config
+            let element_encoder = |v: &[u8]| {
+                let mut output = [0u8; 32];
+                output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
+                output
+            };
 
+            // Compute hash of abi encoded ext_data, reduced into field from config
             // Ensure that the passed external data hash matches the computed one
+            let poseidon: Poseidon = POSEIDON.load(deps.storage)?;
+            let mut ext_data_args = Vec::new();
+            let recipient_bytes =
+                element_encoder(&hex::decode(&ext_data.recipient).map_err(|_| ContractError::DecodeError)?);
+            let relayer_bytes =
+                element_encoder(&hex::decode(&ext_data.relayer).map_err(|_| ContractError::DecodeError)?);
+            let fee_bytes = element_encoder(&ext_data.fee.to_le_bytes());
+            let ext_amt_bytes = element_encoder(&ext_data.ext_amount.to_le_bytes());
+            ext_data_args.push(recipient_bytes);
+            ext_data_args.push(relayer_bytes);
+            ext_data_args.push(ext_amt_bytes);
+            ext_data_args.push(fee_bytes);
+            ext_data_args.push(ext_data.encrypted_output1);
+            ext_data_args.push(ext_data.encrypted_output2);
+
+            let computed_ext_data_hash = poseidon.hash(ext_data_args).unwrap_or([0u8; 32]);
+            assert!(computed_ext_data_hash == proof_data.ext_data_hash, "Invalid ext data");
 
             // Making sure that public amount and fee are correct
+            assert!(ext_data.fee < vanchor.max_fee, "Invalid fee amount");
+            assert!(ext_data.ext_amount < vanchor.max_ext_amt, "Invalid ext amount");
 
             // Public amounnt can also be negative, in which
             // case it would wrap around the field, so we should check if FIELD_SIZE -
             // public_amount == proof_data.public_amount, in case of a negative ext_amount
+            let calc_public_amt = ext_data.ext_amount - ext_data.fee;
+            let calc_public_amt_bytes = calc_public_amt.to_le_bytes();
+            assert!(calc_public_amt_bytes == proof_data.public_amount.to_le_bytes(), "Invalid public amount");
 
             // Construct public inputs
+            let chain_id_type_bytes = element_encoder(&compute_chain_id_type(vanchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
+            
+            let mut bytes = Vec::new();
+            bytes.extend_from_slice(&proof_data.public_amount.to_le_bytes());
+            bytes.extend_from_slice(&proof_data.ext_data_hash);
+            for null in &proof_data.input_nullifiers {
+                bytes.extend_from_slice(null);
+            }
+            for comm in &proof_data.output_commitments {
+                bytes.extend_from_slice(comm);
+            }
+            bytes.extend_from_slice(&element_encoder(&chain_id_type_bytes));
+            for root in &proof_data.roots {
+                bytes.extend_from_slice(root);
+            }         
+            
+            let verifier = VANCHORVERIFIER.load(deps.storage)?;
+            let result = match (proof_data.input_nullifiers.len(), proof_data.output_commitments.len()) {
+                (2, 2) => verify(verifier, bytes, proof_data.proof )?,
+                _ => false,
+            };
+
+            if !result {
+                return Err(ContractError::Std(StdError::GenericErr {
+                    msg: "Invalid transaction proof".to_string(),
+                }));
+            }
 
             // Flag nullifiers as used
+            for nullifier in &proof_data.input_nullifiers {
+                NULLIFIERS.save(deps.storage, nullifier.to_vec(), &true)?;
+            }
 
             // Deposit or Withdraw
+            let mut msgs: Vec<CosmosMsg> = vec![];
+            let is_deposit = ext_data.is_deposit;
+            let ext_amt = ext_data.ext_amount;
+            if is_deposit {
+                assert!(ext_amt <= vanchor.max_deposit_amt, "Invalid deposit amount");
+                assert!(ext_amt == Uint256::from(cw20_token_amt.u128()), "Did not send enough tokens");
+                // No need to call "transfer from transactor to this contract"
+                // since this message is the result of sending.
+            
+            } else {
+                assert!(ext_amt >= vanchor.min_withdraw_amt, "Invalid withdraw amount");
+                assert!(cw20_token_amt == Uint128::zero(), "Sent unnecesary funds");
+
+                msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: cw20_address.clone(),
+                    funds: [].to_vec(),
+                    msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                        recipient: ext_data.recipient.clone(),
+                        amount: Uint128::try_from(ext_amt).unwrap(),
+                    })?,
+                }));
+            }
 
             // If fee exists, handle it
+            let fee_exists = !ext_data.fee.is_zero();
+
+            if fee_exists {
+                msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: cw20_address.clone(),
+                    funds: [].to_vec(),
+                    msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                        recipient: ext_data.relayer.clone(),
+                        amount: Uint128::try_from(ext_data.fee).unwrap(),
+                    })?,
+                }));
+            }
 
             // Insert output commitments into the tree
+            let mut merkle_tree = vanchor.merkle_tree;
+            for comm in &proof_data.output_commitments {
+                let poseidon: Poseidon = POSEIDON.load(deps.storage)?;
+                merkle_tree.insert(poseidon, *comm, deps.storage)?;
+            }
 
-            return Ok(Response::new());
+            VANCHOR.save(
+                deps.storage, 
+                &VAnchor {
+                    creator: vanchor.creator,
+                    chain_id: vanchor.chain_id, 
+                    merkle_tree: merkle_tree,
+                    linkable_tree,
+                    cw20_address: vanchor.cw20_address,
+                    max_deposit_amt: vanchor.max_deposit_amt,
+                    min_withdraw_amt: vanchor.min_withdraw_amt,
+                    max_fee: vanchor.max_fee,
+                    max_ext_amt: vanchor.max_ext_amt,
+                }
+            )?;
+
+            return Ok(Response::new()
+                .add_messages(msgs)
+                .add_attributes(vec![
+                    attr("method", "transact"),
+                    attr("deposit", is_deposit.to_string()),
+                    attr("withdraw", (!is_deposit).to_string()),
+                    attr("ext_amt", ext_amt.to_string()),
+                ])
+            );
         }
         Err(_) => Err(ContractError::Std(StdError::generic_err(
             "invalid cw20 hook msg",
@@ -201,6 +325,37 @@ fn is_known_nullifier(store: &dyn Storage, nullifier: [u8; 32]) -> bool {
     NULLIFIERS.has(store, nullifier.to_vec())
 }
 
+// Truncate and pad 256 bit slice
+fn truncate_and_pad(t: &[u8]) -> Vec<u8> {
+    let mut truncated_bytes = t[..20].to_vec();
+    truncated_bytes.extend_from_slice(&[0u8; 12]);
+    truncated_bytes
+}
+
+// Computes the combination bytes of "chain_type" and "chain_id".
+// Combination rule: 8 bytes array(00 * 2 bytes + [chain_type] 2 bytes + [chain_id] 4 bytes)
+// Example:
+//  chain_type - 0x0401, chain_id - 0x00000001 (big endian)
+//  Result - [00, 00, 04, 01, 00, 00, 00, 01]
+fn compute_chain_id_type(chain_id: u64, chain_type: &[u8]) -> u64 {
+    let chain_id_value: u32 = chain_id.try_into().unwrap_or_default();
+    let mut buf = [0u8; 8];
+    #[allow(clippy::needless_borrow)]
+    buf[2..4].copy_from_slice(&chain_type);
+    buf[4..8].copy_from_slice(&chain_id_value.to_be_bytes());
+    u64::from_be_bytes(buf)
+}
+
+// Using "anchor_verifier", verifies if the "proof" really came from "public_input".
+fn verify(
+    verifier: VAnchorVerifier,
+    public_input: Vec<u8>,
+    proof_bytes: Vec<u8>,
+) -> Result<bool, ContractError> {
+    verifier
+        .verify(public_input, proof_bytes)
+        .map_err(|_| ContractError::VerifyError)
+}
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
@@ -221,6 +376,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
+            chain_id: 1,
             max_edges: 0,
             levels: 0,
             max_deposit_amt: Uint256::zero(),
@@ -242,6 +398,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
+            chain_id: 1,
             max_edges: 0,
             levels: 0,
             max_deposit_amt: Uint256::zero(),

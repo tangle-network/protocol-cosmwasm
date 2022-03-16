@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
+    pub chain_id: u64,
     pub levels: u32,
     pub max_edges: u32,
     pub cw20_address: String,
@@ -41,7 +42,7 @@ pub enum Cw20HookMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ProofData {
     pub proof: Vec<u8>,
-    pub public_amount: [u8; 32],
+    pub public_amount: Uint256,
     pub roots: Vec<[u8; 32]>,
     pub input_nullifiers: Vec<[u8; 32]>,
     pub output_commitments: Vec<[u8; 32]>,
@@ -52,10 +53,11 @@ pub struct ProofData {
 pub struct ExtData {
     pub recipient: String,
     pub relayer: String,
-    pub ext_amount: [u8; 32],
-    pub fee: [u8; 32],
+    pub ext_amount: Uint256,
+    pub fee: Uint256,
     pub encrypted_output1: [u8; 32],
     pub encrypted_output2: [u8; 32],
+    pub is_deposit: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

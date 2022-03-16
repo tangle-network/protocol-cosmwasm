@@ -189,6 +189,7 @@ impl LinkableMerkleTree {
 // VAnchor: (TODO: Add the description)
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct VAnchor {
+    pub chain_id: u64,
     pub creator: CanonicalAddr,
     pub merkle_tree: MerkleTree,
     pub linkable_tree: LinkableMerkleTree,
