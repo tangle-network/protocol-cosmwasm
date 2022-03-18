@@ -588,6 +588,70 @@ mod tests {
         let fee_value = 0;
         let refund_value = 0;
         // Setup zk circuit for withdraw
+        let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
+            crate::test_util::setup_wasm_utils_zk_circuit(
+                curve,
+                truncate_and_pad(&recipient_bytes),
+                truncate_and_pad(&relayer_bytes),
+                pk_bytes.clone(),
+                fee_value,
+                refund_value,
+            );
+        let mut deps = mock_dependencies(&coins(2, "token"));
+
+        // Initialize the contract
+        let env = mock_env();
+        let info = mock_info("anyone", &[]);
+        let instantiate_msg = InstantiateMsg {
+            merkletree_levels: 30,
+            deposit_size: Uint128::from(1_000_000_u128),
+            cw20_address: None,
+        };
+
+        let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+
+        // Try the deposit for success
+        let info = mock_info("depositor", &[Coin::new(1_000_000_u128, "uusd")]);
+        let deposit_msg = DepositMsg {
+            from: None,
+            commitment: Some(leaf_element.0),
+            value: Uint256::from(0_u128),
+        };
+
+        let response = deposit(deps.as_mut(), info, deposit_msg.clone()).unwrap();
+        assert_eq!(
+            response.attributes,
+            vec![attr("method", "deposit"), attr("result", "0")]
+        );
+        let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
+        let local_root = root_element.0;
+        assert_eq!(on_chain_root, local_root);
+
+        // Should "succeed" to withdraw tokens.
+        let withdraw_msg = WithdrawMsg {
+            proof_bytes: proof_bytes,
+            root: root_element.0,
+            nullifier_hash: nullifier_hash_element.0,
+            recipient: hex::encode(recipient_bytes.to_vec()),
+            relayer: hex::encode(relayer_bytes.to_vec()),
+            fee: cosmwasm_std::Uint256::from(fee_value),
+            refund: cosmwasm_std::Uint256::from(refund_value),
+            cw20_address: None,
+        };
+        let info = mock_info("withdraw", &[]);
+        let response = withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
+        assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
+    }
+
+    #[test]
+    fn test_mixer_fail_when_any_byte_is_changed_in_proof() {
+        let curve = Curve::Bn254;
+        let (pk_bytes, _) = crate::test_util::setup_environment(curve);
+        let recipient_bytes = [1u8; 32];
+        let relayer_bytes = [2u8; 32];
+        let fee_value = 0;
+        let refund_value = 0;
+        // Setup zk circuit for withdraw
         let (mut proof_bytes, root_element, nullifier_hash_element, leaf_element) =
             crate::test_util::setup_wasm_utils_zk_circuit(
                 curve,
@@ -645,16 +709,57 @@ mod tests {
             withdraw(deps.as_mut(), info, withdraw_msg).is_err(),
             "Should fail with wrong proof bytes"
         );
+    }
 
-        let (proof_bytes, root_element, nullifier_hash_element, _leaf_element) =
-            crate::test_util::setup_wasm_utils_zk_circuit(
+    #[test]
+    fn test_mixer_should_withdraw_native_token() {
+        let curve = Curve::Bn254;
+        let (pk_bytes, _) = crate::test_util::setup_environment(curve);
+        let recipient_bytes = [1u8; 32];
+        let relayer_bytes = [2u8; 32];
+        let fee_value = 0;
+        let refund_value = 0;
+        // Setup zk circuit for withdraw
+        let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
+            crate::test_util::setup_zk_circuit(
                 curve,
                 truncate_and_pad(&recipient_bytes),
                 truncate_and_pad(&relayer_bytes),
-                pk_bytes,
+                pk_bytes.clone(),
                 fee_value,
                 refund_value,
             );
+
+        let mut deps = mock_dependencies(&coins(2, "token"));
+
+        // Initialize the contract
+        let env = mock_env();
+        let info = mock_info("anyone", &[]);
+        let instantiate_msg = InstantiateMsg {
+            merkletree_levels: 30,
+            deposit_size: Uint128::from(1_000_000_u128),
+            cw20_address: None,
+        };
+
+        let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+
+        // Try the deposit for success
+        let info = mock_info("depositor", &[Coin::new(1_000_000_u128, "uusd")]);
+        let deposit_msg = DepositMsg {
+            from: None,
+            commitment: Some(leaf_element.0),
+            value: Uint256::from(0_u128),
+        };
+
+        let response = deposit(deps.as_mut(), info, deposit_msg.clone()).unwrap();
+        assert_eq!(
+            response.attributes,
+            vec![attr("method", "deposit"), attr("result", "0")]
+        );
+        let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
+        let local_root = root_element.0;
+        assert_eq!(on_chain_root, local_root);
+
         let withdraw_msg = WithdrawMsg {
             proof_bytes: proof_bytes,
             root: root_element.0,
@@ -671,7 +776,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mixer_should_withdraw_native_token() {
+    fn test_mixer_should_fail_when_invalid_merkle_roots() {
         let curve = Curve::Bn254;
         let (pk_bytes, _) = crate::test_util::setup_environment(curve);
         let recipient_bytes = [1u8; 32];
@@ -737,30 +842,6 @@ mod tests {
             err.to_string(),
             "Generic error: Root is not known".to_string()
         );
-
-        let (proof_bytes, root_element, nullifier_hash_element, _) =
-            crate::test_util::setup_zk_circuit(
-                curve,
-                truncate_and_pad(&recipient_bytes),
-                truncate_and_pad(&relayer_bytes),
-                pk_bytes,
-                fee_value,
-                refund_value,
-            );
-
-        let withdraw_msg = WithdrawMsg {
-            proof_bytes: proof_bytes,
-            root: root_element.0,
-            nullifier_hash: nullifier_hash_element.0,
-            recipient: hex::encode(recipient_bytes.to_vec()),
-            relayer: hex::encode(relayer_bytes.to_vec()),
-            fee: cosmwasm_std::Uint256::from(fee_value),
-            refund: cosmwasm_std::Uint256::from(refund_value),
-            cw20_address: None,
-        };
-        let info = mock_info("withdraw", &[]);
-        let response = withdraw(deps.as_mut(), info, withdraw_msg).unwrap();
-        assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
     }
 
     #[test]
