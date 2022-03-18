@@ -1,9 +1,7 @@
 use ark_bn254::Bn254;
 use arkworks_circuits::setup::{
-    common::{Leaf, MixerProof},
-    mixer::{
-        setup_leaf_with_privates_raw_x5_5, setup_leaf_x5_5, setup_proof_x5_5, MixerProverSetup,
-    },
+    common::Leaf,
+    mixer::{setup_leaf_with_privates_raw_x5_5, setup_leaf_x5_5, setup_proof_x5_5},
 };
 use arkworks_utils::utils::common::Curve;
 
@@ -17,10 +15,6 @@ use wasm_utils::{
 pub struct Element(pub [u8; 32]);
 
 impl Element {
-    fn to_bytes(&self) -> &[u8] {
-        &self.0
-    }
-
     fn from_bytes(input: &[u8]) -> Self {
         let mut buf = [0u8; 32];
         buf.copy_from_slice(input);

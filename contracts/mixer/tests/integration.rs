@@ -29,7 +29,7 @@ type PoseidonCRH5 = CRH<Fr>;
 static WASM: &[u8] = include_bytes!("./cosmwasm_mixer.wasm");
 
 #[test]
-fn integration_test_instantiate_anchor() {
+fn integration_test_instantiate_mixer() {
     // "Gas_limit" should be set high manually, since the low value can cause "GasDepletion" error.
     let mut deps = mock_instance_with_gas_limit(WASM, 100_000_000);
 
@@ -55,7 +55,7 @@ fn integration_test_instantiate_anchor() {
 }
 
 #[test]
-fn integration_test_anchor_deposit_native() {
+fn integration_test_mixer_deposit_native_token() {
     let mut deps = mock_instance_with_gas_limit(WASM, 200_000_000);
 
     // Initialize the contract
@@ -96,7 +96,7 @@ fn integration_test_anchor_deposit_native() {
 }
 
 #[test]
-fn integration_test_anchor_deposit_cw20() {
+fn integration_test_mixer_deposit_cw20_token() {
     let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
 
     let mut deps = mock_instance_with_gas_limit(WASM, 200_000_000);
