@@ -938,4 +938,79 @@ mod tests {
         ];
         assert_eq!(response.messages.len(), expected_messages.len());
     }
+
+    #[test]
+    fn test_mixer_should_fail_when_wrong_relayer_input() {
+        let curve = Curve::Bn254;
+        let (pk_bytes, _) = crate::test_util::setup_environment(curve);
+        let recipient_bytes = [1u8; 32];
+        let relayer_bytes = [2u8; 32];
+        let fee_value = 0;
+        let refund_value = 0;
+        // Setup zk circuit for withdraw
+        let (proof_bytes, root_element, nullifier_hash_element, leaf_element) =
+            crate::test_util::setup_zk_circuit(
+                curve,
+                truncate_and_pad(&recipient_bytes),
+                truncate_and_pad(&relayer_bytes),
+                pk_bytes.clone(),
+                fee_value,
+                refund_value,
+            );
+
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
+
+        let mut deps = mock_dependencies(&coins(2, "token"));
+
+        // Initialize the contract
+        let env = mock_env();
+        let info = mock_info("anyone", &[]);
+        let instantiate_msg = InstantiateMsg {
+            merkletree_levels: 30,
+            deposit_size: Uint128::from(1_000_000_u128),
+            cw20_address: Some(cw20_address.clone()),
+        };
+
+        let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+
+        // Try the deposit for success
+        let info = mock_info(cw20_address.as_str(), &[]);
+        let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender: cw20_address.clone(),
+            amount: Uint128::from(1_000_000_u128),
+            msg: to_binary(&Cw20HookMsg::DepositCw20 {
+                commitment: Some(leaf_element.0),
+            })
+            .unwrap(),
+        });
+
+        let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
+        assert_eq!(
+            response.attributes,
+            vec![attr("method", "deposit_cw20"), attr("result", "0")]
+        );
+
+        let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
+        let local_root = root_element.0;
+        assert_eq!(on_chain_root, local_root);
+
+        // Should fail with "Invalid withdraw proof" since "relayer" is changed.
+        let wrong_relayer_bytes = [0u8; 32];
+        let withdraw_msg = WithdrawMsg {
+            proof_bytes: proof_bytes,
+            root: root_element.0,
+            nullifier_hash: nullifier_hash_element.0,
+            recipient: hex::encode(recipient_bytes.to_vec()),
+            relayer: hex::encode(wrong_relayer_bytes.to_vec()),
+            fee: cosmwasm_std::Uint256::from(fee_value),
+            refund: cosmwasm_std::Uint256::from(refund_value),
+            cw20_address: None,
+        };
+        let info = mock_info("withdraw", &[]);
+        let err = withdraw(deps.as_mut(), info, withdraw_msg).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Generic error: Invalid withdraw proof".to_string()
+        );
+    }
 }
