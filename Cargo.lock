@@ -357,7 +357,7 @@ dependencies = [
  "ark-snark",
  "ark-std",
  "arkworks-gadgets",
- "arkworks-utils",
+ "arkworks-utils 0.4.20",
  "blake2",
  "digest 0.9.0",
  "ethabi",
@@ -383,9 +383,66 @@ dependencies = [
  "ark-serialize",
  "ark-snark",
  "ark-std",
- "arkworks-utils",
+ "arkworks-utils 0.4.20",
  "blake2",
  "digest 0.9.0",
+]
+
+[[package]]
+name = "arkworks-native-gadgets"
+version = "0.5.0"
+source = "git+https://github.com/webb-tools/arkworks-gadgets#3fd8035fdd1ea2e593d839c700690713817a2e7c"
+dependencies = [
+ "ark-crypto-primitives",
+ "ark-ff",
+ "ark-std",
+]
+
+[[package]]
+name = "arkworks-r1cs-circuits"
+version = "0.5.0"
+source = "git+https://github.com/webb-tools/arkworks-gadgets#3fd8035fdd1ea2e593d839c700690713817a2e7c"
+dependencies = [
+ "ark-ff",
+ "ark-r1cs-std",
+ "ark-relations",
+ "ark-std",
+ "arkworks-native-gadgets",
+ "arkworks-r1cs-gadgets",
+]
+
+[[package]]
+name = "arkworks-r1cs-gadgets"
+version = "0.5.0"
+source = "git+https://github.com/webb-tools/arkworks-gadgets#3fd8035fdd1ea2e593d839c700690713817a2e7c"
+dependencies = [
+ "ark-crypto-primitives",
+ "ark-ff",
+ "ark-r1cs-std",
+ "ark-relations",
+ "ark-std",
+ "arkworks-native-gadgets",
+]
+
+[[package]]
+name = "arkworks-setups"
+version = "0.5.0"
+source = "git+https://github.com/webb-tools/arkworks-gadgets#3fd8035fdd1ea2e593d839c700690713817a2e7c"
+dependencies = [
+ "ark-crypto-primitives",
+ "ark-ec",
+ "ark-ff",
+ "ark-groth16",
+ "ark-r1cs-std",
+ "ark-relations",
+ "ark-serialize",
+ "ark-std",
+ "arkworks-native-gadgets",
+ "arkworks-r1cs-circuits",
+ "arkworks-r1cs-gadgets",
+ "arkworks-utils 0.5.0",
+ "parity-scale-codec 2.3.1",
+ "tiny-keccak",
 ]
 
 [[package]]
@@ -412,6 +469,16 @@ dependencies = [
  "ark-std",
  "blake2",
  "digest 0.9.0",
+]
+
+[[package]]
+name = "arkworks-utils"
+version = "0.5.0"
+source = "git+https://github.com/webb-tools/arkworks-gadgets#3fd8035fdd1ea2e593d839c700690713817a2e7c"
+dependencies = [
+ "ark-ff",
+ "ark-std",
+ "hex",
 ]
 
 [[package]]
@@ -670,7 +737,7 @@ dependencies = [
  "ark-std",
  "arkworks-circuits",
  "arkworks-gadgets",
- "arkworks-utils",
+ "arkworks-utils 0.4.20",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -733,7 +800,7 @@ dependencies = [
  "ark-std",
  "arkworks-circuits",
  "arkworks-gadgets",
- "arkworks-utils",
+ "arkworks-utils 0.4.20",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -797,7 +864,9 @@ dependencies = [
  "ark-std",
  "arkworks-circuits",
  "arkworks-gadgets",
- "arkworks-utils",
+ "arkworks-native-gadgets",
+ "arkworks-setups",
+ "arkworks-utils 0.4.20",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -2288,7 +2357,7 @@ dependencies = [
  "ark-serialize",
  "ark-std",
  "arkworks-gadgets",
- "arkworks-utils",
+ "arkworks-utils 0.4.20",
  "cosmwasm-bignumber",
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -3448,7 +3517,7 @@ dependencies = [
  "ark-std",
  "arkworks-circuits",
  "arkworks-gadgets",
- "arkworks-utils",
+ "arkworks-utils 0.4.20",
  "console_error_panic_hook",
  "getrandom 0.2.5",
  "hex",

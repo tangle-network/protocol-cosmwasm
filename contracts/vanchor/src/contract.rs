@@ -1,18 +1,26 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{from_binary, to_binary, attr, CosmosMsg, StdError, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Storage, Uint256, Uint128, WasmMsg};
+use cosmwasm_std::{
+    attr, from_binary, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response,
+    StdError, StdResult, Storage, Uint128, Uint256, WasmMsg,
+};
 use cw2::set_contract_version;
 
+use sp_core::hashing::keccak_256;
+
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
-use protocol_cosmwasm::vanchor::{InstantiateMsg, ExecuteMsg, QueryMsg, UpdateConfigMsg, Cw20HookMsg, ProofData, ExtData};
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::vanchor_verifier::VAnchorVerifier;
 use protocol_cosmwasm::poseidon::Poseidon;
+use protocol_cosmwasm::vanchor::{
+    Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, QueryMsg, UpdateConfigMsg,
+};
+use protocol_cosmwasm::vanchor_verifier::VAnchorVerifier;
 use protocol_cosmwasm::zeroes::zeroes;
 
 use crate::state::{
-    save_root, save_subtree, read_curr_neighbor_root_index, save_curr_neighbor_root_index, save_neighbor_roots, save_edge,
-    VAnchor, LinkableMerkleTree, MerkleTree, VANCHOR, VANCHORVERIFIER, NULLIFIERS, POSEIDON, Edge
+    read_curr_neighbor_root_index, save_curr_neighbor_root_index, save_edge, save_neighbor_roots,
+    save_root, save_subtree, Edge, LinkableMerkleTree, MerkleTree, VAnchor, NULLIFIERS, POSEIDON,
+    VANCHOR, VANCHORVERIFIER,
 };
 
 // version info for migration info
@@ -34,7 +42,7 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     // Validation 1. Check if any funds are sent with this message.
     if !info.funds.is_empty() {
-        return Err(ContractError::UnnecessaryFunds {  });
+        return Err(ContractError::UnnecessaryFunds {});
     }
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -44,7 +52,7 @@ pub fn instantiate(
 
     // Initialize the VAnchor_verifier
     VANCHORVERIFIER.save(deps.storage, &VAnchorVerifier::new())?;
-  
+
     // Initialize the merkle tree
     let merkle_tree: MerkleTree = MerkleTree {
         levels: msg.levels,
@@ -97,21 +105,33 @@ pub fn execute(
     match msg {
         ExecuteMsg::UpdateConfig(msg) => update_vanchor_config(deps, info, msg),
         ExecuteMsg::Receive(msg) => transact(deps, info, msg),
-        ExecuteMsg::AddEdge { src_chain_id, root, latest_leaf_index } => add_edge(deps, info, src_chain_id, root, latest_leaf_index),
-        ExecuteMsg::UpdateEdge { src_chain_id, root, latest_leaf_index } => update_edge(deps, info, src_chain_id, root, latest_leaf_index),
+        ExecuteMsg::AddEdge {
+            src_chain_id,
+            root,
+            latest_leaf_index,
+        } => add_edge(deps, info, src_chain_id, root, latest_leaf_index),
+        ExecuteMsg::UpdateEdge {
+            src_chain_id,
+            root,
+            latest_leaf_index,
+        } => update_edge(deps, info, src_chain_id, root, latest_leaf_index),
     }
 }
 
-fn update_vanchor_config(deps: DepsMut, info: MessageInfo, msg: UpdateConfigMsg) -> Result<Response, ContractError> {
+fn update_vanchor_config(
+    deps: DepsMut,
+    info: MessageInfo,
+    msg: UpdateConfigMsg,
+) -> Result<Response, ContractError> {
     // Validation 1. Check if any funds are sent with this message.
     if !info.funds.is_empty() {
-        return Err(ContractError::UnnecessaryFunds {  });
+        return Err(ContractError::UnnecessaryFunds {});
     }
 
     let mut vanchor = VANCHOR.load(deps.storage)?;
     // Validation 2. Check if the msg sender is "creator".
     if vanchor.creator != deps.api.addr_canonicalize(info.sender.as_str())? {
-        return Err(ContractError::Unauthorized {  });
+        return Err(ContractError::Unauthorized {});
     }
 
     // Update the vanchor config.
@@ -133,12 +153,14 @@ fn update_vanchor_config(deps: DepsMut, info: MessageInfo, msg: UpdateConfigMsg)
 
     VANCHOR.save(deps.storage, &vanchor)?;
 
-    Ok(Response::new().add_attributes(vec![
-        attr("method", "update_vanchor_config"),
-    ]))
+    Ok(Response::new().add_attributes(vec![attr("method", "update_vanchor_config")]))
 }
 
-fn transact(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Result<Response, ContractError> {
+fn transact(
+    deps: DepsMut,
+    info: MessageInfo,
+    cw20_msg: Cw20ReceiveMsg,
+) -> Result<Response, ContractError> {
     // Only Cw20 token contract can execute this message.
     let vanchor: VAnchor = VANCHOR.load(deps.storage)?;
     if vanchor.cw20_address != deps.api.addr_canonicalize(info.sender.as_str())? {
@@ -150,12 +172,22 @@ fn transact(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Resul
     let cw20_address = info.sender.to_string();
 
     match from_binary(&cw20_msg.msg) {
-        Ok(Cw20HookMsg::Transact { proof_data, ext_data, is_deposit }) =>{
+        Ok(Cw20HookMsg::Transact {
+            proof_data,
+            ext_data,
+            is_deposit,
+        }) => {
             // Validation 1. Double check the number of roots.
-            assert!(vanchor.linkable_tree.max_edges == proof_data.roots.len() as u32, "Max edges not matched");
+            assert!(
+                vanchor.linkable_tree.max_edges == proof_data.roots.len() as u32,
+                "Max edges not matched"
+            );
 
             // Validation 2. Check if the root is known to merkle tree
-            if !vanchor.merkle_tree.is_known_root(proof_data.roots[0], deps.storage) {
+            if !vanchor
+                .merkle_tree
+                .is_known_root(proof_data.roots[0], deps.storage)
+            {
                 return Err(ContractError::Std(StdError::GenericErr {
                     msg: "Root is not known".to_string(),
                 }));
@@ -186,38 +218,50 @@ fn transact(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Resul
 
             // Compute hash of abi encoded ext_data, reduced into field from config
             // Ensure that the passed external data hash matches the computed one
-            let poseidon: Poseidon = POSEIDON.load(deps.storage)?;
             let mut ext_data_args = Vec::new();
-            let recipient_bytes =
-                element_encoder(&hex::decode(&ext_data.recipient).map_err(|_| ContractError::DecodeError)?);
-            let relayer_bytes =
-                element_encoder(&hex::decode(&ext_data.relayer).map_err(|_| ContractError::DecodeError)?);
+            let recipient_bytes = element_encoder(
+                &hex::decode(&ext_data.recipient).map_err(|_| ContractError::DecodeError)?,
+            );
+            let relayer_bytes = element_encoder(
+                &hex::decode(&ext_data.relayer).map_err(|_| ContractError::DecodeError)?,
+            );
             let fee_bytes = element_encoder(&ext_data.fee.to_le_bytes());
             let ext_amt_bytes = element_encoder(&ext_data.ext_amount.to_le_bytes());
-            ext_data_args.push(recipient_bytes);
-            ext_data_args.push(relayer_bytes);
-            ext_data_args.push(ext_amt_bytes);
-            ext_data_args.push(fee_bytes);
-            ext_data_args.push(ext_data.encrypted_output1);
-            ext_data_args.push(ext_data.encrypted_output2);
+            ext_data_args.extend_from_slice(&recipient_bytes);
+            ext_data_args.extend_from_slice(&relayer_bytes);
+            ext_data_args.extend_from_slice(&ext_amt_bytes);
+            ext_data_args.extend_from_slice(&fee_bytes);
+            ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
+            ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
 
-            let computed_ext_data_hash = poseidon.hash(ext_data_args).unwrap_or([0u8; 32]);
-            assert!(computed_ext_data_hash == proof_data.ext_data_hash, "Invalid ext data");
+            let computed_ext_data_hash = keccak_256(&ext_data_args);
+            assert!(
+                computed_ext_data_hash == proof_data.ext_data_hash,
+                "Invalid ext data"
+            );
 
             // Making sure that public amount and fee are correct
             assert!(ext_data.fee < vanchor.max_fee, "Invalid fee amount");
-            assert!(ext_data.ext_amount < vanchor.max_ext_amt, "Invalid ext amount");
+            assert!(
+                ext_data.ext_amount < vanchor.max_ext_amt,
+                "Invalid ext amount"
+            );
 
             // Public amounnt can also be negative, in which
             // case it would wrap around the field, so we should check if FIELD_SIZE -
             // public_amount == proof_data.public_amount, in case of a negative ext_amount
             let calc_public_amt = ext_data.ext_amount - ext_data.fee;
             let calc_public_amt_bytes = calc_public_amt.to_le_bytes();
-            assert!(calc_public_amt_bytes == proof_data.public_amount.to_le_bytes(), "Invalid public amount");
+            assert!(
+                calc_public_amt_bytes == proof_data.public_amount.to_le_bytes(),
+                "Invalid public amount"
+            );
 
             // Construct public inputs
-            let chain_id_type_bytes = element_encoder(&compute_chain_id_type(vanchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
-            
+            let chain_id_type_bytes = element_encoder(
+                &compute_chain_id_type(vanchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes(),
+            );
+
             let mut bytes = Vec::new();
             bytes.extend_from_slice(&proof_data.public_amount.to_le_bytes());
             bytes.extend_from_slice(&proof_data.ext_data_hash);
@@ -230,11 +274,14 @@ fn transact(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Resul
             bytes.extend_from_slice(&element_encoder(&chain_id_type_bytes));
             for root in &proof_data.roots {
                 bytes.extend_from_slice(root);
-            }         
-            
+            }
+
             let verifier = VANCHORVERIFIER.load(deps.storage)?;
-            let result = match (proof_data.input_nullifiers.len(), proof_data.output_commitments.len()) {
-                (2, 2) => verify(verifier, bytes, proof_data.proof )?,
+            let result = match (
+                proof_data.input_nullifiers.len(),
+                proof_data.output_commitments.len(),
+            ) {
+                (2, 2) => verify(verifier, bytes, proof_data.proof)?,
                 _ => false,
             };
 
@@ -254,12 +301,17 @@ fn transact(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Resul
             let ext_amt = ext_data.ext_amount;
             if is_deposit {
                 assert!(ext_amt <= vanchor.max_deposit_amt, "Invalid deposit amount");
-                assert!(ext_amt == Uint256::from(cw20_token_amt.u128()), "Did not send enough tokens");
+                assert!(
+                    ext_amt == Uint256::from(cw20_token_amt.u128()),
+                    "Did not send enough tokens"
+                );
                 // No need to call "transfer from transactor to this contract"
                 // since this message is the result of sending.
-            
             } else {
-                assert!(ext_amt >= vanchor.min_withdraw_amt, "Invalid withdraw amount");
+                assert!(
+                    ext_amt >= vanchor.min_withdraw_amt,
+                    "Invalid withdraw amount"
+                );
                 assert!(cw20_token_amt == Uint128::zero(), "Sent unnecesary funds");
 
                 msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
@@ -294,10 +346,10 @@ fn transact(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Resul
             }
 
             VANCHOR.save(
-                deps.storage, 
+                deps.storage,
                 &VAnchor {
                     creator: vanchor.creator,
-                    chain_id: vanchor.chain_id, 
+                    chain_id: vanchor.chain_id,
                     merkle_tree: merkle_tree,
                     linkable_tree,
                     cw20_address: vanchor.cw20_address,
@@ -305,18 +357,15 @@ fn transact(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Resul
                     min_withdraw_amt: vanchor.min_withdraw_amt,
                     max_fee: vanchor.max_fee,
                     max_ext_amt: vanchor.max_ext_amt,
-                }
+                },
             )?;
 
-            return Ok(Response::new()
-                .add_messages(msgs)
-                .add_attributes(vec![
-                    attr("method", "transact"),
-                    attr("deposit", is_deposit.to_string()),
-                    attr("withdraw", (!is_deposit).to_string()),
-                    attr("ext_amt", ext_amt.to_string()),
-                ])
-            );
+            return Ok(Response::new().add_messages(msgs).add_attributes(vec![
+                attr("method", "transact"),
+                attr("deposit", is_deposit.to_string()),
+                attr("withdraw", (!is_deposit).to_string()),
+                attr("ext_amt", ext_amt.to_string()),
+            ]));
         }
         Err(_) => Err(ContractError::Std(StdError::generic_err(
             "invalid cw20 hook msg",
@@ -324,62 +373,89 @@ fn transact(deps: DepsMut, info: MessageInfo, cw20_msg: Cw20ReceiveMsg) -> Resul
     }
 }
 
-fn add_edge(deps: DepsMut, info: MessageInfo, src_chain_id: u64, root: [u8; 32], latest_leaf_index: u32) -> Result<Response, ContractError> {
+fn add_edge(
+    deps: DepsMut,
+    info: MessageInfo,
+    src_chain_id: u64,
+    root: [u8; 32],
+    latest_leaf_index: u32,
+) -> Result<Response, ContractError> {
     // Validation 1. Check if any funds are sent with this message.
     if !info.funds.is_empty() {
-        return Err(ContractError::UnnecessaryFunds {  });
+        return Err(ContractError::UnnecessaryFunds {});
     }
 
     let vanchor = VANCHOR.load(deps.storage)?;
     let linkable_tree = vanchor.linkable_tree;
     if linkable_tree.has_edge(src_chain_id, deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr { msg: "Edge already exists".to_string() }));
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Edge already exists".to_string(),
+        }));
     }
 
     let curr_length = linkable_tree.get_latest_neighbor_edges(deps.storage).len();
     if curr_length > linkable_tree.max_edges as usize {
-        return Err(ContractError::Std(StdError::GenericErr { msg: "Too many edges".to_string() }));
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Too many edges".to_string(),
+        }));
     }
 
     // craft edge
-    let edge: Edge = Edge { chain_id: src_chain_id, root, latest_leaf_index };
+    let edge: Edge = Edge {
+        chain_id: src_chain_id,
+        root,
+        latest_leaf_index,
+    };
 
     // update historical neighbor list for this edge's root
     let curr_neighbor_root_idx = read_curr_neighbor_root_index(deps.storage, src_chain_id)?;
-    save_curr_neighbor_root_index(deps.storage, src_chain_id, (curr_neighbor_root_idx + 1) % HISTORY_LENGTH )?;
+    save_curr_neighbor_root_index(
+        deps.storage,
+        src_chain_id,
+        (curr_neighbor_root_idx + 1) % HISTORY_LENGTH,
+    )?;
 
     save_neighbor_roots(deps.storage, (src_chain_id, curr_neighbor_root_idx), root)?;
 
     // Append new edge to the end of the edge list for the given tree
     save_edge(deps.storage, src_chain_id, edge)?;
-    
-    Ok(Response::new().add_attributes(vec![
-        attr("method", "add_edge"),
-    ]))
+
+    Ok(Response::new().add_attributes(vec![attr("method", "add_edge")]))
 }
 
-fn update_edge(deps: DepsMut, info: MessageInfo, src_chain_id: u64, root: [u8; 32], latest_leaf_index: u32) -> Result<Response, ContractError> {
+fn update_edge(
+    deps: DepsMut,
+    info: MessageInfo,
+    src_chain_id: u64,
+    root: [u8; 32],
+    latest_leaf_index: u32,
+) -> Result<Response, ContractError> {
     // Validation 1. Check if any funds are sent with this message.
     if !info.funds.is_empty() {
-        return Err(ContractError::UnnecessaryFunds {  });
+        return Err(ContractError::UnnecessaryFunds {});
     }
 
     let vanchor = VANCHOR.load(deps.storage)?;
     let linkable_tree = vanchor.linkable_tree;
     if !linkable_tree.has_edge(src_chain_id, deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr { msg: "Edge does not exist".to_string() }));
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Edge does not exist".to_string(),
+        }));
     }
 
-    let edge: Edge = Edge { chain_id: src_chain_id, root, latest_leaf_index };
-    let neighbor_root_idx = (read_curr_neighbor_root_index(deps.storage, src_chain_id)? + 1) % HISTORY_LENGTH;
+    let edge: Edge = Edge {
+        chain_id: src_chain_id,
+        root,
+        latest_leaf_index,
+    };
+    let neighbor_root_idx =
+        (read_curr_neighbor_root_index(deps.storage, src_chain_id)? + 1) % HISTORY_LENGTH;
     save_curr_neighbor_root_index(deps.storage, src_chain_id, neighbor_root_idx)?;
     save_neighbor_roots(deps.storage, (src_chain_id, neighbor_root_idx), root)?;
 
     save_edge(deps.storage, src_chain_id, edge)?;
-    
-    Ok(Response::new().add_attributes(vec![
-        attr("method", "udpate_edge")
-    ]))
+
+    Ok(Response::new().add_attributes(vec![attr("method", "udpate_edge")]))
 }
 
 // Check if the "nullifier" is already used or not.
@@ -429,20 +505,14 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sp_core::hashing::keccak_256;
-    use ark_bn254::Fr;
-    use ark_crypto_primitives::CRH as CRHTrait;
+    use ark_ff::BigInteger;
     use ark_ff::PrimeField;
-    use ark_ff::{BigInteger, Field};
-    use ark_std::One;
-    use arkworks_gadgets::poseidon::CRH;
-    use arkworks_utils::utils::bn254_x5_5::get_poseidon_bn254_x5_5;
-    use arkworks_utils::utils::common::Curve;
+    use arkworks_setups::Curve;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{attr, coins, Uint128};
-    type PoseidonCRH5 = CRH<Fr>;
+    use cosmwasm_std::{attr, Uint128};
+    use sp_core::hashing::keccak_256;
 
-    fn element_encoder (v: &[u8]) -> [u8; 32] {
+    fn element_encoder(v: &[u8]) -> [u8; 32] {
         let mut output = [0u8; 32];
         output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
         output
@@ -499,7 +569,13 @@ mod tests {
         };
         let info = mock_info("intruder", &[]);
         assert!(
-            execute(deps.as_mut(), mock_env(), info, ExecuteMsg::UpdateConfig(update_config_msg)).is_err(),
+            execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UpdateConfig(update_config_msg)
+            )
+            .is_err(),
             "Should fail with unauthorized",
         );
 
@@ -511,7 +587,13 @@ mod tests {
             max_fee: Some(Uint256::from(1u128)),
         };
         let info = mock_info("creator", &[]);
-        let _ = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::UpdateConfig(update_config_msg)).unwrap();
+        let _ = execute(
+            deps.as_mut(),
+            mock_env(),
+            info,
+            ExecuteMsg::UpdateConfig(update_config_msg),
+        )
+        .unwrap();
     }
 
     #[test]
@@ -524,9 +606,9 @@ mod tests {
             chain_id: 1,
             max_edges: 2,
             levels: 30,
-            max_deposit_amt: Uint256::from(10u128),
-            min_withdraw_amt: Uint256::from(10u128),
-            max_ext_amt: Uint256::from(10u128),
+            max_deposit_amt: Uint256::from(40u128),
+            min_withdraw_amt: Uint256::from(0u128),
+            max_ext_amt: Uint256::from(20u128),
             max_fee: Uint256::from(10u128),
             cw20_address: cw20_address.clone(),
         };
@@ -535,7 +617,6 @@ mod tests {
         // we can just call .unwrap() to assert this was a success
         let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-
         // Initialize the vanchor
         let (pk_bytes, _) = crate::test_util::setup_environment(Curve::Bn254);
         let transactor = [1u8; 32];
@@ -543,10 +624,10 @@ mod tests {
         let relayer_bytes = [0u8; 32];
         let ext_amount = 10;
         let fee = 0;
-        
+
         let public_amount = 10;
 
-        let chain_type = [2, 0];
+        let chain_type = [4, 0];
         let chain_id = compute_chain_id_type(1, &chain_type);
         let in_chain_ids = [chain_id; 2];
         let in_amounts = [0, 0];
@@ -555,8 +636,7 @@ mod tests {
         let out_amounts = [10, 0];
 
         let in_utxos = crate::test_util::setup_utxos(in_chain_ids, in_amounts, Some(in_indices));
-        // We are adding indices to out utxos, since they will be used as an input utxos in next
-        // transaction
+        // We are adding indices to out utxos, since they will be used as an input utxos in next transaction
         let out_utxos = crate::test_util::setup_utxos(out_chain_ids, out_amounts, Some(in_indices));
 
         let output1 = out_utxos[0].commitment.into_repr().to_bytes_le();
@@ -572,10 +652,8 @@ mod tests {
         };
 
         let mut ext_data_args = Vec::new();
-        let recipient_bytes =
-            element_encoder(&hex::decode(&ext_data.recipient).unwrap());
-        let relayer_bytes =
-            element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+        let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
+        let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
         let fee_bytes = element_encoder(&ext_data.fee.to_le_bytes());
         let ext_amt_bytes = element_encoder(&ext_data.ext_amount.to_le_bytes());
         ext_data_args.extend_from_slice(&recipient_bytes);
@@ -585,29 +663,34 @@ mod tests {
         ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
         ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
 
-
         let ext_data_hash = keccak_256(&ext_data_args);
-
         let custom_roots = Some([[0u8; 32]; 2].map(|x| x.to_vec()));
         let (proof, public_inputs) = crate::test_util::setup_zk_circuit(
             public_amount,
+            chain_id,
             ext_data_hash.to_vec(),
             in_utxos,
             out_utxos,
             custom_roots,
-            &pk_bytes,
+            pk_bytes,
         );
 
         // Deconstructing public inputs
         let (_chain_id, public_amount, root_set, nullifiers, commitments, ext_data_hash) =
-        crate::test_util::deconstruct_public_inputs_el(&public_inputs);
+            crate::test_util::deconstruct_public_inputs_el(&public_inputs);
 
         // Constructing proof data
         let root_set = root_set.into_iter().map(|v| v.0).collect();
         let nullifiers = nullifiers.into_iter().map(|v| v.0).collect();
         let commitments = commitments.into_iter().map(|v| v.0).collect();
-        let proof_data = 
-        ProofData::new(proof, Uint256::from(10u128), root_set, nullifiers, commitments, ext_data_hash.0);
+        let proof_data = ProofData::new(
+            proof,
+            Uint256::from(10u128),
+            root_set,
+            nullifiers,
+            commitments,
+            ext_data_hash.0,
+        );
 
         // Should "transact" with success.
         let info = mock_info(cw20_address.as_str(), &[]);
@@ -618,7 +701,8 @@ mod tests {
                 proof_data: proof_data,
                 ext_data: ext_data,
                 is_deposit: true,
-            }).unwrap(),
+            })
+            .unwrap(),
         });
 
         let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
@@ -631,5 +715,5 @@ mod tests {
                 attr("ext_amt", "10"),
             ]
         );
-    }   
+    }
 }
