@@ -13,8 +13,9 @@ use protocol_cosmwasm::anchor::{
 use protocol_cosmwasm::anchor_verifier::AnchorVerifier;
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::poseidon::Poseidon;
+use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::zeroes::zeroes;
-
+use codec::Encode;
 use crate::state::{
     save_root, save_subtree, Anchor, LinkableMerkleTree, MerkleTree, ANCHOR, ANCHORVERIFIER,
     NULLIFIERS, POSEIDON,
@@ -211,21 +212,39 @@ pub fn withdraw(
         truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);
     let relayer_bytes =
         truncate_and_pad(&hex::decode(&msg.relayer).map_err(|_| ContractError::DecodeError)?);
-    let fee_bytes = element_encoder(&msg.fee.to_le_bytes());
-    let refund_bytes = element_encoder(&msg.refund.to_le_bytes());
+    let fee_u128 = match Uint128::try_from(msg.fee) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Cannot convert fee".to_string(),
+            }))
+        }
+    };
+    let refund_u128 = match Uint128::try_from(msg.refund) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Cannot convert refund".to_string(),
+            }))
+        }
+    };
+
+    let mut arbitrary_data_bytes = Vec::new();
+    arbitrary_data_bytes.extend_from_slice(&recipient_bytes);
+    arbitrary_data_bytes.extend_from_slice(&relayer_bytes);
+    arbitrary_data_bytes.extend_from_slice(&fee_u128.u128().encode());
+    arbitrary_data_bytes.extend_from_slice(&refund_u128.u128().encode());
+    arbitrary_data_bytes.extend_from_slice(&msg.commitment);
+    let arbitrary_input = Keccak256::hash(&arbitrary_data_bytes).map_err(|_| ContractError::HashError)?;
 
     // Join the public input bytes
     let mut bytes = Vec::new();
-    bytes.extend_from_slice(&chain_id_type_bytes);
     bytes.extend_from_slice(&msg.nullifier_hash);
+    bytes.extend_from_slice(&arbitrary_input);
+    bytes.extend_from_slice(&chain_id_type_bytes);
     for root in msg.roots {
         bytes.extend_from_slice(&root);
     }
-    bytes.extend_from_slice(&recipient_bytes);
-    bytes.extend_from_slice(&relayer_bytes);
-    bytes.extend_from_slice(&fee_bytes);
-    bytes.extend_from_slice(&refund_bytes);
-    bytes.extend_from_slice(&msg.commitment);
 
     // Verify the proof
     let verifier = ANCHORVERIFIER.load(deps.storage)?;
@@ -339,7 +358,7 @@ fn verify(
 ) -> Result<bool, ContractError> {
     verifier
         .verify(public_input, proof_bytes)
-        .map_err(|_| ContractError::VerifyError)
+        .map_err(|e| ContractError::VerifyError)
 }
 
 // Truncate and pad 256 bit slice
@@ -373,12 +392,11 @@ mod tests {
     use ark_ff::PrimeField;
     use ark_ff::{BigInteger, Field};
     use ark_std::One;
-    use arkworks_gadgets::poseidon::CRH;
-    use arkworks_utils::utils::bn254_x5_5::get_poseidon_bn254_x5_5;
-    use arkworks_utils::utils::common::Curve;
+    use arkworks_native_gadgets::poseidon::{Poseidon, FieldHasher};
+    use arkworks_setups::Curve;
+    use arkworks_setups::common::setup_params;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{attr, coins, Uint128};
-    type PoseidonCRH5 = CRH<Fr>;
 
     #[test]
     fn test_anchor_proper_initialization() {
@@ -427,13 +445,9 @@ mod tests {
         let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
         // Initialize the mixer
-        let params = get_poseidon_bn254_x5_5();
-        let left_input = Fr::one().into_repr().to_bytes_le();
-        let right_input = Fr::one().double().into_repr().to_bytes_le();
-        let mut input = Vec::new();
-        input.extend_from_slice(&left_input);
-        input.extend_from_slice(&right_input);
-        let res = <PoseidonCRH5 as CRHTrait>::evaluate(&params, &input).unwrap();
+        let params = setup_params(Curve::Bn254, 5, 3);
+        let poseidon = Poseidon::new(params);
+        let res = poseidon.hash_two(&Fr::one(), &Fr::one()).unwrap();
         let mut element: [u8; 32] = [0u8; 32];
         element.copy_from_slice(&res.into_repr().to_bytes_le());
 
@@ -475,7 +489,7 @@ mod tests {
                 truncate_and_pad(&relayer_bytes),
                 commitment_bytes,
                 pk_bytes.clone(),
-                src_chain_id as u128,
+                src_chain_id,
                 fee_value,
                 refund_value,
             );
