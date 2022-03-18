@@ -6,3 +6,4 @@ pub mod mixer_verifier;
 pub mod poseidon;
 pub mod verifier;
 pub mod zeroes;
+pub mod keccak;
