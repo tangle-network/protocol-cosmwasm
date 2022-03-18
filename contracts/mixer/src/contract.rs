@@ -471,7 +471,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mixer_deposit_native_token() {
+    fn test_mixer_should_be_able_to_deposit_native_token() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
         // Initialize the contract
@@ -534,7 +534,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mixer_deposit_cw20() {
+    fn test_mixer_should_be_able_to_deposit_cw20_token() {
         let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
 
         let mut deps = mock_dependencies(&coins(2, "token"));
@@ -580,7 +580,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mixer_withdraw_native_wasm_utils() {
+    fn test_mixer_should_work_with_wasm_utils() {
         let curve = Curve::Bn254;
         let (pk_bytes, _) = crate::test_util::setup_environment(curve);
         let recipient_bytes = [1u8; 32];
@@ -671,7 +671,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mixer_withdraw_native() {
+    fn test_mixer_should_withdraw_native_token() {
         let curve = Curve::Bn254;
         let (pk_bytes, _) = crate::test_util::setup_environment(curve);
         let recipient_bytes = [1u8; 32];
@@ -764,7 +764,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mixer_withdraw_cw20() {
+    fn test_mixer_should_withdraw_cw20_token() {
         let curve = Curve::Bn254;
         let (pk_bytes, _) = crate::test_util::setup_environment(curve);
         let recipient_bytes = [1u8; 32];
