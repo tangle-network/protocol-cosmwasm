@@ -23,18 +23,24 @@ use crate::test_util::Element;
 
 type PoseidonCRH5 = CRH<ark_bn254::Fr>;
 
+const MAX_EDGES: u32 = 2;
+const CHAIN_ID: u64 = 1;
+const LEVELS: u32 = 30;
+const CW20_ADDRESS: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
+const DEPOSIT_SIZE: u128 = 1_000_000;
+const DEPOSITOR: &str = "depositor";
+
 #[test]
 fn test_anchor_proper_initialization() {
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
     let mut deps = mock_dependencies(&[]);
     let env = mock_env();
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
-        max_edges: 0,
-        chain_id: 1,
-        levels: 0,
-        deposit_size: Uint128::from(1_000_000_u128),
-        cw20_address: cw20_address.clone(),
+        max_edges: MAX_EDGES,
+        chain_id: CHAIN_ID,
+        levels: LEVELS,
+        deposit_size: Uint128::from(DEPOSIT_SIZE),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
 
     // Should pass this "unwrap" if success.
@@ -47,24 +53,22 @@ fn test_anchor_proper_initialization() {
 
     let query = query(deps.as_ref(), mock_env(), QueryMsg::GetCw20Address {}).unwrap();
     let info: InfoResponse = from_binary(&query).unwrap();
-    assert_eq!(info.cw20_address, cw20_address);
+    assert_eq!(info.cw20_address, CW20_ADDRESS.to_string());
 }
 
 #[test]
 fn test_anchor_should_be_able_to_deposit() {
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
-
     let mut deps = mock_dependencies(&coins(2, "token"));
 
     // Initialize the contract
     let env = mock_env();
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
-        max_edges: 2,
-        chain_id: 1,
-        levels: 30,
-        deposit_size: Uint128::from(1_000_000_u128),
-        cw20_address: cw20_address.clone(),
+        max_edges: MAX_EDGES,
+        chain_id: CHAIN_ID,
+        levels: LEVELS,
+        deposit_size: Uint128::from(DEPOSIT_SIZE),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
 
     let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
@@ -81,10 +85,10 @@ fn test_anchor_should_be_able_to_deposit() {
     element.copy_from_slice(&res.into_repr().to_bytes_le());
 
     // Should "deposit" cw20 tokens with success.
-    let info = mock_info(cw20_address.as_str(), &[]);
+    let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: cw20_address.clone(),
-        amount: Uint128::from(1_000_000_u128),
+        sender: DEPOSITOR.to_string(),
+        amount: Uint128::from(DEPOSIT_SIZE),
         msg: to_binary(&Cw20HookMsg::DepositCw20 {
             commitment: Some(element),
         })
@@ -123,27 +127,26 @@ fn test_anchor_fail_when_any_byte_is_changed_in_proof() {
             refund_value,
         );
 
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
     let mut deps = mock_dependencies(&coins(2, "token"));
 
     // Initialize the contract
     let env = mock_env();
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
-        max_edges: 2,
-        chain_id: 1,
-        levels: 30,
-        deposit_size: Uint128::from(1_000_000_u128),
-        cw20_address: cw20_address.clone(),
+        max_edges: MAX_EDGES,
+        chain_id: CHAIN_ID,
+        levels: LEVELS,
+        deposit_size: Uint128::from(DEPOSIT_SIZE),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
 
     let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
     // Should "deposit" cw20 tokens with success.
-    let info = mock_info(cw20_address.as_str(), &[]);
+    let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: cw20_address.clone(),
-        amount: Uint128::from(1_000_000_u128),
+        sender: DEPOSITOR.to_string(),
+        amount: Uint128::from(DEPOSIT_SIZE),
         msg: to_binary(&Cw20HookMsg::DepositCw20 {
             commitment: Some(leaf_element.0),
         })
@@ -178,7 +181,7 @@ fn test_anchor_fail_when_any_byte_is_changed_in_proof() {
         fee: cosmwasm_std::Uint256::from(fee_value),
         refund: cosmwasm_std::Uint256::from(refund_value),
         commitment: commitment_element.0,
-        cw20_address: cw20_address.clone(),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("withdraw", &[]);
     assert!(
@@ -218,27 +221,26 @@ fn test_anchor_fail_when_invalid_merkle_roots() {
             refund_value,
         );
 
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
     let mut deps = mock_dependencies(&coins(2, "token"));
 
     // Initialize the contract
     let env = mock_env();
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
-        max_edges: 2,
-        chain_id: 1,
-        levels: 30,
+        max_edges: MAX_EDGES,
+        chain_id: CHAIN_ID,
+        levels: LEVELS,
         deposit_size: Uint128::from(1_000_000_u128),
-        cw20_address: cw20_address.clone(),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
 
     let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
     // Should "deposit" cw20 tokens with success.
-    let info = mock_info(cw20_address.as_str(), &[]);
+    let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: cw20_address.clone(),
-        amount: Uint128::from(1_000_000_u128),
+        sender: DEPOSITOR.to_string(),
+        amount: Uint128::from(DEPOSIT_SIZE),
         msg: to_binary(&Cw20HookMsg::DepositCw20 {
             commitment: Some(leaf_element.0),
         })
@@ -271,7 +273,7 @@ fn test_anchor_fail_when_invalid_merkle_roots() {
         fee: cosmwasm_std::Uint256::from(fee_value),
         refund: cosmwasm_std::Uint256::from(refund_value),
         commitment: commitment_element.0,
-        cw20_address: cw20_address.clone(),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("withdraw", &[]);
     let err = execute(
@@ -312,27 +314,26 @@ fn test_anchor_works_with_wasm_utils() {
             refund_value,
         );
 
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
     let mut deps = mock_dependencies(&coins(2, "token"));
 
     // Initialize the contract
     let env = mock_env();
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
-        max_edges: 2,
-        chain_id: 1,
-        levels: 30,
+        max_edges: MAX_EDGES,
+        chain_id: CHAIN_ID,
+        levels: LEVELS,
         deposit_size: Uint128::from(1_000_000_u128),
-        cw20_address: cw20_address.clone(),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
 
     let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
     // Should "deposit" cw20 tokens with success.
-    let info = mock_info(cw20_address.as_str(), &[]);
+    let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: cw20_address.clone(),
-        amount: Uint128::from(1_000_000_u128),
+        sender: DEPOSITOR.to_string(),
+        amount: Uint128::from(DEPOSIT_SIZE),
         msg: to_binary(&Cw20HookMsg::DepositCw20 {
             commitment: Some(leaf_element.0),
         })
@@ -364,7 +365,7 @@ fn test_anchor_works_with_wasm_utils() {
         fee: cosmwasm_std::Uint256::from(fee_value),
         refund: cosmwasm_std::Uint256::from(refund_value),
         commitment: commitment_element.0,
-        cw20_address: cw20_address.clone(),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("withdraw", &[]);
     let response = execute(
@@ -380,16 +381,16 @@ fn test_anchor_works_with_wasm_utils() {
     let expected_relayer = hex::encode(relayer_bytes.to_vec());
     let expected_messages: Vec<CosmosMsg> = vec![
         CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: cw20_address.clone(),
+            contract_addr: CW20_ADDRESS.to_string(),
             funds: [].to_vec(),
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: expected_recipient,
-                amount: Uint128::from(1_000_000_u128),
+                amount: Uint128::from(DEPOSIT_SIZE),
             })
             .unwrap(),
         }),
         CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: cw20_address.clone(),
+            contract_addr: CW20_ADDRESS.to_string(),
             funds: [].to_vec(),
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: expected_relayer,
@@ -426,27 +427,26 @@ fn test_anchor_works() {
             refund_value,
         );
 
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
     let mut deps = mock_dependencies(&coins(2, "token"));
 
     // Initialize the contract
     let env = mock_env();
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
-        max_edges: 2,
-        chain_id: 1,
-        levels: 30,
+        max_edges: MAX_EDGES,
+        chain_id: CHAIN_ID,
+        levels: LEVELS,
         deposit_size: Uint128::from(1_000_000_u128),
-        cw20_address: cw20_address.clone(),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
 
     let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
     // Should "deposit" cw20 tokens with success.
-    let info = mock_info(cw20_address.as_str(), &[]);
+    let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: cw20_address.clone(),
-        amount: Uint128::from(1_000_000_u128),
+        sender: DEPOSITOR.to_string(),
+        amount: Uint128::from(DEPOSIT_SIZE),
         msg: to_binary(&Cw20HookMsg::DepositCw20 {
             commitment: Some(leaf_element.0),
         })
@@ -477,7 +477,7 @@ fn test_anchor_works() {
         fee: cosmwasm_std::Uint256::from(fee_value),
         refund: cosmwasm_std::Uint256::from(refund_value),
         commitment: commitment_element.0,
-        cw20_address: cw20_address.clone(),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("withdraw", &[]);
     let response = execute(
@@ -493,16 +493,16 @@ fn test_anchor_works() {
     let expected_relayer = hex::encode(relayer_bytes.to_vec());
     let expected_messages: Vec<CosmosMsg> = vec![
         CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: cw20_address.clone(),
+            contract_addr: CW20_ADDRESS.to_string(),
             funds: [].to_vec(),
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: expected_recipient,
-                amount: Uint128::from(1_000_000_u128),
+                amount: Uint128::from(DEPOSIT_SIZE),
             })
             .unwrap(),
         }),
         CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: cw20_address.clone(),
+            contract_addr: CW20_ADDRESS.to_string(),
             funds: [].to_vec(),
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: expected_relayer,
@@ -539,27 +539,26 @@ fn test_anchor_fail_when_relayer_is_diff_from_that_in_proof_generation() {
             refund_value,
         );
 
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
     let mut deps = mock_dependencies(&coins(2, "token"));
 
     // Initialize the contract
     let env = mock_env();
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
-        max_edges: 2,
-        chain_id: 1,
-        levels: 30,
+        max_edges: MAX_EDGES,
+        chain_id: CHAIN_ID,
+        levels: LEVELS,
         deposit_size: Uint128::from(1_000_000_u128),
-        cw20_address: cw20_address.clone(),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
 
     let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
     // Should "deposit" cw20 tokens with success.
-    let info = mock_info(cw20_address.as_str(), &[]);
+    let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: cw20_address.clone(),
-        amount: Uint128::from(1_000_000_u128),
+        sender: DEPOSITOR.to_string(),
+        amount: Uint128::from(DEPOSIT_SIZE),
         msg: to_binary(&Cw20HookMsg::DepositCw20 {
             commitment: Some(leaf_element.0),
         })
@@ -591,7 +590,7 @@ fn test_anchor_fail_when_relayer_is_diff_from_that_in_proof_generation() {
         fee: cosmwasm_std::Uint256::from(fee_value),
         refund: cosmwasm_std::Uint256::from(refund_value),
         commitment: commitment_element.0,
-        cw20_address: cw20_address.clone(),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("withdraw", &[]);
     let err = execute(
@@ -632,27 +631,26 @@ fn test_anchor_fail_when_fee_submitted_is_changed() {
             refund_value,
         );
 
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
     let mut deps = mock_dependencies(&coins(2, "token"));
 
     // Initialize the contract
     let env = mock_env();
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
-        max_edges: 2,
-        chain_id: 1,
-        levels: 30,
+        max_edges: MAX_EDGES,
+        chain_id: CHAIN_ID,
+        levels: LEVELS,
         deposit_size: Uint128::from(1_000_000_u128),
-        cw20_address: cw20_address.clone(),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
 
     let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
     // Should "deposit" cw20 tokens with success.
-    let info = mock_info(cw20_address.as_str(), &[]);
+    let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: cw20_address.clone(),
-        amount: Uint128::from(1_000_000_u128),
+        sender: DEPOSITOR.to_string(),
+        amount: Uint128::from(DEPOSIT_SIZE),
         msg: to_binary(&Cw20HookMsg::DepositCw20 {
             commitment: Some(leaf_element.0),
         })
@@ -684,7 +682,7 @@ fn test_anchor_fail_when_fee_submitted_is_changed() {
         fee: cosmwasm_std::Uint256::from(changed_fee_value),
         refund: cosmwasm_std::Uint256::from(refund_value),
         commitment: commitment_element.0,
-        cw20_address: cw20_address.clone(),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("withdraw", &[]);
     let err = execute(
