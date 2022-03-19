@@ -464,7 +464,8 @@ fn is_known_nullifier(store: &dyn Storage, nullifier: [u8; 32]) -> bool {
 }
 
 // Truncate and pad 256 bit slice
-fn truncate_and_pad(t: &[u8]) -> Vec<u8> {
+// NOTE: remove `pub`
+pub fn truncate_and_pad(t: &[u8]) -> Vec<u8> {
     let mut truncated_bytes = t[..20].to_vec();
     truncated_bytes.extend_from_slice(&[0u8; 12]);
     truncated_bytes
