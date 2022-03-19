@@ -1,4 +1,4 @@
-use cosmwasm_std::{Uint256};
+use cosmwasm_std::Uint256;
 use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -20,8 +20,16 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     UpdateConfig(UpdateConfigMsg),
     Receive(Cw20ReceiveMsg),
-    AddEdge { src_chain_id: u64 , root: [u8; 32], latest_leaf_index: u32 },
-    UpdateEdge { src_chain_id: u64, root: [u8; 32], latest_leaf_index: u32 }, 
+    AddEdge {
+        src_chain_id: u64,
+        root: [u8; 32],
+        latest_leaf_index: u32,
+    },
+    UpdateEdge {
+        src_chain_id: u64,
+        root: [u8; 32],
+        latest_leaf_index: u32,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -35,7 +43,7 @@ pub struct UpdateConfigMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
-    Transact { 
+    Transact {
         proof_data: ProofData,
         ext_data: ExtData,
         is_deposit: bool,
@@ -54,15 +62,22 @@ pub struct ProofData {
 
 impl ProofData {
     pub fn new(
-		proof: Vec<u8>,
-		public_amount: Uint256,
-		roots: Vec<[u8; 32]>,
-		input_nullifiers: Vec<[u8; 32]>,
-		output_commitments: Vec<[u8; 32]>,
-		ext_data_hash: [u8; 32],
-	) -> Self {
-		Self { proof, public_amount, roots, input_nullifiers, output_commitments, ext_data_hash }
-	}
+        proof: Vec<u8>,
+        public_amount: Uint256,
+        roots: Vec<[u8; 32]>,
+        input_nullifiers: Vec<[u8; 32]>,
+        output_commitments: Vec<[u8; 32]>,
+        ext_data_hash: [u8; 32],
+    ) -> Self {
+        Self {
+            proof,
+            public_amount,
+            roots,
+            input_nullifiers,
+            output_commitments,
+            ext_data_hash,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -78,6 +93,5 @@ pub struct ExtData {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-   // TODO
+    // TODO
 }
-

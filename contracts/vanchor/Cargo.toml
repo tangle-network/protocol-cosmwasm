@@ -45,13 +45,6 @@ ark-std = { version = "^0.3.0", default-features = false }
 ark-bn254 = { version = "^0.3.0", default-features = false, features = [ "curve" ] }
 ark-crypto-primitives = { version = "^0.3.0", features = ["r1cs"], default-features = false }
 
-arkworks-gadgets = { version = "0.4.19", default-features = false }
-arkworks-utils = { version = "0.4.19", default-features = false, features = [
-    "poseidon_bn254_x5_3",
-    "poseidon_bn254_x5_4",
-    "poseidon_bn254_x5_5",
-]}
-
 ark-ec = { version = "^0.3.0", default-features = false }
 ark-groth16 = { version = "^0.3.0", default-features = false }
 ark-serialize = { version = "^0.3.0", default-features = false }
@@ -63,8 +56,8 @@ protocol-cosmwasm = { version = "0.1.0", path = "../../packages/protocol_cosmwas
 cosmwasm-schema = { version = "0.16.0" }
 cosmwasm-vm = { version = "0.16.5" }
 arkworks-circuits = { version = "0.4.19" }
-arkworks-setups = { version = "0.5.0", features = ["r1cs"], git = "https://github.com/webb-tools/arkworks-gadgets", default-features = false }
-arkworks-native-gadgets = { version = "0.5.0", git = "https://github.com/webb-tools/arkworks-gadgets", default-features = false }
+arkworks-setups = { version = "0.5.3", features = ["r1cs"], default-features = false }
+arkworks-native-gadgets = { version = "0.5.3", default-features = false }
 
 [target.'cfg(not(target_arch="wasm32"))'.dependencies]
 wasm-utils = { version = "0.1.2" }

@@ -10,6 +10,7 @@ use sp_core::hashing::keccak_256;
 
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use protocol_cosmwasm::error::ContractError;
+use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::vanchor::{
     Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, QueryMsg, UpdateConfigMsg,
@@ -234,7 +235,8 @@ fn transact(
             ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
             ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
 
-            let computed_ext_data_hash = keccak_256(&ext_data_args);
+            let computed_ext_data_hash =
+                Keccak256::hash(&ext_data_args).map_err(|_| ContractError::HashError)?;
             assert!(
                 computed_ext_data_hash == proof_data.ext_data_hash,
                 "Invalid ext data"
