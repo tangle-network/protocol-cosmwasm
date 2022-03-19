@@ -6,14 +6,12 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 
-use sp_core::hashing::keccak_256;
-
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::vanchor::{
-    Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, QueryMsg, UpdateConfigMsg,
+    Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, UpdateConfigMsg,
 };
 use protocol_cosmwasm::vanchor_verifier::VAnchorVerifier;
 use protocol_cosmwasm::zeroes::zeroes;
@@ -331,7 +329,7 @@ fn transact(
 
             if fee_exists {
                 msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: cw20_address.clone(),
+                    contract_addr: cw20_address,
                     funds: [].to_vec(),
                     msg: to_binary(&Cw20ExecuteMsg::Transfer {
                         recipient: ext_data.relayer.clone(),
@@ -352,7 +350,7 @@ fn transact(
                 &VAnchor {
                     creator: vanchor.creator,
                     chain_id: vanchor.chain_id,
-                    merkle_tree: merkle_tree,
+                    merkle_tree,
                     linkable_tree,
                     cw20_address: vanchor.cw20_address,
                     max_deposit_amt: vanchor.max_deposit_amt,
@@ -362,12 +360,12 @@ fn transact(
                 },
             )?;
 
-            return Ok(Response::new().add_messages(msgs).add_attributes(vec![
+            Ok(Response::new().add_messages(msgs).add_attributes(vec![
                 attr("method", "transact"),
                 attr("deposit", is_deposit.to_string()),
                 attr("withdraw", (!is_deposit).to_string()),
                 attr("ext_amt", ext_amt.to_string()),
-            ]));
+            ]))
         }
         Err(_) => Err(ContractError::Std(StdError::generic_err(
             "invalid cw20 hook msg",
@@ -498,7 +496,7 @@ fn verify(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         // TODO
     }
