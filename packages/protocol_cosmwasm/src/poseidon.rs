@@ -1,17 +1,22 @@
 pub use self::poseidon::Poseidon;
 
 mod hasher {
-    use ark_crypto_primitives::{Error, CRH as CRHTrait};
+    use ark_crypto_primitives::Error;
     use ark_ff::{BigInteger, PrimeField};
     use ark_std::{marker::PhantomData, vec::Vec};
-    use arkworks_gadgets::poseidon::CRH;
-    use arkworks_utils::poseidon::PoseidonParameters;
+    use arkworks_native_gadgets::poseidon::FieldHasher;
+    use arkworks_native_gadgets::poseidon::Poseidon;
+    use arkworks_native_gadgets::poseidon::PoseidonParameters;
+    use arkworks_native_gadgets::to_field_elements;
     pub struct ArkworksPoseidonHasher<F: PrimeField>(PhantomData<F>);
 
     impl<F: PrimeField> ArkworksPoseidonHasher<F> {
         pub fn hash(input: &[u8], param_bytes: &[u8]) -> Result<Vec<u8>, Error> {
             let params = PoseidonParameters::<F>::from_bytes(param_bytes)?;
-            let output: F = <CRH<F> as CRHTrait>::evaluate(&params, input)?;
+            let poseidon = Poseidon::new(params);
+
+            let input_f = to_field_elements::<F>(input)?;
+            let output: F = poseidon.hash(&input_f)?;
             let value = output.into_repr().to_bytes_le();
             Ok(value)
         }
@@ -23,6 +28,9 @@ mod hasher {
 
 #[allow(clippy::all)]
 pub mod poseidon {
+    use ark_bn254::Fr as Bn254Fr;
+    use arkworks_setups::common::setup_params;
+    use arkworks_setups::Curve;
     use serde::{Deserialize, Serialize};
 
     use super::hasher::ArkworksPoseidonHasherBn254;
@@ -49,15 +57,9 @@ pub mod poseidon {
     impl Poseidon {
         pub fn new() -> Self {
             Self {
-                hasher_params_width_3_bytes:
-                    arkworks_utils::utils::bn254_x5_3::get_poseidon_bn254_x5_3::<ark_bn254::Fr>()
-                        .to_bytes(),
-                hasher_params_width_4_bytes:
-                    arkworks_utils::utils::bn254_x5_4::get_poseidon_bn254_x5_4::<ark_bn254::Fr>()
-                        .to_bytes(),
-                hasher_params_width_5_bytes:
-                    arkworks_utils::utils::bn254_x5_5::get_poseidon_bn254_x5_5::<ark_bn254::Fr>()
-                        .to_bytes(),
+                hasher_params_width_3_bytes: setup_params::<Bn254Fr>(Curve::Bn254, 5, 3).to_bytes(),
+                hasher_params_width_4_bytes: setup_params::<Bn254Fr>(Curve::Bn254, 5, 4).to_bytes(),
+                hasher_params_width_5_bytes: setup_params::<Bn254Fr>(Curve::Bn254, 5, 5).to_bytes(),
             }
         }
 

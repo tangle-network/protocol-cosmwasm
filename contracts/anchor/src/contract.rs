@@ -6,19 +6,20 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 
+use crate::state::{
+    save_root, save_subtree, Anchor, LinkableMerkleTree, MerkleTree, ANCHOR, ANCHORVERIFIER,
+    NULLIFIERS, POSEIDON,
+};
+use codec::Encode;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use protocol_cosmwasm::anchor::{
     Cw20HookMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg, WithdrawMsg,
 };
 use protocol_cosmwasm::anchor_verifier::AnchorVerifier;
 use protocol_cosmwasm::error::ContractError;
+use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::zeroes::zeroes;
-
-use crate::state::{
-    save_root, save_subtree, Anchor, LinkableMerkleTree, MerkleTree, ANCHOR, ANCHORVERIFIER,
-    NULLIFIERS, POSEIDON,
-};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-anchor";
@@ -211,21 +212,40 @@ pub fn withdraw(
         truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);
     let relayer_bytes =
         truncate_and_pad(&hex::decode(&msg.relayer).map_err(|_| ContractError::DecodeError)?);
-    let fee_bytes = element_encoder(&msg.fee.to_le_bytes());
-    let refund_bytes = element_encoder(&msg.refund.to_le_bytes());
+    let fee_u128 = match Uint128::try_from(msg.fee) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Cannot convert fee".to_string(),
+            }))
+        }
+    };
+    let refund_u128 = match Uint128::try_from(msg.refund) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Cannot convert refund".to_string(),
+            }))
+        }
+    };
+
+    let mut arbitrary_data_bytes = Vec::new();
+    arbitrary_data_bytes.extend_from_slice(&recipient_bytes);
+    arbitrary_data_bytes.extend_from_slice(&relayer_bytes);
+    arbitrary_data_bytes.extend_from_slice(&fee_u128.u128().encode());
+    arbitrary_data_bytes.extend_from_slice(&refund_u128.u128().encode());
+    arbitrary_data_bytes.extend_from_slice(&msg.commitment);
+    let arbitrary_input =
+        Keccak256::hash(&arbitrary_data_bytes).map_err(|_| ContractError::HashError)?;
 
     // Join the public input bytes
     let mut bytes = Vec::new();
-    bytes.extend_from_slice(&chain_id_type_bytes);
     bytes.extend_from_slice(&msg.nullifier_hash);
+    bytes.extend_from_slice(&arbitrary_input);
+    bytes.extend_from_slice(&chain_id_type_bytes);
     for root in msg.roots {
         bytes.extend_from_slice(&root);
     }
-    bytes.extend_from_slice(&recipient_bytes);
-    bytes.extend_from_slice(&relayer_bytes);
-    bytes.extend_from_slice(&fee_bytes);
-    bytes.extend_from_slice(&refund_bytes);
-    bytes.extend_from_slice(&msg.commitment);
 
     // Verify the proof
     let verifier = ANCHORVERIFIER.load(deps.storage)?;

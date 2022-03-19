@@ -1,15 +1,19 @@
 use ark_bn254::Bn254;
-use arkworks_circuits::setup::{
-    common::Leaf,
-    mixer::{setup_leaf_with_privates_raw_x5_5, setup_leaf_x5_5, setup_proof_x5_5},
-};
-use arkworks_utils::utils::common::Curve;
+use arkworks_native_gadgets::poseidon::Poseidon;
+use arkworks_setups::common::{setup_params, Leaf, MixerProof};
+use arkworks_setups::r1cs::mixer::MixerR1CSProver;
+use arkworks_setups::Curve;
+use arkworks_setups::MixerProver;
 
 // wasm-utils dependencies
 use wasm_utils::{
     proof::{generate_proof_js, JsProofInput, MixerProofInput, ProofInput},
     types::{Backend, Curve as WasmCurve},
 };
+
+const DEFAULT_LEAF: [u8; 32] = [0u8; 32];
+const TREE_HEIGHT: usize = 30;
+type MixerR1CSProver_Bn254_30 = MixerR1CSProver<Bn254, TREE_HEIGHT>;
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub struct Element(pub [u8; 32]);
@@ -61,15 +65,16 @@ pub fn setup_zk_circuit(
         Curve::Bn254 => {
             // fit inputs to the curve.
             let Leaf {
+                chain_id_bytes,
                 secret_bytes,
                 nullifier_bytes,
                 leaf_bytes,
                 nullifier_hash_bytes,
-            } = setup_leaf_x5_5::<Bn254Fr, _>(curve, rng).unwrap();
+            } = MixerR1CSProver_Bn254_30::create_random_leaf(curve, rng).unwrap();
 
             let leaves = vec![leaf_bytes.clone()];
             let index = 0;
-            let proof = setup_proof_x5_5::<Bn254, _>(
+            let proof = MixerR1CSProver_Bn254_30::create_proof(
                 curve,
                 secret_bytes,
                 nullifier_bytes,
@@ -80,6 +85,7 @@ pub fn setup_zk_circuit(
                 fee_value,
                 refund_value,
                 pk_bytes,
+                DEFAULT_LEAF,
                 rng,
             )
             .unwrap();
@@ -120,7 +126,7 @@ pub fn setup_wasm_utils_zk_circuit(
             let raw = hex::decode(&note_secret).unwrap();
             let secret = &raw[0..32];
             let nullifier = &raw[32..64];
-            let leaf = setup_leaf_with_privates_raw_x5_5::<Bn254Fr>(
+            let leaf = MixerR1CSProver_Bn254_30::create_leaf_with_privates(
                 curve,
                 secret.to_vec(),
                 nullifier.to_vec(),
@@ -131,10 +137,10 @@ pub fn setup_wasm_utils_zk_circuit(
 
             let mixer_proof_input = MixerProofInput {
                 exponentiation: 5,
-                width: 5,
+                width: 3,
                 curve: WasmCurve::Bn254,
                 backend: Backend::Arkworks,
-                secrets: secret.to_vec(),
+                secret: secret.to_vec(),
                 nullifier: nullifier.to_vec(),
                 recipient: recipient_bytes.clone(),
                 relayer: relayer_bytes.clone(),

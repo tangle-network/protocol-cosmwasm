@@ -14,9 +14,9 @@ use ark_crypto_primitives::CRH as CRHTrait;
 use ark_ff::PrimeField;
 use ark_ff::{BigInteger, Field};
 use ark_std::One;
-use arkworks_gadgets::poseidon::CRH;
-use arkworks_utils::utils::bn254_x5_5::get_poseidon_bn254_x5_5;
-type PoseidonCRH5 = CRH<Fr>;
+use arkworks_native_gadgets::poseidon::{FieldHasher, Poseidon};
+use arkworks_setups::common::setup_params;
+use arkworks_setups::Curve;
 
 // This line will test the output of cargo wasm
 // static WASM: &[u8] = include_bytes!("../../../artifacts/cosmwasm_mixer.wasm");
@@ -70,13 +70,9 @@ fn integration_test_mixer_deposit_native_token() {
     let _res: Response = instantiate(&mut deps, env, info, instantiate_msg).unwrap();
 
     // Initialize the mixer
-    let params = get_poseidon_bn254_x5_5();
-    let left_input = Fr::one().into_repr().to_bytes_le();
-    let right_input = Fr::one().double().into_repr().to_bytes_le();
-    let mut input = Vec::new();
-    input.extend_from_slice(&left_input);
-    input.extend_from_slice(&right_input);
-    let res = <PoseidonCRH5 as CRHTrait>::evaluate(&params, &input).unwrap();
+    let params = setup_params(Curve::Bn254, 5, 3);
+    let poseidon = Poseidon::new(params);
+    let res = poseidon.hash_two(&Fr::one(), &Fr::one()).unwrap();
     let mut element: [u8; 32] = [0u8; 32];
     element.copy_from_slice(&res.into_repr().to_bytes_le());
 
@@ -113,13 +109,9 @@ fn integration_test_mixer_deposit_cw20_token() {
     let _res: Response = instantiate(&mut deps, env, info, instantiate_msg).unwrap();
 
     // Initialize the mixer
-    let params = get_poseidon_bn254_x5_5();
-    let left_input = Fr::one().into_repr().to_bytes_le();
-    let right_input = Fr::one().double().into_repr().to_bytes_le();
-    let mut input = Vec::new();
-    input.extend_from_slice(&left_input);
-    input.extend_from_slice(&right_input);
-    let res = <PoseidonCRH5 as CRHTrait>::evaluate(&params, &input).unwrap();
+    let params = setup_params(Curve::Bn254, 5, 3);
+    let poseidon = Poseidon::new(params);
+    let res = poseidon.hash_two(&Fr::one(), &Fr::one()).unwrap();
     let mut element: [u8; 32] = [0u8; 32];
     element.copy_from_slice(&res.into_repr().to_bytes_le());
 

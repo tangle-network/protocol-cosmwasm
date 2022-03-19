@@ -8,6 +8,7 @@ use cw2::set_contract_version;
 use std::convert::TryFrom;
 
 use protocol_cosmwasm::error::ContractError;
+use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::mixer::{
     Cw20HookMsg, DepositMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg, WithdrawMsg,
 };
@@ -15,6 +16,7 @@ use protocol_cosmwasm::mixer_verifier::MixerVerifier;
 use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::zeroes::zeroes;
 
+use codec::Encode;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use crate::state::{
@@ -253,28 +255,41 @@ pub fn withdraw(
         }));
     }
 
-    let element_encoder = |v: &[u8]| {
-        let mut output = [0u8; 32];
-        output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
-        output
-    };
-
     // Format the public input bytes
     let recipient_bytes =
         truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);
     let relayer_bytes =
         truncate_and_pad(&hex::decode(&msg.relayer).map_err(|_| ContractError::DecodeError)?);
-    let fee_bytes = element_encoder(&msg.fee.to_le_bytes());
-    let refund_bytes = element_encoder(&msg.refund.to_le_bytes());
+    let fee_u128 = match Uint128::try_from(msg.fee) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Cannot convert fee".to_string(),
+            }))
+        }
+    };
+    let refund_u128 = match Uint128::try_from(msg.refund) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Cannot convert refund".to_string(),
+            }))
+        }
+    };
+
+    let mut arbitrary_data_bytes = Vec::new();
+    arbitrary_data_bytes.extend_from_slice(&recipient_bytes);
+    arbitrary_data_bytes.extend_from_slice(&relayer_bytes);
+    arbitrary_data_bytes.extend_from_slice(&fee_u128.u128().encode());
+    arbitrary_data_bytes.extend_from_slice(&refund_u128.u128().encode());
+    let arbitrary_input =
+        Keccak256::hash(&arbitrary_data_bytes).map_err(|_| ContractError::HashError)?;
 
     // Join the public input bytes
     let mut bytes = Vec::new();
     bytes.extend_from_slice(&msg.nullifier_hash);
     bytes.extend_from_slice(&msg.root);
-    bytes.extend_from_slice(&recipient_bytes);
-    bytes.extend_from_slice(&relayer_bytes);
-    bytes.extend_from_slice(&fee_bytes);
-    bytes.extend_from_slice(&refund_bytes);
+    bytes.extend_from_slice(&arbitrary_input);
     // Verify the proof
     let verifier = MIXERVERIFIER.load(deps.storage)?;
     let result = verify(verifier, bytes, msg.proof_bytes)?;

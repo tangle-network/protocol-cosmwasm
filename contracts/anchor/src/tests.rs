@@ -3,9 +3,9 @@ use ark_crypto_primitives::CRH as CRHTrait;
 use ark_ff::PrimeField;
 use ark_ff::{BigInteger, Field};
 use ark_std::One;
-use arkworks_gadgets::poseidon::CRH;
-use arkworks_utils::utils::bn254_x5_5::get_poseidon_bn254_x5_5;
-use arkworks_utils::utils::common::Curve;
+use arkworks_native_gadgets::poseidon::{FieldHasher, Poseidon};
+use arkworks_setups::common::setup_params;
+use arkworks_setups::Curve;
 
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::{attr, coins, from_binary, to_binary, CosmosMsg, Uint128, WasmMsg};
@@ -20,8 +20,6 @@ use crate::contract::{
 };
 #[cfg(test)]
 use crate::test_util::Element;
-
-type PoseidonCRH5 = CRH<ark_bn254::Fr>;
 
 const MAX_EDGES: u32 = 2;
 const CHAIN_ID: u64 = 1;
@@ -74,13 +72,9 @@ fn test_anchor_should_be_able_to_deposit() {
     let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
     // Initialize the anchor.
-    let params = get_poseidon_bn254_x5_5();
-    let left_input = Fr::one().into_repr().to_bytes_le();
-    let right_input = Fr::one().double().into_repr().to_bytes_le();
-    let mut input = Vec::new();
-    input.extend_from_slice(&left_input);
-    input.extend_from_slice(&right_input);
-    let res = <PoseidonCRH5 as CRHTrait>::evaluate(&params, &input).unwrap();
+    let params = setup_params(Curve::Bn254, 5, 3);
+    let poseidon = Poseidon::new(params);
+    let res = poseidon.hash_two(&Fr::one(), &Fr::one()).unwrap();
     let mut element: [u8; 32] = [0u8; 32];
     element.copy_from_slice(&res.into_repr().to_bytes_le());
 
@@ -122,7 +116,7 @@ fn test_anchor_fail_when_any_byte_is_changed_in_proof() {
             truncate_and_pad(&relayer_bytes),
             commitment_bytes,
             pk_bytes.clone(),
-            src_chain_id as u128,
+            src_chain_id,
             fee_value,
             refund_value,
         );
@@ -216,7 +210,7 @@ fn test_anchor_fail_when_invalid_merkle_roots() {
             truncate_and_pad(&relayer_bytes),
             commitment_bytes,
             pk_bytes.clone(),
-            src_chain_id as u128,
+            src_chain_id,
             fee_value,
             refund_value,
         );
@@ -309,7 +303,7 @@ fn test_anchor_works_with_wasm_utils() {
             truncate_and_pad(&relayer_bytes),
             commitment_bytes,
             pk_bytes.clone(),
-            src_chain_id as u128,
+            src_chain_id,
             fee_value,
             refund_value,
         );
