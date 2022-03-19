@@ -255,12 +255,6 @@ pub fn withdraw(
         }));
     }
 
-    let element_encoder = |v: &[u8]| {
-        let mut output = [0u8; 32];
-        output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
-        output
-    };
-
     // Format the public input bytes
     let recipient_bytes =
         truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);

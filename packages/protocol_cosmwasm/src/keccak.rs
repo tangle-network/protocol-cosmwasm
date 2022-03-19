@@ -1,7 +1,6 @@
 pub use keccak::Keccak256;
 
 mod hasher {
-    use ark_crypto_primitives::Error;
     use ark_ff::{BigInteger, PrimeField};
     use ark_std::{marker::PhantomData, vec::Vec};
     use arkworks_setups::common::keccak_256;
@@ -12,8 +11,7 @@ mod hasher {
         pub fn hash(input: &[u8], _param_bytes: &[u8]) -> Vec<u8> {
             let res = keccak_256(input);
             let field_res = F::from_le_bytes_mod_order(&res);
-            let value = field_res.into_repr().to_bytes_le();
-            value
+            field_res.into_repr().to_bytes_le()
         }
     }
 
@@ -21,6 +19,7 @@ mod hasher {
     pub type Keccak256Bn254 = Keccak256<Bn254>;
 }
 
+#[allow(clippy::all)]
 pub mod keccak {
     use super::hasher::Keccak256Bn254;
 
