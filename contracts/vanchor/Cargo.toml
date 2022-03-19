@@ -55,7 +55,6 @@ protocol-cosmwasm = { version = "0.1.0", path = "../../packages/protocol_cosmwas
 [dev-dependencies]
 cosmwasm-schema = { version = "0.16.0" }
 cosmwasm-vm = { version = "0.16.5" }
-arkworks-circuits = { version = "0.4.19" }
 arkworks-setups = { version = "0.5.3", features = ["r1cs"], default-features = false }
 arkworks-native-gadgets = { version = "0.5.3", default-features = false }
 
