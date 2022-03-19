@@ -399,6 +399,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "arkworks-native-gadgets"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f89b1d1b013428e6e4d3da7e6c93121a22afd9e5b13740517ac3eb7afdc4c5e6"
+dependencies = [
+ "ark-crypto-primitives",
+ "ark-ff",
+ "ark-std",
+]
+
+[[package]]
 name = "arkworks-r1cs-circuits"
 version = "0.5.0"
 source = "git+https://github.com/webb-tools/arkworks-gadgets#3fd8035fdd1ea2e593d839c700690713817a2e7c"
@@ -407,8 +418,22 @@ dependencies = [
  "ark-r1cs-std",
  "ark-relations",
  "ark-std",
- "arkworks-native-gadgets",
- "arkworks-r1cs-gadgets",
+ "arkworks-native-gadgets 0.5.0",
+ "arkworks-r1cs-gadgets 0.5.0",
+]
+
+[[package]]
+name = "arkworks-r1cs-circuits"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21289269e5117dc930fd8f913a8bbe82f7151acd935455322aaeea0d0c25680a"
+dependencies = [
+ "ark-ff",
+ "ark-r1cs-std",
+ "ark-relations",
+ "ark-std",
+ "arkworks-native-gadgets 0.5.3",
+ "arkworks-r1cs-gadgets 0.5.3",
 ]
 
 [[package]]
@@ -421,7 +446,21 @@ dependencies = [
  "ark-r1cs-std",
  "ark-relations",
  "ark-std",
- "arkworks-native-gadgets",
+ "arkworks-native-gadgets 0.5.0",
+]
+
+[[package]]
+name = "arkworks-r1cs-gadgets"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33436eccb08bd5e857d67cd2901c9bc0f3d006309ed350e3f3d2649cd79e9647"
+dependencies = [
+ "ark-crypto-primitives",
+ "ark-ff",
+ "ark-r1cs-std",
+ "ark-relations",
+ "ark-std",
+ "arkworks-native-gadgets 0.5.3",
 ]
 
 [[package]]
@@ -437,10 +476,32 @@ dependencies = [
  "ark-relations",
  "ark-serialize",
  "ark-std",
- "arkworks-native-gadgets",
- "arkworks-r1cs-circuits",
- "arkworks-r1cs-gadgets",
+ "arkworks-native-gadgets 0.5.0",
+ "arkworks-r1cs-circuits 0.5.0",
+ "arkworks-r1cs-gadgets 0.5.0",
  "arkworks-utils 0.5.0",
+ "parity-scale-codec 2.3.1",
+ "tiny-keccak",
+]
+
+[[package]]
+name = "arkworks-setups"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77d1f81648d900fec22bd2d8e1a5727895d00f3961882853b0a005e9307f0df3"
+dependencies = [
+ "ark-crypto-primitives",
+ "ark-ec",
+ "ark-ff",
+ "ark-groth16",
+ "ark-r1cs-std",
+ "ark-relations",
+ "ark-serialize",
+ "ark-std",
+ "arkworks-native-gadgets 0.5.3",
+ "arkworks-r1cs-circuits 0.5.3",
+ "arkworks-r1cs-gadgets 0.5.3",
+ "arkworks-utils 0.5.3",
  "parity-scale-codec 2.3.1",
  "tiny-keccak",
 ]
@@ -475,6 +536,17 @@ dependencies = [
 name = "arkworks-utils"
 version = "0.5.0"
 source = "git+https://github.com/webb-tools/arkworks-gadgets#3fd8035fdd1ea2e593d839c700690713817a2e7c"
+dependencies = [
+ "ark-ff",
+ "ark-std",
+ "hex",
+]
+
+[[package]]
+name = "arkworks-utils"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c09e682dc152e3d444c01da4fbbd61b8ccf9493091546193656fae93d2c3968"
 dependencies = [
  "ark-ff",
  "ark-std",
@@ -735,9 +807,8 @@ dependencies = [
  "ark-groth16",
  "ark-serialize",
  "ark-std",
- "arkworks-circuits",
- "arkworks-gadgets",
- "arkworks-utils 0.4.20",
+ "arkworks-native-gadgets 0.5.3",
+ "arkworks-setups 0.5.3",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -746,6 +817,7 @@ dependencies = [
  "cw2",
  "cw20",
  "hex",
+ "parity-scale-codec 2.3.1",
  "protocol-cosmwasm",
  "schemars",
  "serde",
@@ -798,9 +870,8 @@ dependencies = [
  "ark-groth16",
  "ark-serialize",
  "ark-std",
- "arkworks-circuits",
- "arkworks-gadgets",
- "arkworks-utils 0.4.20",
+ "arkworks-native-gadgets 0.5.3",
+ "arkworks-setups 0.5.3",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -809,6 +880,7 @@ dependencies = [
  "cw2",
  "cw20",
  "hex",
+ "parity-scale-codec 2.3.1",
  "protocol-cosmwasm",
  "schemars",
  "serde",
@@ -864,8 +936,8 @@ dependencies = [
  "ark-std",
  "arkworks-circuits",
  "arkworks-gadgets",
- "arkworks-native-gadgets",
- "arkworks-setups",
+ "arkworks-native-gadgets 0.5.0",
+ "arkworks-setups 0.5.0",
  "arkworks-utils 0.4.20",
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1742,7 +1814,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba6a270039626615617f3f36d15fc827041df3b78c439da2cadfa47455a77f2f"
 dependencies = [
- "parity-scale-codec 3.1.0",
+ "parity-scale-codec 3.1.2",
 ]
 
 [[package]]
@@ -2129,15 +2201,15 @@ dependencies = [
 
 [[package]]
 name = "parity-scale-codec"
-version = "3.1.0"
+version = "3.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8483b84fb12de1dc23bf95d26030d16cea56391d136db0db37f749508104e3e6"
+checksum = "e8b44461635bbb1a0300f100a841e571e7d919c81c73075ef5d152ffdb521066"
 dependencies = [
  "arrayvec 0.7.2",
  "bitvec",
  "byte-slice-cast",
  "impl-trait-for-tuples",
- "parity-scale-codec-derive 3.1.0",
+ "parity-scale-codec-derive 3.1.2",
  "serde",
 ]
 
@@ -2155,9 +2227,9 @@ dependencies = [
 
 [[package]]
 name = "parity-scale-codec-derive"
-version = "3.1.0"
+version = "3.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7259388ceb4c23bc09caef272c9e7a732b3b8f9fbd0b41f0009a91d6548cc1d9"
+checksum = "c45ed1f39709f5a89338fab50e59816b2e8815f5bb58276e7ddf9afd495f73f8"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -2298,7 +2370,7 @@ dependencies = [
  "fixed-hash",
  "impl-codec",
  "impl-serde",
- "scale-info 1.0.0",
+ "scale-info",
  "uint",
 ]
 
@@ -2356,8 +2428,8 @@ dependencies = [
  "ark-groth16",
  "ark-serialize",
  "ark-std",
- "arkworks-gadgets",
- "arkworks-utils 0.4.20",
+ "arkworks-native-gadgets 0.5.3",
+ "arkworks-setups 0.5.3",
  "cosmwasm-bignumber",
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -2670,18 +2742,6 @@ checksum = "73b4b750c782965c211b42f022f59af1fbceabdd026623714f104152f1ec149f"
 
 [[package]]
 name = "scale-info"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c55b744399c25532d63a0d2789b109df8d46fc93752d46b0782991a931a782f"
-dependencies = [
- "cfg-if",
- "derive_more",
- "parity-scale-codec 2.3.1",
- "scale-info-derive 1.0.0",
-]
-
-[[package]]
-name = "scale-info"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0563970d79bcbf3c537ce3ad36d859b30d36fc5b190efd227f1f7a84d7cf0d42"
@@ -2689,20 +2749,8 @@ dependencies = [
  "bitvec",
  "cfg-if",
  "derive_more",
- "parity-scale-codec 3.1.0",
- "scale-info-derive 2.0.0",
-]
-
-[[package]]
-name = "scale-info-derive"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "baeb2780690380592f86205aa4ee49815feb2acad8c2f59e6dd207148c3f1fcd"
-dependencies = [
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "syn",
+ "parity-scale-codec 3.1.2",
+ "scale-info-derive",
 ]
 
 [[package]]
@@ -2966,13 +3014,13 @@ dependencies = [
  "log",
  "merlin",
  "num-traits",
- "parity-scale-codec 3.1.0",
+ "parity-scale-codec 3.1.2",
  "parity-util-mem",
  "parking_lot",
  "primitive-types 0.11.1",
  "rand 0.7.3",
  "regex",
- "scale-info 2.0.1",
+ "scale-info",
  "schnorrkel",
  "secp256k1",
  "secrecy",
@@ -3023,7 +3071,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fcfd91f92a2a59224230a77c4a5d6f51709620c0aab4e51f108ccece6adc56f"
 dependencies = [
  "environmental",
- "parity-scale-codec 3.1.0",
+ "parity-scale-codec 3.1.2",
  "sp-std",
  "sp-storage",
 ]
@@ -3035,7 +3083,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "158bf0305c75a50fc0e334b889568f519a126e32b87900c3f4251202dece7b4b"
 dependencies = [
  "impl-trait-for-tuples",
- "parity-scale-codec 3.1.0",
+ "parity-scale-codec 3.1.2",
  "primitive-types 0.11.1",
  "sp-externalities",
  "sp-runtime-interface-proc-macro",
@@ -3072,7 +3120,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5dab53af846068e3e0716d3ccc70ea0db44035c79b2ed5821aaa6635039efa37"
 dependencies = [
  "impl-serde",
- "parity-scale-codec 3.1.0",
+ "parity-scale-codec 3.1.2",
  "ref-cast",
  "serde",
  "sp-debug-derive",
@@ -3085,7 +3133,7 @@ version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69a67e555d171c4238bd223393cda747dd20ec7d4f5fe5c042c056cb7fde9eda"
 dependencies = [
- "parity-scale-codec 3.1.0",
+ "parity-scale-codec 3.1.2",
  "sp-std",
  "tracing",
  "tracing-core",
@@ -3100,7 +3148,7 @@ checksum = "10d88debe690c2b24eaa9536a150334fcef2ae184c21a0e5b3e80135407a7d52"
 dependencies = [
  "impl-trait-for-tuples",
  "log",
- "parity-scale-codec 3.1.0",
+ "parity-scale-codec 3.1.2",
  "sp-std",
  "wasmi",
 ]
@@ -3504,9 +3552,9 @@ checksum = "3d958d035c4438e28c70e4321a2911302f10135ce78a9c7834c0cab4123d06a2"
 
 [[package]]
 name = "wasm-utils"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9625f877efbd8c83ae11470af21b4bd20f49d55f638fc8d17623fa2aece88cae"
+checksum = "c6d50a0a311ce77fbd7ee780d3fbee3d6fb3c446e47250624c55d24955f25097"
 dependencies = [
  "ark-bls12-381",
  "ark-bn254",
@@ -3515,9 +3563,8 @@ dependencies = [
  "ark-ff",
  "ark-serialize",
  "ark-std",
- "arkworks-circuits",
- "arkworks-gadgets",
- "arkworks-utils 0.4.20",
+ "arkworks-native-gadgets 0.5.3",
+ "arkworks-setups 0.5.3",
  "console_error_panic_hook",
  "getrandom 0.2.5",
  "hex",
