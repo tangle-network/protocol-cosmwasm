@@ -514,6 +514,15 @@ mod tests {
     use protocol_cosmwasm::vanchor::{ExtData, ProofData};
     use sp_core::hashing::keccak_256;
 
+    const CHAIN_ID: u64 = 1;
+    const MAX_EDGES: u32 = 2;
+    const LEVELS: u32 = 30;
+    const MAX_DEPOSIT_AMT: u128 = 40;
+    const MIN_WITHDRAW_AMT: u128 = 0;
+    const MAX_EXT_AMT: u128 = 20;
+    const MAX_FEE: u128 = 10;
+    const CW20_ADDRESS: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
+
     fn element_encoder(v: &[u8]) -> [u8; 32] {
         let mut output = [0u8; 32];
         output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
@@ -522,18 +531,17 @@ mod tests {
 
     #[test]
     fn proper_initialization() {
-        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            chain_id: 1,
-            max_edges: 0,
-            levels: 0,
-            max_deposit_amt: Uint256::zero(),
-            min_withdraw_amt: Uint256::zero(),
-            max_ext_amt: Uint256::zero(),
-            max_fee: Uint256::zero(),
-            cw20_address: cw20_address,
+            chain_id: CHAIN_ID,
+            max_edges: MAX_EDGES,
+            levels: LEVELS,
+            max_deposit_amt: Uint256::from(MAX_DEPOSIT_AMT),
+            min_withdraw_amt: Uint256::from(MIN_WITHDRAW_AMT),
+            max_ext_amt: Uint256::from(MAX_EXT_AMT),
+            max_fee: Uint256::from(MAX_FEE),
+            cw20_address: CW20_ADDRESS.to_string(),
         };
         let info = mock_info("creator", &[]);
 
@@ -544,18 +552,17 @@ mod tests {
 
     #[test]
     fn test_vanchor_update_config() {
-        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            chain_id: 1,
-            max_edges: 0,
-            levels: 0,
-            max_deposit_amt: Uint256::zero(),
-            min_withdraw_amt: Uint256::zero(),
-            max_ext_amt: Uint256::zero(),
-            max_fee: Uint256::zero(),
-            cw20_address: cw20_address,
+            chain_id: CHAIN_ID,
+            max_edges: MAX_EDGES,
+            levels: LEVELS,
+            max_deposit_amt: Uint256::from(MAX_DEPOSIT_AMT),
+            min_withdraw_amt: Uint256::from(MIN_WITHDRAW_AMT),
+            max_ext_amt: Uint256::from(MAX_EXT_AMT),
+            max_fee: Uint256::from(MAX_FEE),
+            cw20_address: CW20_ADDRESS.to_string(),
         };
         let info = mock_info("creator", &[]);
 
@@ -601,18 +608,17 @@ mod tests {
     #[test]
     fn test_vanchor_transact_deposit_cw20() {
         // Instantiate the "vanchor" contract.
-        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            chain_id: 1,
-            max_edges: 2,
-            levels: 30,
-            max_deposit_amt: Uint256::from(40u128),
-            min_withdraw_amt: Uint256::from(0u128),
-            max_ext_amt: Uint256::from(20u128),
-            max_fee: Uint256::from(10u128),
-            cw20_address: cw20_address.clone(),
+            chain_id: CHAIN_ID,
+            max_edges: MAX_EDGES,
+            levels: LEVELS,
+            max_deposit_amt: Uint256::from(MAX_DEPOSIT_AMT),
+            min_withdraw_amt: Uint256::from(MIN_WITHDRAW_AMT),
+            max_ext_amt: Uint256::from(MAX_EXT_AMT),
+            max_fee: Uint256::from(MAX_FEE),
+            cw20_address: CW20_ADDRESS.to_string(),
         };
         let info = mock_info("creator", &[]);
 
@@ -621,7 +627,7 @@ mod tests {
 
         // Initialize the vanchor
         let (pk_bytes, _) = crate::test_util::setup_environment(Curve::Bn254);
-        let transactor = [1u8; 32];
+        let transactor_bytes = [1u8; 32];
         let recipient_bytes = [2u8; 32];
         let relayer_bytes = [0u8; 32];
         let ext_amount = 10;
@@ -685,9 +691,11 @@ mod tests {
         let root_set = root_set.into_iter().map(|v| v.0).collect();
         let nullifiers = nullifiers.into_iter().map(|v| v.0).collect();
         let commitments = commitments.into_iter().map(|v| v.0).collect();
+        let mut public_amount_le_bytes: [u8; 16] = [0; 16];
+        public_amount_le_bytes.copy_from_slice(&public_amount.0.split_at(16).0);
         let proof_data = ProofData::new(
             proof,
-            Uint256::from(10u128),
+            Uint256::from(u128::from_le_bytes(public_amount_le_bytes)),
             root_set,
             nullifiers,
             commitments,
@@ -695,10 +703,10 @@ mod tests {
         );
 
         // Should "transact" with success.
-        let info = mock_info(cw20_address.as_str(), &[]);
+        let info = mock_info(CW20_ADDRESS, &[]);
         let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-            sender: cw20_address.clone(),
-            amount: Uint128::from(10u128),
+            sender: hex::encode(transactor_bytes),
+            amount: Uint128::from(u128::from_le_bytes(public_amount_le_bytes)),
             msg: to_binary(&Cw20HookMsg::Transact {
                 proof_data: proof_data,
                 ext_data: ext_data,
