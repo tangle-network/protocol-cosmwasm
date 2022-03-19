@@ -1,7 +1,7 @@
 pub use self::poseidon::Poseidon;
 
 mod hasher {
-    use ark_crypto_primitives::{Error};
+    use ark_crypto_primitives::Error;
     use ark_ff::{BigInteger, PrimeField};
     use ark_std::{marker::PhantomData, vec::Vec};
     use arkworks_native_gadgets::poseidon::FieldHasher;
@@ -28,10 +28,10 @@ mod hasher {
 
 #[allow(clippy::all)]
 pub mod poseidon {
+    use ark_bn254::Fr as Bn254Fr;
     use arkworks_setups::common::setup_params;
     use arkworks_setups::Curve;
     use serde::{Deserialize, Serialize};
-    use ark_bn254::Fr as Bn254Fr;
 
     use super::hasher::ArkworksPoseidonHasherBn254;
 

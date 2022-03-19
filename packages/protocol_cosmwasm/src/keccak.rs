@@ -1,7 +1,7 @@
 pub use keccak::Keccak256;
 
 mod hasher {
-    use ark_crypto_primitives::{Error};
+    use ark_crypto_primitives::Error;
     use ark_ff::{BigInteger, PrimeField};
     use ark_std::{marker::PhantomData, vec::Vec};
     use arkworks_setups::common::keccak_256;
@@ -12,7 +12,7 @@ mod hasher {
         pub fn hash(input: &[u8], _param_bytes: &[u8]) -> Vec<u8> {
             let res = keccak_256(input);
             let field_res = F::from_le_bytes_mod_order(&res);
-		    let value = field_res.into_repr().to_bytes_le();
+            let value = field_res.into_repr().to_bytes_le();
             value
         }
     }
@@ -30,7 +30,7 @@ pub mod keccak {
         /// Returned if there is an error hashing
         HashError,
     }
-    
+
     pub struct Keccak256;
 
     impl Keccak256 {

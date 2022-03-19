@@ -1,10 +1,10 @@
 use ark_bn254::Bn254;
 use ark_ff::{BigInteger, PrimeField};
 use arkworks_native_gadgets::poseidon::Poseidon;
+use arkworks_setups::common::{setup_params, setup_tree_and_create_path};
+use arkworks_setups::common::{AnchorProof, Leaf};
 use arkworks_setups::r1cs::anchor::AnchorR1CSProver;
 use arkworks_setups::AnchorProver;
-use arkworks_setups::common::{AnchorProof, Leaf};
-use arkworks_setups::common::{setup_params, setup_tree_and_create_path};
 use arkworks_setups::Curve;
 use wasm_utils::ANCHOR_COUNT;
 use wasm_utils::{
@@ -82,19 +82,29 @@ pub fn setup_zk_circuit(
                 nullifier_bytes,
                 leaf_bytes,
                 nullifier_hash_bytes,
-            } = AnchorR1CSProver_Bn254_30_2::create_random_leaf(Curve::Bn254, chain_id, rng).unwrap();
+            } = AnchorR1CSProver_Bn254_30_2::create_random_leaf(Curve::Bn254, chain_id, rng)
+                .unwrap();
             let leaves = vec![leaf_bytes.clone()];
             let leaves_f = vec![Bn254Fr::from_le_bytes_mod_order(&leaf_bytes)];
             let index = 0;
 
             let params3 = setup_params::<Bn254Fr>(curve, 5, 3);
             let poseidon3 = Poseidon::new(params3);
-            let (tree, _) = setup_tree_and_create_path::<_, Poseidon<Bn254Fr>, TREE_DEPTH>(&poseidon3, &leaves_f, index, &DEFAULT_LEAF).unwrap();
+            let (tree, _) = setup_tree_and_create_path::<_, Poseidon<Bn254Fr>, TREE_DEPTH>(
+                &poseidon3,
+                &leaves_f,
+                index,
+                &DEFAULT_LEAF,
+            )
+            .unwrap();
             let roots_f = [tree.root(); ANCHOR_COUNT];
             let roots_raw = roots_f.map(|x| x.into_repr().to_bytes_le());
 
             let AnchorProof {
-                proof, roots_raw, public_inputs_raw, ..
+                proof,
+                roots_raw,
+                public_inputs_raw,
+                ..
             } = AnchorR1CSProver_Bn254_30_2::create_proof(
                 curve,
                 chain_id,
@@ -110,7 +120,7 @@ pub fn setup_zk_circuit(
                 commitment_bytes,
                 pk_bytes,
                 DEFAULT_LEAF,
-                rng
+                rng,
             )
             .unwrap();
 
@@ -150,7 +160,13 @@ pub fn setup_wasm_utils_zk_circuit(
 
             let secret = &raw[0..32];
             let nullifier = &raw[32..64];
-            let leaf = AnchorR1CSProver_Bn254_30_2::create_leaf_with_privates(Curve::Bn254, chain_id, secret.to_vec(), nullifier.to_vec()).unwrap();
+            let leaf = AnchorR1CSProver_Bn254_30_2::create_leaf_with_privates(
+                Curve::Bn254,
+                chain_id,
+                secret.to_vec(),
+                nullifier.to_vec(),
+            )
+            .unwrap();
 
             let leaves = vec![leaf.leaf_bytes.clone()];
             let leaves_f = vec![Bn254Fr::from_le_bytes_mod_order(&leaf.leaf_bytes)];
@@ -158,7 +174,13 @@ pub fn setup_wasm_utils_zk_circuit(
 
             let params3 = setup_params::<Bn254Fr>(curve, 5, 3);
             let poseidon3 = Poseidon::new(params3);
-            let (tree, _) = setup_tree_and_create_path::<_, Poseidon<Bn254Fr>, TREE_DEPTH>(&poseidon3, &leaves_f, index, &DEFAULT_LEAF).unwrap();
+            let (tree, _) = setup_tree_and_create_path::<_, Poseidon<Bn254Fr>, TREE_DEPTH>(
+                &poseidon3,
+                &leaves_f,
+                index,
+                &DEFAULT_LEAF,
+            )
+            .unwrap();
             let roots_f = [tree.root(); ANCHOR_COUNT];
             let roots_raw = roots_f.map(|x| x.into_repr().to_bytes_le());
 

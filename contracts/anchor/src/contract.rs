@@ -6,20 +6,20 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 
+use crate::state::{
+    save_root, save_subtree, Anchor, LinkableMerkleTree, MerkleTree, ANCHOR, ANCHORVERIFIER,
+    NULLIFIERS, POSEIDON,
+};
+use codec::Encode;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use protocol_cosmwasm::anchor::{
     Cw20HookMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg, WithdrawMsg,
 };
 use protocol_cosmwasm::anchor_verifier::AnchorVerifier;
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::keccak::Keccak256;
+use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::zeroes::zeroes;
-use codec::Encode;
-use crate::state::{
-    save_root, save_subtree, Anchor, LinkableMerkleTree, MerkleTree, ANCHOR, ANCHORVERIFIER,
-    NULLIFIERS, POSEIDON,
-};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-anchor";
@@ -235,7 +235,8 @@ pub fn withdraw(
     arbitrary_data_bytes.extend_from_slice(&fee_u128.u128().encode());
     arbitrary_data_bytes.extend_from_slice(&refund_u128.u128().encode());
     arbitrary_data_bytes.extend_from_slice(&msg.commitment);
-    let arbitrary_input = Keccak256::hash(&arbitrary_data_bytes).map_err(|_| ContractError::HashError)?;
+    let arbitrary_input =
+        Keccak256::hash(&arbitrary_data_bytes).map_err(|_| ContractError::HashError)?;
 
     // Join the public input bytes
     let mut bytes = Vec::new();
@@ -392,9 +393,9 @@ mod tests {
     use ark_ff::PrimeField;
     use ark_ff::{BigInteger, Field};
     use ark_std::One;
-    use arkworks_native_gadgets::poseidon::{Poseidon, FieldHasher};
-    use arkworks_setups::Curve;
+    use arkworks_native_gadgets::poseidon::{FieldHasher, Poseidon};
     use arkworks_setups::common::setup_params;
+    use arkworks_setups::Curve;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{attr, coins, Uint128};
 

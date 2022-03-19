@@ -2,9 +2,9 @@
 pub mod verifier {
     use ark_crypto_primitives::{Error, SNARK};
     use ark_ec::PairingEngine;
+    use ark_ff::BigInteger;
     use ark_ff::FromBytes;
     use ark_ff::PrimeField;
-    use ark_ff::BigInteger;
     use ark_groth16::{Groth16, Proof, VerifyingKey};
     use ark_serialize::CanonicalDeserialize;
     use ark_std::marker::PhantomData;

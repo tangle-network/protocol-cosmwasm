@@ -8,6 +8,7 @@ use cw2::set_contract_version;
 use std::convert::TryFrom;
 
 use protocol_cosmwasm::error::ContractError;
+use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::mixer::{
     Cw20HookMsg, DepositMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg, WithdrawMsg,
 };
@@ -15,6 +16,7 @@ use protocol_cosmwasm::mixer_verifier::MixerVerifier;
 use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::zeroes::zeroes;
 
+use codec::Encode;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use crate::state::{
@@ -264,17 +266,36 @@ pub fn withdraw(
         truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);
     let relayer_bytes =
         truncate_and_pad(&hex::decode(&msg.relayer).map_err(|_| ContractError::DecodeError)?);
-    let fee_bytes = element_encoder(&msg.fee.to_le_bytes());
-    let refund_bytes = element_encoder(&msg.refund.to_le_bytes());
+    let fee_u128 = match Uint128::try_from(msg.fee) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Cannot convert fee".to_string(),
+            }))
+        }
+    };
+    let refund_u128 = match Uint128::try_from(msg.refund) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Cannot convert refund".to_string(),
+            }))
+        }
+    };
+
+    let mut arbitrary_data_bytes = Vec::new();
+    arbitrary_data_bytes.extend_from_slice(&recipient_bytes);
+    arbitrary_data_bytes.extend_from_slice(&relayer_bytes);
+    arbitrary_data_bytes.extend_from_slice(&fee_u128.u128().encode());
+    arbitrary_data_bytes.extend_from_slice(&refund_u128.u128().encode());
+    let arbitrary_input =
+        Keccak256::hash(&arbitrary_data_bytes).map_err(|_| ContractError::HashError)?;
 
     // Join the public input bytes
     let mut bytes = Vec::new();
     bytes.extend_from_slice(&msg.nullifier_hash);
     bytes.extend_from_slice(&msg.root);
-    bytes.extend_from_slice(&recipient_bytes);
-    bytes.extend_from_slice(&relayer_bytes);
-    bytes.extend_from_slice(&fee_bytes);
-    bytes.extend_from_slice(&refund_bytes);
+    bytes.extend_from_slice(&arbitrary_input);
     // Verify the proof
     let verifier = MIXERVERIFIER.load(deps.storage)?;
     let result = verify(verifier, bytes, msg.proof_bytes)?;
@@ -442,12 +463,12 @@ mod tests {
     use ark_ff::PrimeField;
     use ark_ff::{BigInteger, Field};
     use ark_std::One;
-    use arkworks_gadgets::poseidon::CRH;
-    use arkworks_utils::utils::bn254_x5_5::get_poseidon_bn254_x5_5;
-    use arkworks_utils::utils::common::Curve;
+    use arkworks_native_gadgets::poseidon::FieldHasher;
+    use arkworks_native_gadgets::poseidon::Poseidon;
+    use arkworks_setups::common::setup_params;
+    use arkworks_setups::Curve;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{attr, coins, Uint128};
-    type PoseidonCRH5 = CRH<Fr>;
 
     #[test]
     fn test_mixer_proper_initialization() {
@@ -486,13 +507,9 @@ mod tests {
         let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
         // Initialize the mixer
-        let params = get_poseidon_bn254_x5_5();
-        let left_input = Fr::one().into_repr().to_bytes_le();
-        let right_input = Fr::one().double().into_repr().to_bytes_le();
-        let mut input = Vec::new();
-        input.extend_from_slice(&left_input);
-        input.extend_from_slice(&right_input);
-        let res = <PoseidonCRH5 as CRHTrait>::evaluate(&params, &input).unwrap();
+        let params = setup_params(Curve::Bn254, 5, 3);
+        let poseidon = Poseidon::new(params);
+        let res = poseidon.hash_two(&Fr::one(), &Fr::one()).unwrap();
         let mut element: [u8; 32] = [0u8; 32];
         element.copy_from_slice(&res.into_repr().to_bytes_le());
 
@@ -551,13 +568,9 @@ mod tests {
         let _ = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
 
         // Initialize the mixer
-        let params = get_poseidon_bn254_x5_5();
-        let left_input = Fr::one().into_repr().to_bytes_le();
-        let right_input = Fr::one().double().into_repr().to_bytes_le();
-        let mut input = Vec::new();
-        input.extend_from_slice(&left_input);
-        input.extend_from_slice(&right_input);
-        let res = <PoseidonCRH5 as CRHTrait>::evaluate(&params, &input).unwrap();
+        let params = setup_params(Curve::Bn254, 5, 3);
+        let poseidon = Poseidon::new(params);
+        let res = poseidon.hash_two(&Fr::one(), &Fr::one()).unwrap();
         let mut element: [u8; 32] = [0u8; 32];
         element.copy_from_slice(&res.into_repr().to_bytes_le());
 

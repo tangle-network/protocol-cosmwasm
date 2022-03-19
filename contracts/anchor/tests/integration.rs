@@ -11,7 +11,7 @@ use ark_bn254::Fr;
 use ark_ff::PrimeField;
 use ark_ff::{BigInteger, Field};
 use ark_std::One;
-use arkworks_native_gadgets::poseidon::{Poseidon, FieldHasher};
+use arkworks_native_gadgets::poseidon::{FieldHasher, Poseidon};
 use arkworks_setups::common::setup_params;
 use arkworks_setups::Curve;
 
@@ -73,7 +73,7 @@ fn test_deposit_cw20() {
     let _res: Response = instantiate(&mut deps, env, info, instantiate_msg).unwrap();
 
     // Initialize the mixer
-    let params = setup_params(Curve::Bn254, 5, 3);
+    let params = setup_params(Curve::Bn254, 5, 4);
     let poseidon = Poseidon::new(params);
     let res = poseidon.hash_two(&Fr::one(), &Fr::one()).unwrap();
     let mut element: [u8; 32] = [0u8; 32];
