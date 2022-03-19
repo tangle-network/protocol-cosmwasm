@@ -5,7 +5,7 @@ pub mod verifier {
     use ark_groth16::{Groth16, Proof, VerifyingKey};
     use ark_serialize::CanonicalDeserialize;
     use ark_std::marker::PhantomData;
-    use arkworks_utils::utils::to_field_elements;
+    use arkworks_native_gadgets::to_field_elements;
     pub struct ArkworksVerifierGroth16<E: PairingEngine>(PhantomData<E>);
 
     pub fn verify_groth16<E: PairingEngine>(

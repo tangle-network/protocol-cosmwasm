@@ -38,18 +38,15 @@ cw20 = "0.8.1"
 schemars = "0.8.3"
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }
 
+codec = {package = "parity-scale-codec", version = "2.3.0", default-features = false, features = ["derive", "max-encoded-len"]}
 hex = "0.4"
 ark-ff = { version = "^0.3.0", default-features = false }
 ark-std = { version = "^0.3.0", default-features = false }
 ark-bn254 = { version = "^0.3.0", default-features = false, features = [ "curve" ] }
 ark-crypto-primitives = { version = "^0.3.0", features = ["r1cs"], default-features = false }
 
-arkworks-gadgets = { version = "0.4.19", default-features = false }
-arkworks-utils = { version = "0.4.19", default-features = false, features = [
-    "poseidon_bn254_x5_3",
-    "poseidon_bn254_x5_4",
-    "poseidon_bn254_x5_5",
-]}
+arkworks-setups = { version = "0.5.3", default-features = false }
+arkworks-native-gadgets = { version = "0.5.3", default-features = false }
 
 ark-ec = { version = "^0.3.0", default-features = false }
 ark-groth16 = { version = "^0.3.0", default-features = false }
@@ -61,7 +58,6 @@ protocol-cosmwasm = { version = "0.1.0", path = "../../packages/protocol_cosmwas
 [dev-dependencies]
 cosmwasm-schema = { version = "0.16.0" }
 cosmwasm-vm = { version = "0.16.5" }
-arkworks-circuits = { version = "0.4.19" }
 
 [target.'cfg(not(target_arch="wasm32"))'.dependencies]
-wasm-utils = { version = "0.1.2" }
+wasm-utils = { version = "0.1.3" }
