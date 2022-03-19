@@ -359,7 +359,7 @@ fn verify(
 ) -> Result<bool, ContractError> {
     verifier
         .verify(public_input, proof_bytes)
-        .map_err(|e| ContractError::VerifyError)
+        .map_err(|_| ContractError::VerifyError)
 }
 
 // Truncate and pad 256 bit slice
