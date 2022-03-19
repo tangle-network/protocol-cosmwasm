@@ -511,6 +511,7 @@ mod tests {
     use arkworks_setups::Curve;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{attr, Uint128};
+    use protocol_cosmwasm::vanchor::{ExtData, ProofData};
     use sp_core::hashing::keccak_256;
 
     fn element_encoder(v: &[u8]) -> [u8; 32] {
