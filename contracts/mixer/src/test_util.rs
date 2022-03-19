@@ -19,10 +19,6 @@ type MixerR1CSProver_Bn254_30 = MixerR1CSProver<Bn254, TREE_HEIGHT>;
 pub struct Element(pub [u8; 32]);
 
 impl Element {
-    fn to_bytes(&self) -> &[u8] {
-        &self.0
-    }
-
     fn from_bytes(input: &[u8]) -> Self {
         let mut buf = [0u8; 32];
         buf.copy_from_slice(input);

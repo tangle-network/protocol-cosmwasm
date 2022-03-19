@@ -55,7 +55,7 @@ fn integration_test_instantiate_mixer() {
 }
 
 #[test]
-fn integration_test_mixer_deposit_native() {
+fn integration_test_mixer_deposit_native_token() {
     let mut deps = mock_instance_with_gas_limit(WASM, 200_000_000);
 
     // Initialize the contract
@@ -92,7 +92,7 @@ fn integration_test_mixer_deposit_native() {
 }
 
 #[test]
-fn integration_test_mixer_deposit_cw20() {
+fn integration_test_mixer_deposit_cw20_token() {
     let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
 
     let mut deps = mock_instance_with_gas_limit(WASM, 200_000_000);
