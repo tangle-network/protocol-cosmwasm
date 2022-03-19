@@ -27,7 +27,7 @@ fn element_encoder(v: &[u8]) -> [u8; 32] {
 }
 
 #[test]
-fn proper_initialization() {
+fn test_vanchor_proper_initialization() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InstantiateMsg {
