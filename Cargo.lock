@@ -385,7 +385,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77d1f81648d900fec22bd2d8e1a5727895d00f3961882853b0a005e9307f0df3"
 dependencies = [
  "ark-crypto-primitives",
- "ark-ec",
  "ark-ff",
  "ark-groth16",
  "ark-r1cs-std",
@@ -402,9 +401,9 @@ dependencies = [
 
 [[package]]
 name = "arkworks-setups"
-version = "1.0.0"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02b47ec0b488a100f032f9e676852b32869a8c8a34352854984f2c55bbad3ba8"
+checksum = "77d1f81648d900fec22bd2d8e1a5727895d00f3961882853b0a005e9307f0df3"
 dependencies = [
  "ark-crypto-primitives",
  "ark-ec",
@@ -691,8 +690,8 @@ dependencies = [
  "ark-groth16",
  "ark-serialize",
  "ark-std",
- "arkworks-native-gadgets 1.0.0",
- "arkworks-setups 1.0.0",
+ "arkworks-native-gadgets",
+ "arkworks-setups",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -701,7 +700,7 @@ dependencies = [
  "cw2",
  "cw20",
  "hex",
- "parity-scale-codec 2.3.1",
+ "parity-scale-codec",
  "protocol-cosmwasm",
  "schemars",
  "serde",
@@ -754,8 +753,8 @@ dependencies = [
  "ark-groth16",
  "ark-serialize",
  "ark-std",
- "arkworks-native-gadgets 1.0.0",
- "arkworks-setups 1.0.0",
+ "arkworks-native-gadgets",
+ "arkworks-setups",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -764,7 +763,7 @@ dependencies = [
  "cw2",
  "cw20",
  "hex",
- "parity-scale-codec 2.3.1",
+ "parity-scale-codec",
  "protocol-cosmwasm",
  "schemars",
  "serde",
@@ -1733,12 +1732,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "keccak"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67c21572b4949434e4fc1e1978b99c5f77064153c59d998bf13ecd96fb5ecba7"
-
-[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2563,12 +2556,6 @@ name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
-
-[[package]]
-name = "rustc-hex"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e75f6a532d0fd9f7f13144f392b6ad56a32696bfcd9c78f797f16bbb6f072d6"
 
 [[package]]
 name = "rustc_version"
