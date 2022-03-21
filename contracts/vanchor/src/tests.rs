@@ -21,7 +21,11 @@ const MAX_FEE: u128 = 10;
 const CW20_ADDRESS: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 
 fn element_encoder(v: &[u8]) -> [u8; 32] {
-    let mut output = if v.ends_with(&[255u8]) { [255u8; 32] } else { [0u8; 32] };
+    let mut output = if v.ends_with(&[255u8]) {
+        [255u8; 32]
+    } else {
+        [0u8; 32]
+    };
     output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
     output
 }

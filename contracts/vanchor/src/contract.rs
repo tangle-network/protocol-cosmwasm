@@ -7,8 +7,8 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
-use protocol_cosmwasm::field_ops::{ArkworksIntoFieldBn254, IntoPrimeField};
 use protocol_cosmwasm::error::ContractError;
+use protocol_cosmwasm::field_ops::{ArkworksIntoFieldBn254, IntoPrimeField};
 use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::vanchor::{
@@ -213,7 +213,11 @@ fn transact(
             }
 
             let element_encoder = |v: &[u8]| {
-                let mut output = if v.ends_with(&[255u8]) { [255u8; 32] } else { [0u8; 32] };
+                let mut output = if v.ends_with(&[255u8]) {
+                    [255u8; 32]
+                } else {
+                    [0u8; 32]
+                };
                 output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
                 output
             };
@@ -245,7 +249,10 @@ fn transact(
 
             let abs_ext_amt = ext_amt.unsigned_abs();
             // Making sure that public amount and fee are correct
-            assert!(Uint256::from(ext_data_fee) < vanchor.max_fee, "Invalid fee amount");
+            assert!(
+                Uint256::from(ext_data_fee) < vanchor.max_fee,
+                "Invalid fee amount"
+            );
             assert!(
                 Uint256::from(abs_ext_amt) < vanchor.max_ext_amt,
                 "Invalid ext amount"
@@ -255,7 +262,8 @@ fn transact(
             // case it would wrap around the field, so we should check if FIELD_SIZE -
             // public_amount == proof_data.public_amount, in case of a negative ext_amount
             let calc_public_amt = ext_amt - ext_data_fee as i128;
-            let calc_public_amt_bytes = element_encoder(&ArkworksIntoFieldBn254::into_field(calc_public_amt));
+            let calc_public_amt_bytes =
+                element_encoder(&ArkworksIntoFieldBn254::into_field(calc_public_amt));
             assert!(
                 calc_public_amt_bytes == proof_data.public_amount,
                 "Invalid public amount"
@@ -305,7 +313,10 @@ fn transact(
 
             let is_deposit = ext_amt.is_positive();
             if is_deposit {
-                assert!(Uint256::from(abs_ext_amt) <= vanchor.max_deposit_amt, "Invalid deposit amount");
+                assert!(
+                    Uint256::from(abs_ext_amt) <= vanchor.max_deposit_amt,
+                    "Invalid deposit amount"
+                );
                 assert!(
                     abs_ext_amt == cw20_token_amt.u128(),
                     "Did not send enough tokens"
