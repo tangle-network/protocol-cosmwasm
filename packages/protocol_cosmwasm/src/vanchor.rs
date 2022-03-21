@@ -46,14 +46,13 @@ pub enum Cw20HookMsg {
     Transact {
         proof_data: ProofData,
         ext_data: ExtData,
-        is_deposit: bool,
     },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ProofData {
     pub proof: Vec<u8>,
-    pub public_amount: Uint256,
+    pub public_amount: [u8; 32],
     pub roots: Vec<[u8; 32]>,
     pub input_nullifiers: Vec<[u8; 32]>,
     pub output_commitments: Vec<[u8; 32]>,
@@ -63,7 +62,7 @@ pub struct ProofData {
 impl ProofData {
     pub fn new(
         proof: Vec<u8>,
-        public_amount: Uint256,
+        public_amount: [u8; 32],
         roots: Vec<[u8; 32]>,
         input_nullifiers: Vec<[u8; 32]>,
         output_commitments: Vec<[u8; 32]>,
@@ -84,8 +83,8 @@ impl ProofData {
 pub struct ExtData {
     pub recipient: String,
     pub relayer: String,
-    pub ext_amount: Uint256,
-    pub fee: Uint256,
+    pub ext_amount: String,
+    pub fee: String,
     pub encrypted_output1: [u8; 32],
     pub encrypted_output2: [u8; 32],
 }

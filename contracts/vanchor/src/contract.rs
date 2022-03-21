@@ -7,6 +7,7 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
+use protocol_cosmwasm::field_ops::{ArkworksIntoFieldBn254, IntoPrimeField};
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::poseidon::Poseidon;
@@ -174,8 +175,10 @@ fn transact(
         Ok(Cw20HookMsg::Transact {
             proof_data,
             ext_data,
-            is_deposit,
         }) => {
+            let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+            let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
+
             // Validation 1. Double check the number of roots.
             assert!(
                 vanchor.linkable_tree.max_edges == proof_data.roots.len() as u32,
@@ -210,7 +213,7 @@ fn transact(
             }
 
             let element_encoder = |v: &[u8]| {
-                let mut output = [0u8; 32];
+                let mut output = if v.ends_with(&[255u8]) { [255u8; 32] } else { [0u8; 32] };
                 output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
                 output
             };
@@ -224,8 +227,8 @@ fn transact(
             let relayer_bytes = element_encoder(
                 &hex::decode(&ext_data.relayer).map_err(|_| ContractError::DecodeError)?,
             );
-            let fee_bytes = element_encoder(&ext_data.fee.to_le_bytes());
-            let ext_amt_bytes = element_encoder(&ext_data.ext_amount.to_le_bytes());
+            let fee_bytes = element_encoder(&ext_data_fee.to_le_bytes());
+            let ext_amt_bytes = element_encoder(&ext_amt.to_le_bytes());
             ext_data_args.extend_from_slice(&recipient_bytes);
             ext_data_args.extend_from_slice(&relayer_bytes);
             ext_data_args.extend_from_slice(&ext_amt_bytes);
@@ -240,20 +243,21 @@ fn transact(
                 "Invalid ext data"
             );
 
+            let abs_ext_amt = ext_amt.unsigned_abs();
             // Making sure that public amount and fee are correct
-            assert!(ext_data.fee < vanchor.max_fee, "Invalid fee amount");
+            assert!(Uint256::from(ext_data_fee) < vanchor.max_fee, "Invalid fee amount");
             assert!(
-                ext_data.ext_amount < vanchor.max_ext_amt,
+                Uint256::from(abs_ext_amt) < vanchor.max_ext_amt,
                 "Invalid ext amount"
             );
 
             // Public amounnt can also be negative, in which
             // case it would wrap around the field, so we should check if FIELD_SIZE -
             // public_amount == proof_data.public_amount, in case of a negative ext_amount
-            let calc_public_amt = ext_data.ext_amount - ext_data.fee;
-            let calc_public_amt_bytes = calc_public_amt.to_le_bytes();
+            let calc_public_amt = ext_amt - ext_data_fee as i128;
+            let calc_public_amt_bytes = element_encoder(&ArkworksIntoFieldBn254::into_field(calc_public_amt));
             assert!(
-                calc_public_amt_bytes == proof_data.public_amount.to_le_bytes(),
+                calc_public_amt_bytes == proof_data.public_amount,
                 "Invalid public amount"
             );
 
@@ -263,7 +267,7 @@ fn transact(
             );
 
             let mut bytes = Vec::new();
-            bytes.extend_from_slice(&proof_data.public_amount.to_le_bytes());
+            bytes.extend_from_slice(&proof_data.public_amount);
             bytes.extend_from_slice(&proof_data.ext_data_hash);
             for null in &proof_data.input_nullifiers {
                 bytes.extend_from_slice(null);
@@ -298,18 +302,19 @@ fn transact(
 
             // Deposit or Withdraw
             let mut msgs: Vec<CosmosMsg> = vec![];
-            let ext_amt = ext_data.ext_amount;
+
+            let is_deposit = ext_amt.is_positive();
             if is_deposit {
-                assert!(ext_amt <= vanchor.max_deposit_amt, "Invalid deposit amount");
+                assert!(Uint256::from(abs_ext_amt) <= vanchor.max_deposit_amt, "Invalid deposit amount");
                 assert!(
-                    ext_amt == Uint256::from(cw20_token_amt.u128()),
+                    abs_ext_amt == cw20_token_amt.u128(),
                     "Did not send enough tokens"
                 );
                 // No need to call "transfer from transactor to this contract"
                 // since this message is the result of sending.
             } else {
                 assert!(
-                    ext_amt >= vanchor.min_withdraw_amt,
+                    Uint256::from(abs_ext_amt) >= vanchor.min_withdraw_amt,
                     "Invalid withdraw amount"
                 );
                 assert!(cw20_token_amt == Uint128::zero(), "Sent unnecesary funds");
@@ -319,13 +324,13 @@ fn transact(
                     funds: [].to_vec(),
                     msg: to_binary(&Cw20ExecuteMsg::Transfer {
                         recipient: ext_data.recipient.clone(),
-                        amount: Uint128::try_from(ext_amt).unwrap(),
+                        amount: Uint128::try_from(abs_ext_amt).unwrap(),
                     })?,
                 }));
             }
 
             // If fee exists, handle it
-            let fee_exists = !ext_data.fee.is_zero();
+            let fee_exists = ext_data_fee != 0;
 
             if fee_exists {
                 msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
@@ -333,7 +338,7 @@ fn transact(
                     funds: [].to_vec(),
                     msg: to_binary(&Cw20ExecuteMsg::Transfer {
                         recipient: ext_data.relayer.clone(),
-                        amount: Uint128::try_from(ext_data.fee).unwrap(),
+                        amount: Uint128::try_from(ext_data_fee).unwrap(),
                     })?,
                 }));
             }

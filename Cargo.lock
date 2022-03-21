@@ -63,6 +63,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4361135be9122e0870de935d7c439aef945b9f9ddd4199a553b5270b49c82a27"
 
 [[package]]
+name = "ark-bls12-377"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc41c02c0d18a226947ee9ee023b1d957bdb6a68fc22ac296722935a9fef423c"
+dependencies = [
+ "ark-ec",
+ "ark-ff",
+ "ark-r1cs-std",
+ "ark-std",
+]
+
+[[package]]
 name = "ark-bls12-381"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2185,6 +2197,8 @@ dependencies = [
 name = "protocol-cosmwasm"
 version = "0.1.0"
 dependencies = [
+ "ark-bls12-377",
+ "ark-bls12-381",
  "ark-bn254",
  "ark-crypto-primitives",
  "ark-ec",
@@ -2200,6 +2214,7 @@ dependencies = [
  "cw20",
  "schemars",
  "serde",
+ "sp-std 4.0.0 (git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.16)",
  "thiserror",
 ]
 
@@ -2781,7 +2796,7 @@ dependencies = [
  "sp-debug-derive",
  "sp-externalities",
  "sp-runtime-interface",
- "sp-std",
+ "sp-std 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "sp-storage",
  "ss58-registry",
  "substrate-bip39",
@@ -2800,7 +2815,7 @@ dependencies = [
  "blake2-rfc",
  "byteorder",
  "sha2 0.9.9",
- "sp-std",
+ "sp-std 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tiny-keccak",
  "twox-hash",
 ]
@@ -2824,7 +2839,7 @@ checksum = "0fcfd91f92a2a59224230a77c4a5d6f51709620c0aab4e51f108ccece6adc56f"
 dependencies = [
  "environmental",
  "parity-scale-codec 3.1.2",
- "sp-std",
+ "sp-std 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "sp-storage",
 ]
 
@@ -2839,7 +2854,7 @@ dependencies = [
  "primitive-types",
  "sp-externalities",
  "sp-runtime-interface-proc-macro",
- "sp-std",
+ "sp-std 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "sp-storage",
  "sp-tracing",
  "sp-wasm-interface",
@@ -2866,6 +2881,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14804d6069ee7a388240b665f17908d98386ffb0b5d39f89a4099fc7a2a4c03f"
 
 [[package]]
+name = "sp-std"
+version = "4.0.0"
+source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.16#19162e43be45817b44c7d48e50d03f074f60fbf4"
+
+[[package]]
 name = "sp-storage"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2876,7 +2896,7 @@ dependencies = [
  "ref-cast",
  "serde",
  "sp-debug-derive",
- "sp-std",
+ "sp-std 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2886,7 +2906,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69a67e555d171c4238bd223393cda747dd20ec7d4f5fe5c042c056cb7fde9eda"
 dependencies = [
  "parity-scale-codec 3.1.2",
- "sp-std",
+ "sp-std 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tracing",
  "tracing-core",
  "tracing-subscriber",
@@ -2901,7 +2921,7 @@ dependencies = [
  "impl-trait-for-tuples",
  "log",
  "parity-scale-codec 3.1.2",
- "sp-std",
+ "sp-std 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasmi",
 ]
 

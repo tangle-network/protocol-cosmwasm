@@ -22,6 +22,8 @@ thiserror = { version = "1.0.26" }
 ark-ff = { version = "^0.3.0", default-features = false }
 ark-std = { version = "^0.3.0", default-features = false }
 ark-bn254 = { version = "^0.3.0", default-features = false, features = [ "curve" ] }
+ark-bls12-381 = { version = "^0.3.0", default-features = false, features = [ "curve" ] }
+ark-bls12-377 = { version = "^0.3.0", default-features = false, features = [ "curve", "r1cs" ], optional = true }
 ark-crypto-primitives = { version = "^0.3.0", features = ["r1cs"], default-features = false }
 
 arkworks-setups = { version = "0.5.3", default-features = false }
@@ -30,3 +32,5 @@ arkworks-native-gadgets = { version = "0.5.3", default-features = false }
 ark-ec = { version = "^0.3.0", default-features = false }
 ark-groth16 = { version = "^0.3.0", default-features = false }
 ark-serialize = { version = "^0.3.0", default-features = false }
+
+sp-std = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.16" }

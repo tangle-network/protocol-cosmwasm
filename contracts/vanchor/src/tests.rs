@@ -21,7 +21,7 @@ const MAX_FEE: u128 = 10;
 const CW20_ADDRESS: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 
 fn element_encoder(v: &[u8]) -> [u8; 32] {
-    let mut output = [0u8; 32];
+    let mut output = if v.ends_with(&[255u8]) { [255u8; 32] } else { [0u8; 32] };
     output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
     output
 }
@@ -127,10 +127,10 @@ fn test_vanchor_transact_deposit_cw20() {
     let transactor_bytes = [1u8; 32];
     let recipient_bytes = [2u8; 32];
     let relayer_bytes = [0u8; 32];
-    let ext_amount = 10;
-    let fee = 0;
+    let ext_amount = 10_i128;
+    let fee = 0_u128;
 
-    let public_amount = 10;
+    let public_amount = 10_i128;
 
     let chain_type = [4, 0];
     let chain_id = compute_chain_id_type(1, &chain_type);
@@ -150,8 +150,8 @@ fn test_vanchor_transact_deposit_cw20() {
     let ext_data = ExtData {
         recipient: hex::encode(recipient_bytes),
         relayer: hex::encode(relayer_bytes),
-        ext_amount: Uint256::from(ext_amount as u128),
-        fee: Uint256::from(fee as u128),
+        ext_amount: ext_amount.to_string(),
+        fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -159,8 +159,8 @@ fn test_vanchor_transact_deposit_cw20() {
     let mut ext_data_args = Vec::new();
     let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
     let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
-    let fee_bytes = element_encoder(&ext_data.fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_data.ext_amount.to_le_bytes());
+    let fee_bytes = element_encoder(&fee.to_le_bytes());
+    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
     ext_data_args.extend_from_slice(&relayer_bytes);
     ext_data_args.extend_from_slice(&ext_amt_bytes);
@@ -188,11 +188,9 @@ fn test_vanchor_transact_deposit_cw20() {
     let root_set = root_set.into_iter().map(|v| v.0).collect();
     let nullifiers = nullifiers.into_iter().map(|v| v.0).collect();
     let commitments = commitments.into_iter().map(|v| v.0).collect();
-    let mut public_amount_le_bytes: [u8; 16] = [0; 16];
-    public_amount_le_bytes.copy_from_slice(&public_amount.0.split_at(16).0);
     let proof_data = ProofData::new(
         proof,
-        Uint256::from(u128::from_le_bytes(public_amount_le_bytes)),
+        public_amount.0,
         root_set,
         nullifiers,
         commitments,
@@ -203,11 +201,10 @@ fn test_vanchor_transact_deposit_cw20() {
     let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: hex::encode(transactor_bytes),
-        amount: Uint128::from(u128::from_le_bytes(public_amount_le_bytes)),
+        amount: Uint128::from(10_u128),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
             ext_data: ext_data,
-            is_deposit: true,
         })
         .unwrap(),
     });
@@ -249,10 +246,10 @@ fn test_vanchor_transact_withdraw_cw20() {
     let transactor_bytes = [1u8; 32];
     let recipient_bytes = [2u8; 32];
     let relayer_bytes = [0u8; 32];
-    let ext_amount = 10;
-    let fee = 0;
+    let ext_amount = 10_i128;
+    let fee = 0_u128;
 
-    let public_amount = 10;
+    let public_amount = 10_i128;
 
     let chain_type = [4, 0];
     let chain_id = compute_chain_id_type(1, &chain_type);
@@ -272,8 +269,8 @@ fn test_vanchor_transact_withdraw_cw20() {
     let ext_data = ExtData {
         recipient: hex::encode(recipient_bytes),
         relayer: hex::encode(relayer_bytes),
-        ext_amount: Uint256::from(ext_amount as u128),
-        fee: Uint256::from(fee as u128),
+        ext_amount: ext_amount.to_string(),
+        fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -281,8 +278,8 @@ fn test_vanchor_transact_withdraw_cw20() {
     let mut ext_data_args = Vec::new();
     let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
     let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
-    let fee_bytes = element_encoder(&ext_data.fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_data.ext_amount.to_le_bytes());
+    let fee_bytes = element_encoder(&fee.to_le_bytes());
+    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
     ext_data_args.extend_from_slice(&relayer_bytes);
     ext_data_args.extend_from_slice(&ext_amt_bytes);
@@ -297,7 +294,7 @@ fn test_vanchor_transact_withdraw_cw20() {
         chain_id,
         ext_data_hash.to_vec(),
         in_utxos,
-        out_utxos,
+        out_utxos.clone(),
         custom_roots,
         pk_bytes,
     );
@@ -310,11 +307,9 @@ fn test_vanchor_transact_withdraw_cw20() {
     let root_set = root_set.into_iter().map(|v| v.0).collect();
     let nullifiers = nullifiers.into_iter().map(|v| v.0).collect();
     let commitments = commitments.into_iter().map(|v| v.0).collect();
-    let mut public_amount_le_bytes: [u8; 16] = [0; 16];
-    public_amount_le_bytes.copy_from_slice(&public_amount.0.split_at(16).0);
     let proof_data = ProofData::new(
         proof,
-        Uint256::from(u128::from_le_bytes(public_amount_le_bytes)),
+        public_amount.0,
         root_set,
         nullifiers,
         commitments,
@@ -325,11 +320,10 @@ fn test_vanchor_transact_withdraw_cw20() {
     let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: hex::encode(transactor_bytes),
-        amount: Uint128::from(u128::from_le_bytes(public_amount_le_bytes)),
+        amount: Uint128::from(10_u128),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
             ext_data: ext_data,
-            is_deposit: true,
         })
         .unwrap(),
     });
@@ -340,27 +334,27 @@ fn test_vanchor_transact_withdraw_cw20() {
     // Prepare the "withdraw" data.
     let (pk_bytes, _) = crate::test_util::setup_environment(Curve::Bn254);
 
-    let ext_amount = 5; // It means "-5" since withdraw.
-    let fee = 2;
+    let ext_amount = -5_i128;
+    let fee = 2_u128;
 
-    let public_amount = 7; // It means "-7" since withdraw.
+    let public_amount = -7_i128;
 
     let chain_id = compute_chain_id_type(CHAIN_ID, &chain_type);
     let out_chain_ids = [CHAIN_ID; 2];
     // After withdrawing -7
     let out_amounts = [1, 2];
 
-    let in_utxos = crate::test_util::setup_utxos(in_chain_ids, in_amounts, Some(in_indices));
-    // We are adding indices to out utxos, since they will be used as an input utxos in next transaction
-    let out_utxos = crate::test_util::setup_utxos(out_chain_ids, out_amounts, Some(in_indices));
+    // "in_utxos" become the "out_utxos" of last transact.
+    let in_utxos = out_utxos;
+    let out_utxos = crate::test_util::setup_utxos(out_chain_ids, out_amounts, None);
 
     let output1 = out_utxos[0].commitment.into_repr().to_bytes_le();
     let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
     let ext_data = ExtData {
         recipient: hex::encode(recipient_bytes),
         relayer: hex::encode(relayer_bytes),
-        ext_amount: Uint256::from(ext_amount as u128),
-        fee: Uint256::from(fee as u128),
+        ext_amount: ext_amount.to_string(),
+        fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -368,8 +362,8 @@ fn test_vanchor_transact_withdraw_cw20() {
     let mut ext_data_args = Vec::new();
     let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
     let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
-    let fee_bytes = element_encoder(&ext_data.fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_data.ext_amount.to_le_bytes());
+    let fee_bytes = element_encoder(&fee.to_le_bytes());
+    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
     ext_data_args.extend_from_slice(&relayer_bytes);
     ext_data_args.extend_from_slice(&ext_amt_bytes);
@@ -397,12 +391,10 @@ fn test_vanchor_transact_withdraw_cw20() {
     let root_set = root_set.into_iter().map(|v| v.0).collect();
     let nullifiers = nullifiers.into_iter().map(|v| v.0).collect();
     let commitments = commitments.into_iter().map(|v| v.0).collect();
-    let mut public_amount_le_bytes: [u8; 16] = [0; 16];
-    public_amount_le_bytes.copy_from_slice(&public_amount.0.split_at(16).0);
 
     let proof_data = ProofData::new(
         proof,
-        Uint256::from(u128::from_le_bytes(public_amount_le_bytes)),
+        public_amount.0,
         root_set,
         nullifiers,
         commitments,
@@ -417,7 +409,6 @@ fn test_vanchor_transact_withdraw_cw20() {
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
             ext_data: ext_data,
-            is_deposit: false,
         })
         .unwrap(),
     });
@@ -430,7 +421,7 @@ fn test_vanchor_transact_withdraw_cw20() {
             attr("method", "transact"),
             attr("deposit", "false"),
             attr("withdraw", "true"),
-            attr("ext_amt", "5"),
+            attr("ext_amt", "-5"),
         ]
     );
 }
