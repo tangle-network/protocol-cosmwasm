@@ -213,11 +213,7 @@ fn transact(
             }
 
             let element_encoder = |v: &[u8]| {
-                let mut output = if v.ends_with(&[255u8]) {
-                    [255u8; 32]
-                } else {
-                    [0u8; 32]
-                };
+                let mut output = [0u8; 32];
                 output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
                 output
             };
