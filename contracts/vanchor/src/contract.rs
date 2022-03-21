@@ -180,10 +180,11 @@ fn transact(
             let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
 
             // Validation 1. Double check the number of roots.
-            assert!(
-                vanchor.linkable_tree.max_edges == proof_data.roots.len() as u32,
-                "Max edges not matched"
-            );
+            if vanchor.linkable_tree.max_edges != proof_data.roots.len() as u32 {
+                return Err(ContractError::Std(StdError::GenericErr {
+                    msg: "Max edges not matched".to_string(),
+                }));
+            }
 
             // Validation 2. Check if the root is known to merkle tree
             if !vanchor
@@ -238,21 +239,25 @@ fn transact(
 
             let computed_ext_data_hash =
                 Keccak256::hash(&ext_data_args).map_err(|_| ContractError::HashError)?;
-            assert!(
-                computed_ext_data_hash == proof_data.ext_data_hash,
-                "Invalid ext data"
-            );
+            if computed_ext_data_hash != proof_data.ext_data_hash {
+                return Err(ContractError::Std(StdError::GenericErr {
+                    msg: "Invalid ext data".to_string(),
+                }));
+            }
 
             let abs_ext_amt = ext_amt.unsigned_abs();
             // Making sure that public amount and fee are correct
-            assert!(
-                Uint256::from(ext_data_fee) < vanchor.max_fee,
-                "Invalid fee amount"
-            );
-            assert!(
-                Uint256::from(abs_ext_amt) < vanchor.max_ext_amt,
-                "Invalid ext amount"
-            );
+            if Uint256::from(ext_data_fee) > vanchor.max_fee {
+                return Err(ContractError::Std(StdError::GenericErr {
+                    msg: "Invalid fee amount".to_string(),
+                }));
+            }
+
+            if Uint256::from(abs_ext_amt) > vanchor.max_ext_amt {
+                return Err(ContractError::Std(StdError::GenericErr {
+                    msg: "Invalid ext amount".to_string(),
+                }));
+            }
 
             // Public amounnt can also be negative, in which
             // case it would wrap around the field, so we should check if FIELD_SIZE -
@@ -260,10 +265,11 @@ fn transact(
             let calc_public_amt = ext_amt - ext_data_fee as i128;
             let calc_public_amt_bytes =
                 element_encoder(&ArkworksIntoFieldBn254::into_field(calc_public_amt));
-            assert!(
-                calc_public_amt_bytes == proof_data.public_amount,
-                "Invalid public amount"
-            );
+            if calc_public_amt_bytes != proof_data.public_amount {
+                return Err(ContractError::Std(StdError::GenericErr {
+                    msg: "Invalid public amount".to_string(),
+                }));
+            }
 
             // Construct public inputs
             let chain_id_type_bytes = element_encoder(
@@ -309,23 +315,29 @@ fn transact(
 
             let is_deposit = ext_amt.is_positive();
             if is_deposit {
-                assert!(
-                    Uint256::from(abs_ext_amt) <= vanchor.max_deposit_amt,
-                    "Invalid deposit amount"
-                );
-                assert!(
-                    abs_ext_amt == cw20_token_amt.u128(),
-                    "Did not send enough tokens"
-                );
+                if Uint256::from(abs_ext_amt) > vanchor.max_deposit_amt {
+                    return Err(ContractError::Std(StdError::GenericErr {
+                        msg: "Invalid deposit amount".to_string(),
+                    }));
+                };
+                if abs_ext_amt != cw20_token_amt.u128() {
+                    return Err(ContractError::Std(StdError::GenericErr {
+                        msg: "Did not send enough tokens".to_string(),
+                    }));
+                };
                 // No need to call "transfer from transactor to this contract"
                 // since this message is the result of sending.
             } else {
-                assert!(
-                    Uint256::from(abs_ext_amt) >= vanchor.min_withdraw_amt,
-                    "Invalid withdraw amount"
-                );
-                assert!(cw20_token_amt == Uint128::zero(), "Sent unnecesary funds");
-
+                if Uint256::from(abs_ext_amt) < vanchor.min_withdraw_amt {
+                    return Err(ContractError::Std(StdError::GenericErr {
+                        msg: "Invalid withdraw amount".to_string(),
+                    }));
+                }
+                if cw20_token_amt != Uint128::zero() {
+                    return Err(ContractError::Std(StdError::GenericErr {
+                        msg: "Sent unnecessary funds".to_string(),
+                    }));
+                }
                 msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: cw20_address.clone(),
                     funds: [].to_vec(),
