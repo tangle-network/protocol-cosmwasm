@@ -1,47 +1,47 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "InstantiateMsg",
+  "title": "UpdateConfigMsg",
   "type": "object",
-  "required": [
-    "chain_id",
-    "cw20_address",
-    "levels",
-    "max_deposit_amt",
-    "max_edges",
-    "max_ext_amt",
-    "max_fee",
-    "min_withdraw_amt"
-  ],
   "properties": {
-    "chain_id": {
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
-    },
-    "cw20_address": {
-      "type": "string"
-    },
-    "levels": {
-      "type": "integer",
-      "format": "uint32",
-      "minimum": 0.0
-    },
     "max_deposit_amt": {
-      "$ref": "#/definitions/Uint256"
-    },
-    "max_edges": {
-      "type": "integer",
-      "format": "uint32",
-      "minimum": 0.0
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Uint256"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "max_ext_amt": {
-      "$ref": "#/definitions/Uint256"
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Uint256"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "max_fee": {
-      "$ref": "#/definitions/Uint256"
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Uint256"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "min_withdraw_amt": {
-      "$ref": "#/definitions/Uint256"
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Uint256"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "definitions": {

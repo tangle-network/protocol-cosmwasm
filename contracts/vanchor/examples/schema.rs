@@ -3,7 +3,9 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use protocol_cosmwasm::vanchor::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use protocol_cosmwasm::vanchor::{
+    Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, QueryMsg, UpdateConfigMsg,
+};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
@@ -14,4 +16,8 @@ fn main() {
     export_schema(&schema_for!(InstantiateMsg), &out_dir);
     export_schema(&schema_for!(ExecuteMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
+    export_schema(&schema_for!(ProofData), &out_dir);
+    export_schema(&schema_for!(ExtData), &out_dir);
+    export_schema(&schema_for!(Cw20HookMsg), &out_dir);
+    export_schema(&schema_for!(UpdateConfigMsg), &out_dir);
 }
