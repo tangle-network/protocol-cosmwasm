@@ -26,8 +26,8 @@ ark-bls12-381 = { version = "^0.3.0", default-features = false, features = [ "cu
 ark-bls12-377 = { version = "^0.3.0", default-features = false, features = [ "curve", "r1cs" ], optional = true }
 ark-crypto-primitives = { version = "^0.3.0", features = ["r1cs"], default-features = false }
 
-arkworks-setups = { version = "0.5.3", default-features = false }
-arkworks-native-gadgets = { version = "0.5.3", default-features = false }
+arkworks-setups = { version = "1.0.0", default-features = false }
+arkworks-native-gadgets = { version = "1.0.0", default-features = false }
 
 ark-ec = { version = "^0.3.0", default-features = false }
 ark-groth16 = { version = "^0.3.0", default-features = false }
