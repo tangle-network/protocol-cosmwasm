@@ -1,0 +1,157 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Cw20HookMsg",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "transact"
+      ],
+      "properties": {
+        "transact": {
+          "type": "object",
+          "required": [
+            "ext_data",
+            "proof_data"
+          ],
+          "properties": {
+            "ext_data": {
+              "$ref": "#/definitions/ExtData"
+            },
+            "proof_data": {
+              "$ref": "#/definitions/ProofData"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "definitions": {
+    "ExtData": {
+      "type": "object",
+      "required": [
+        "encrypted_output1",
+        "encrypted_output2",
+        "ext_amount",
+        "fee",
+        "recipient",
+        "relayer"
+      ],
+      "properties": {
+        "encrypted_output1": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          },
+          "maxItems": 32,
+          "minItems": 32
+        },
+        "encrypted_output2": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          },
+          "maxItems": 32,
+          "minItems": 32
+        },
+        "ext_amount": {
+          "type": "string"
+        },
+        "fee": {
+          "type": "string"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "relayer": {
+          "type": "string"
+        }
+      }
+    },
+    "ProofData": {
+      "type": "object",
+      "required": [
+        "ext_data_hash",
+        "input_nullifiers",
+        "output_commitments",
+        "proof",
+        "public_amount",
+        "roots"
+      ],
+      "properties": {
+        "ext_data_hash": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          },
+          "maxItems": 32,
+          "minItems": 32
+        },
+        "input_nullifiers": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8",
+              "minimum": 0.0
+            },
+            "maxItems": 32,
+            "minItems": 32
+          }
+        },
+        "output_commitments": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8",
+              "minimum": 0.0
+            },
+            "maxItems": 32,
+            "minItems": 32
+          }
+        },
+        "proof": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          }
+        },
+        "public_amount": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          },
+          "maxItems": 32,
+          "minItems": 32
+        },
+        "roots": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8",
+              "minimum": 0.0
+            },
+            "maxItems": 32,
+            "minItems": 32
+          }
+        }
+      }
+    }
+  }
+}
