@@ -22,7 +22,7 @@ pub mod anchor_verifier {
     impl AnchorVerifier {
         pub fn new() -> Self {
             let vk_bytes = include_bytes!(
-                "../../../protocol-substrate-fixtures/fixed-anchor/bn254/x5/verifying_key.bin"
+                "../../../protocol-substrate-fixtures/fixed-anchor/bn254/x5/2/verifying_key.bin"
             );
             Self {
                 vk_bytes: vk_bytes.to_vec(),

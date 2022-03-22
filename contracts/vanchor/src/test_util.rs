@@ -40,11 +40,11 @@ pub fn setup_environment(curve: Curve) -> (Vec<u8>, Vec<u8>) {
     match curve {
         Curve::Bn254 => {
             let pk_bytes = include_bytes!(
-                "../../../protocol-substrate-fixtures/vanchor/bn254/x5/proving_key_uncompressed.bin"
+                "../../../protocol-substrate-fixtures/vanchor/bn254/x5/2-2-2/proving_key_uncompressed.bin"
             )
             .to_vec();
             let vk_bytes = include_bytes!(
-                "../../../protocol-substrate-fixtures/vanchor/bn254/x5/verifying_key.bin"
+                "../../../protocol-substrate-fixtures/vanchor/bn254/x5/2-2-2/verifying_key.bin"
             )
             .to_vec();
 
