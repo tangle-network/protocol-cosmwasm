@@ -20,10 +20,7 @@ pub mod vanchor_verifier {
     pub type Result<T> = core::result::Result<T, Error>;
 
     impl VAnchorVerifier {
-        pub fn new() -> Self {
-            let vk_bytes = include_bytes!(
-                "../../../protocol-substrate-fixtures/vanchor/bn254/x5/verifying_key.bin"
-            );
+        pub fn new(vk_bytes: &[u8]) -> Self {
             Self {
                 vk_bytes: vk_bytes.to_vec(),
             }
@@ -32,12 +29,6 @@ pub mod vanchor_verifier {
         pub fn verify(&self, public_inp_bytes: Vec<u8>, proof_bytes: Vec<u8>) -> Result<bool> {
             ArkworksVerifierBn254::verify(&public_inp_bytes, &proof_bytes, &self.vk_bytes)
                 .map_err(|_| Error::VerifierError)
-        }
-    }
-
-    impl Default for VAnchorVerifier {
-        fn default() -> Self {
-            Self::new()
         }
     }
 }

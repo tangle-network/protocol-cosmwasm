@@ -207,8 +207,11 @@ pub const NULLIFIERS: Map<Vec<u8>, bool> = Map::new("used_nullifers");
 // "Poseidon hasher"
 pub const POSEIDON: Item<Poseidon> = Item::new("poseidon");
 
-// "VAnchorVerifier"
-pub const VANCHORVERIFIER: Item<VAnchorVerifier> = Item::new("vanchor_verifier");
+// "VAnchorVerifier (2 * 2)
+pub const VERIFIER_2_2: Item<VAnchorVerifier> = Item::new("vanchor_verifier_2_2");
+
+// "VAnchorVerifier" (16 * 2)
+pub const VERIFIER_16_2: Item<VAnchorVerifier> = Item::new("vanchor_verifier_16_2");
 
 // MerkleTree
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
