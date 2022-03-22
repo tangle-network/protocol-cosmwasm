@@ -290,9 +290,9 @@ impl MerkleTree {
     }
 
     pub fn is_known_root(&self, root: [u8; 32], store: &dyn Storage) -> bool {
-        // if root == [0u8; 32] {
-        //     return false;
-        // }
+        if root == [0u8; 32] {
+            return false;
+        }
 
         let mut i = self.current_root_index;
         for _ in 0..ROOT_HISTORY_SIZE {

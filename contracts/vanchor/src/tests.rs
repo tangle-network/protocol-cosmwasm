@@ -10,6 +10,7 @@ use crate::contract::{compute_chain_id_type, execute, instantiate};
 use protocol_cosmwasm::vanchor::{
     Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, UpdateConfigMsg,
 };
+use protocol_cosmwasm::zeroes::zeroes;
 
 const CHAIN_ID: u64 = 1;
 const MAX_EDGES: u32 = 2;
@@ -169,7 +170,7 @@ fn test_vanchor_transact_deposit_cw20() {
     ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
 
     let ext_data_hash = keccak_256(&ext_data_args);
-    let custom_roots = Some([[0u8; 32]; 2].map(|x| x.to_vec()));
+    let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit(
         public_amount,
         chain_id,
@@ -288,7 +289,7 @@ fn test_vanchor_transact_withdraw_cw20() {
     ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
 
     let ext_data_hash = keccak_256(&ext_data_args);
-    let custom_roots = Some([[0u8; 32]; 2].map(|x| x.to_vec()));
+    let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit(
         public_amount,
         chain_id,
@@ -493,7 +494,7 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
     ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
 
     let ext_data_hash = keccak_256(&ext_data_args);
-    let custom_roots = Some([[0u8; 32]; 2].map(|x| x.to_vec()));
+    let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit(
         public_amount,
         chain_id,
@@ -702,7 +703,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
     ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
 
     let ext_data_hash = keccak_256(&ext_data_args);
-    let custom_roots = Some([[0u8; 32]; 2].map(|x| x.to_vec()));
+    let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit(
         public_amount,
         chain_id,
@@ -901,7 +902,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
     ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
 
     let ext_data_hash = keccak_256(&ext_data_args);
-    let custom_roots = Some([[0u8; 32]; 2].map(|x| x.to_vec()));
+    let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit(
         public_amount,
         chain_id,
@@ -1100,7 +1101,7 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
     ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
 
     let ext_data_hash = keccak_256(&ext_data_args);
-    let custom_roots = Some([[0u8; 32]; 2].map(|x| x.to_vec()));
+    let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit(
         public_amount,
         chain_id,
