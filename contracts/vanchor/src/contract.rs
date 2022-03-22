@@ -51,11 +51,12 @@ pub fn instantiate(
     POSEIDON.save(deps.storage, &Poseidon::new())?;
 
     // Initialize the vanchor verifiers
-    let vk_bytes =
-        include_bytes!("../../../protocol-substrate-fixtures/vanchor/bn254/x5/verifying_key.bin");
+    let vk_bytes = include_bytes!(
+        "../../../protocol-substrate-fixtures/vanchor/bn254/x5/2-2-2/verifying_key.bin"
+    );
     VERIFIER_2_2.save(deps.storage, &VAnchorVerifier::new(vk_bytes))?;
     let vk_bytes = include_bytes!(
-        "../../../protocol-substrate-fixtures/vanchor/bn254/x5/16/verifying_key.bin"
+        "../../../protocol-substrate-fixtures/vanchor/bn254/x5/2-16-2/verifying_key.bin"
     );
     VERIFIER_16_2.save(deps.storage, &VAnchorVerifier::new(vk_bytes))?;
 

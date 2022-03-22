@@ -41,7 +41,7 @@ const ANCHOR_CT: usize = 2;
 const NUM_IN_UTXOS_16_2: usize = 16;
 const NUM_OUT_UTXOS_16_2: usize = 2;
 
-pub fn setup_environment(curve: Curve) -> (Vec<u8>, Vec<u8>) {
+pub fn setup_environment_2_2_2(curve: Curve) -> (Vec<u8>, Vec<u8>) {
     match curve {
         Curve::Bn254 => {
             let pk_bytes = include_bytes!(
@@ -62,7 +62,28 @@ pub fn setup_environment(curve: Curve) -> (Vec<u8>, Vec<u8>) {
     }
 }
 
-pub fn setup_utxos(
+pub fn setup_environment_2_16_2(curve: Curve) -> (Vec<u8>, Vec<u8>) {
+    match curve {
+        Curve::Bn254 => {
+            let pk_bytes = include_bytes!(
+                "../../../protocol-substrate-fixtures/vanchor/bn254/x5/2-16-2/proving_key_uncompressed.bin"
+            )
+            .to_vec();
+            let vk_bytes = include_bytes!(
+                "../../../protocol-substrate-fixtures/vanchor/bn254/x5/2-16-2/verifying_key.bin"
+            )
+            .to_vec();
+
+            // finally return the provingkey bytes
+            (pk_bytes, vk_bytes)
+        }
+        Curve::Bls381 => {
+            unimplemented!()
+        }
+    }
+}
+
+pub fn setup_utxos_2_2_2(
     // Transaction inputs
     chain_ids: [u64; NUM_UTXOS],
     amounts: [u128; NUM_UTXOS],
@@ -98,7 +119,7 @@ pub fn setup_utxos(
     in_utxos
 }
 
-pub fn setup_utxos_16_2(
+pub fn setup_utxos_2_16_2(
     // Transaction inputs
     chain_ids: [u64; NUM_IN_UTXOS_16_2],
     amounts: [u128; NUM_IN_UTXOS_16_2],
@@ -145,7 +166,7 @@ pub fn setup_utxos_16_2(
     ]
 }
 
-pub fn setup_zk_circuit(
+pub fn setup_zk_circuit_2_2_2(
     // Metadata inputs
     public_amount: i128,
     chain_id: u64,
@@ -212,7 +233,7 @@ pub fn setup_zk_circuit(
     (vanchor_proof.proof, pub_ins)
 }
 
-pub fn setup_zk_circuit_16_2(
+pub fn setup_zk_circuit_2_16_2(
     // Metadata inputs
     public_amount: i128,
     chain_id: u64,
@@ -281,7 +302,7 @@ pub fn setup_zk_circuit_16_2(
     (vanchor_proof.proof, pub_ins)
 }
 
-pub fn deconstruct_public_inputs(
+pub fn deconstruct_public_inputs_2_2_2(
     public_inputs: &Vec<Bn254Fr>,
 ) -> (
     Bn254Fr,      // Chain Id
@@ -307,7 +328,7 @@ pub fn deconstruct_public_inputs(
     )
 }
 
-pub fn deconstruct_public_inputs_16_2(
+pub fn deconstruct_public_inputs_2_16_2(
     public_inputs: &Vec<Bn254Fr>,
 ) -> (
     Bn254Fr,      // Chain Id
@@ -333,7 +354,7 @@ pub fn deconstruct_public_inputs_16_2(
     )
 }
 
-pub fn deconstruct_public_inputs_el(
+pub fn deconstruct_public_inputs_el_2_2_2(
     public_inputs_f: &Vec<Bn254Fr>,
 ) -> (
     Element,      // Chain Id
@@ -344,7 +365,7 @@ pub fn deconstruct_public_inputs_el(
     Element,      // External amount
 ) {
     let (chain_id, public_amount, roots, nullifiers, commitments, ext_data_hash) =
-        deconstruct_public_inputs(public_inputs_f);
+        deconstruct_public_inputs_2_2_2(public_inputs_f);
     let chain_id_el = Element::from_bytes(&chain_id.into_repr().to_bytes_le());
     let public_amount_el = Element::from_bytes(&public_amount.into_repr().to_bytes_le());
     let root_set_el = roots
@@ -370,7 +391,7 @@ pub fn deconstruct_public_inputs_el(
     )
 }
 
-pub fn deconstruct_public_inputs_el_16_2(
+pub fn deconstruct_public_inputs_el_2_16_2(
     public_inputs_f: &Vec<Bn254Fr>,
 ) -> (
     Element,      // Chain Id
@@ -381,7 +402,7 @@ pub fn deconstruct_public_inputs_el_16_2(
     Element,      // External amount
 ) {
     let (chain_id, public_amount, roots, nullifiers, commitments, ext_data_hash) =
-        deconstruct_public_inputs_16_2(public_inputs_f);
+        deconstruct_public_inputs_2_16_2(public_inputs_f);
     let chain_id_el = Element::from_bytes(&chain_id.into_repr().to_bytes_le());
     let public_amount_el = Element::from_bytes(&public_amount.into_repr().to_bytes_le());
     let root_set_el = roots
