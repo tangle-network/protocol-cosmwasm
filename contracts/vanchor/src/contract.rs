@@ -33,6 +33,11 @@ const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
 // History length for the "Curr_neighbor_root_index".
 const HISTORY_LENGTH: u32 = 30;
 
+const NUM_INS_2: u32 = 2;
+const NUM_OUTS_2: u32 = 2;
+const NUM_INS_16: u32 = 16;
+const NUM_OUTS_16: u32 = 2;
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -51,14 +56,17 @@ pub fn instantiate(
     POSEIDON.save(deps.storage, &Poseidon::new())?;
 
     // Initialize the vanchor verifiers
-    let vk_bytes = include_bytes!(
-        "../../../protocol-substrate-fixtures/vanchor/bn254/x5/2-2-2/verifying_key.bin"
-    );
-    VERIFIER_2_2.save(deps.storage, &VAnchorVerifier::new(vk_bytes))?;
-    let vk_bytes = include_bytes!(
-        "../../../protocol-substrate-fixtures/vanchor/bn254/x5/2-16-2/verifying_key.bin"
-    );
-    VERIFIER_16_2.save(deps.storage, &VAnchorVerifier::new(vk_bytes))?;
+    let verifier_2_2 = match VAnchorVerifier::new(msg.max_edges, NUM_INS_2, NUM_OUTS_2) {
+        Ok(v) => v,
+        Err(e) => return Err(ContractError::Std(e)),
+    };
+    VERIFIER_2_2.save(deps.storage, &verifier_2_2)?;
+
+    let verifier_16_2 = match VAnchorVerifier::new(msg.max_edges, NUM_INS_16, NUM_OUTS_16) {
+        Ok(v) => v,
+        Err(e) => return Err(ContractError::Std(e)),
+    };
+    VERIFIER_16_2.save(deps.storage, &verifier_16_2)?;
 
     // Initialize the merkle tree
     let merkle_tree: MerkleTree = MerkleTree {
