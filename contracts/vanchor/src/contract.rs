@@ -20,7 +20,7 @@ use protocol_cosmwasm::zeroes::zeroes;
 use crate::state::{
     read_curr_neighbor_root_index, save_curr_neighbor_root_index, save_edge, save_neighbor_roots,
     save_root, save_subtree, Edge, LinkableMerkleTree, MerkleTree, VAnchor, NULLIFIERS, POSEIDON,
-    VANCHOR, VANCHORVERIFIER,
+    VANCHOR, VERIFIER_16_2, VERIFIER_2_2,
 };
 
 // version info for migration info
@@ -50,8 +50,15 @@ pub fn instantiate(
     // Initialize the poseidon hasher
     POSEIDON.save(deps.storage, &Poseidon::new())?;
 
-    // Initialize the VAnchor_verifier
-    VANCHORVERIFIER.save(deps.storage, &VAnchorVerifier::new())?;
+    // Initialize the vanchor verifiers
+    let vk_bytes = include_bytes!(
+        "../../../protocol-substrate-fixtures/vanchor/bn254/x5/2-2-2/verifying_key.bin"
+    );
+    VERIFIER_2_2.save(deps.storage, &VAnchorVerifier::new(vk_bytes))?;
+    let vk_bytes = include_bytes!(
+        "../../../protocol-substrate-fixtures/vanchor/bn254/x5/2-16-2/verifying_key.bin"
+    );
+    VERIFIER_16_2.save(deps.storage, &VAnchorVerifier::new(vk_bytes))?;
 
     // Initialize the merkle tree
     let merkle_tree: MerkleTree = MerkleTree {
@@ -290,12 +297,15 @@ fn transact(
                 bytes.extend_from_slice(root);
             }
 
-            let verifier = VANCHORVERIFIER.load(deps.storage)?;
+            let verifier_2_2 = VERIFIER_2_2.load(deps.storage)?;
+            let verifier_16_2 = VERIFIER_16_2.load(deps.storage)?;
+
             let result = match (
                 proof_data.input_nullifiers.len(),
                 proof_data.output_commitments.len(),
             ) {
-                (2, 2) => verify(verifier, bytes, proof_data.proof)?,
+                (2, 2) => verify(verifier_2_2, bytes, proof_data.proof)?,
+                (16, 2) => verify(verifier_16_2, bytes, proof_data.proof)?,
                 _ => false,
             };
 
