@@ -15,22 +15,29 @@ use protocol_cosmwasm::vanchor::InstantiateMsg;
 // For the github CI, we copy the wasm file manually & import here.
 static WASM: &[u8] = include_bytes!("./cosmwasm_vanchor.wasm");
 
+const CHAIN_ID: u64 = 1;
+const MAX_EDGES: u32 = 2;
+const LEVELS: u32 = 30;
+const MAX_DEPOSIT_AMT: u128 = 40;
+const MIN_WITHDRAW_AMT: u128 = 0;
+const MAX_EXT_AMT: u128 = 20;
+const MAX_FEE: u128 = 10;
+const CW20_ADDRESS: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
+
 #[test]
 fn integration_test_instantiate_mixer() {
     // "Gas_limit" should be set high manually, since the low value can cause "GasDepletion" error.
     let mut deps = mock_instance_with_gas_limit(WASM, 100_000_000);
 
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
-
     let msg = InstantiateMsg {
-        chain_id: 1,
-        max_edges: 2,
-        levels: 30,
-        max_deposit_amt: Uint256::from(40_u128),
-        min_withdraw_amt: Uint256::from(0_u128),
-        max_ext_amt: Uint256::from(20_u128),
-        max_fee: Uint256::from(10_u128),
-        cw20_address: cw20_address.clone(),
+        chain_id: CHAIN_ID,
+        max_edges: MAX_EDGES,
+        levels: LEVELS,
+        max_deposit_amt: Uint256::from(MAX_DEPOSIT_AMT),
+        min_withdraw_amt: Uint256::from(MIN_WITHDRAW_AMT),
+        max_ext_amt: Uint256::from(MAX_EXT_AMT),
+        max_fee: Uint256::from(MAX_FEE),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("creator", &[]);
     let response: Response = instantiate(&mut deps, mock_env(), info, msg).unwrap();
