@@ -46,7 +46,11 @@ pub fn instantiate(
     POSEIDON.save(deps.storage, &Poseidon::new())?;
 
     // Initialize the Anchor_verifier
-    ANCHORVERIFIER.save(deps.storage, &AnchorVerifier::new())?;
+    let anchor_verifier = match AnchorVerifier::new(msg.max_edges) {
+        Ok(v) => v,
+        Err(e) => return Err(ContractError::Std(e)),
+    };
+    ANCHORVERIFIER.save(deps.storage, &anchor_verifier)?;
 
     // Initialize the merkle tree
     let merkle_tree: MerkleTree = MerkleTree {

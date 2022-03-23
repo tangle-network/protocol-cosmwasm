@@ -25,19 +25,24 @@ use arkworks_setups::Curve;
 // For the github CI, we copy the wasm file manually & import here.
 static WASM: &[u8] = include_bytes!("./cosmwasm_anchor.wasm");
 
+const MAX_EDGES: u32 = 2;
+const CHAIN_ID: u64 = 1;
+const LEVELS: u32 = 30;
+const CW20_ADDRESS: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
+const DEPOSIT_SIZE: u128 = 1_000_000;
+const DEPOSITOR: &str = "depositor";
+
 #[test]
 fn integration_test_instantiate_anchor() {
     // "Gas_limit" should be set high manually, since the low value can cause "GasDepletion" error.
     let mut deps = mock_instance_with_gas_limit(WASM, 100_000_000);
 
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
-
     let msg = InstantiateMsg {
-        max_edges: 0,
-        chain_id: 1,
-        levels: 0,
-        deposit_size: Uint128::from(1_000_000_u128),
-        cw20_address: cw20_address.clone(),
+        max_edges: MAX_EDGES,
+        chain_id: CHAIN_ID,
+        levels: LEVELS,
+        deposit_size: Uint128::from(DEPOSIT_SIZE),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
 
     let info = mock_info("anyone", &[]);
@@ -50,24 +55,22 @@ fn integration_test_instantiate_anchor() {
 
     let query = query(&mut deps, mock_env(), QueryMsg::GetCw20Address {}).unwrap();
     let info: InfoResponse = from_binary(&query).unwrap();
-    assert_eq!(info.cw20_address, cw20_address);
+    assert_eq!(info.cw20_address, CW20_ADDRESS.to_string());
 }
 
 #[test]
 fn test_deposit_cw20() {
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
-
     let mut deps = mock_instance_with_gas_limit(WASM, 200_000_000);
 
     // Initialize the contract
     let env = mock_env();
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
-        max_edges: 2,
-        chain_id: 1,
-        levels: 30,
-        deposit_size: Uint128::from(1_000_000_u128),
-        cw20_address: cw20_address.clone(),
+        max_edges: MAX_EDGES,
+        chain_id: CHAIN_ID,
+        levels: LEVELS,
+        deposit_size: Uint128::from(DEPOSIT_SIZE),
+        cw20_address: CW20_ADDRESS.to_string(),
     };
 
     let _res: Response = instantiate(&mut deps, env, info, instantiate_msg).unwrap();
@@ -80,10 +83,10 @@ fn test_deposit_cw20() {
     element.copy_from_slice(&res.into_repr().to_bytes_le());
 
     // Should "deposit" cw20 tokens with success.
-    let info = mock_info(cw20_address.as_str(), &[]);
+    let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: cw20_address.clone(),
-        amount: Uint128::from(1_000_000_u128),
+        sender: CW20_ADDRESS.to_string(),
+        amount: Uint128::from(DEPOSIT_SIZE),
         msg: to_binary(&Cw20HookMsg::DepositCw20 {
             commitment: Some(element),
         })
