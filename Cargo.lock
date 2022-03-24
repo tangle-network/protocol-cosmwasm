@@ -809,6 +809,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cosmwasm-tokenwrapper"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-storage-plus",
+ "cw2",
+ "protocol-cosmwasm",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cosmwasm-vanchor"
 version = "0.1.0"
 dependencies = [

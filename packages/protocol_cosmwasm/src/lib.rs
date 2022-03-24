@@ -6,6 +6,7 @@ pub mod keccak;
 pub mod mixer;
 pub mod mixer_verifier;
 pub mod poseidon;
+pub mod token_wrapper;
 pub mod vanchor;
 pub mod vanchor_verifier;
 pub mod verifier;
