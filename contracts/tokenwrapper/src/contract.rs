@@ -17,6 +17,8 @@ use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::token_wrapper::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
+use crate::state::{Supply, TOTAL_SUPPLY};
+
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-tokenwrapper";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -43,6 +45,10 @@ pub fn instantiate(
         }),
     };
     TOKEN_INFO.save(deps.storage, &data)?;
+
+    // set supply to 0
+    let supply = Supply::default();
+    TOTAL_SUPPLY.save(deps.storage, &supply)?;
 
     Ok(Response::default())
 }
@@ -121,10 +127,29 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary};
+    use cw20::TokenInfoResponse;
 
     #[test]
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
-        // TODO
+
+        let info = mock_info("creator", &[]);
+        let instantiate_msg = InstantiateMsg {
+            name: "Webb-WRAP".to_string(),
+            symbol: "WWRP".to_string(),
+            decimals: 6u8,
+        };
+
+        // We call ".unwrap()" to ensure succeed
+        let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+        assert_eq!(res.messages.len(), 0);
+
+        let query = query(deps.as_ref(), mock_env(), QueryMsg::TokenInfo {}).unwrap();
+        let token_info_response: TokenInfoResponse = from_binary(&query).unwrap();
+
+        assert_eq!(token_info_response.name, "Webb-WRAP".to_string());
+        assert_eq!(token_info_response.symbol, "WWRP".to_string());
+        assert_eq!(token_info_response.decimals, 6);
+        assert_eq!(token_info_response.total_supply, Uint128::zero());
     }
 }
