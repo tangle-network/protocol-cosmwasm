@@ -32,7 +32,11 @@ optimize = """docker run --rm -v "$(pwd)":/code \
 cosmwasm-std = { version = "0.16.2" }
 cosmwasm-storage = { version = "0.16.0" }
 cw-storage-plus = "0.8.0"
+cw-utils = { version = "0.12.1" }
 cw2 = "0.8.1"
+cw20 = "0.8.1"
+cw-controllers = { version = "0.8.1" }
+cw20-base = { version = "0.8.1", features = ["library"] }
 schemars = "0.8.3"
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.26" }

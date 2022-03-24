@@ -694,7 +694,7 @@ dependencies = [
  "arkworks-native-gadgets 0.5.3",
  "arkworks-setups 0.5.3",
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 0.16.6",
  "cosmwasm-storage",
  "cosmwasm-vm",
  "cw-storage-plus",
@@ -716,7 +716,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce94de6dd2b3d74cd8d9bc2bf5d6208ffed832ad946774ea9ed2a9ef7d95161f"
 dependencies = [
  "bigint",
- "cosmwasm-std",
+ "cosmwasm-std 0.16.6",
  "schemars",
  "serde",
 ]
@@ -728,9 +728,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa6d40e8d484d04dd66e8d5795a3b36d9aaedda2cd75eeed2e00d56fd4923bdb"
 dependencies = [
  "digest 0.9.0",
- "ed25519-zebra",
+ "ed25519-zebra 2.2.0",
  "k256",
  "rand_core 0.5.1",
+ "thiserror",
+]
+
+[[package]]
+name = "cosmwasm-crypto"
+version = "1.0.0-beta7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88c2565b1e73a816fb659ef4838fc356143fbd35f43c48a51d2d7d4e5d6679d3"
+dependencies = [
+ "digest 0.9.0",
+ "ed25519-zebra 3.0.0",
+ "k256",
+ "rand_core 0.6.3",
  "thiserror",
 ]
 
@@ -739,6 +752,15 @@ name = "cosmwasm-derive"
 version = "0.16.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "848c6ddf2e7dc61c2ebfce263307fce5f66a65ab30e22ac97bf431ed4c5da7f1"
+dependencies = [
+ "syn",
+]
+
+[[package]]
+name = "cosmwasm-derive"
+version = "1.0.0-beta7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa89fcdf8dbbe0088e663d0a814aa7368e7ebe8fb045a3a150fb5fdc2ffe3b45"
 dependencies = [
  "syn",
 ]
@@ -757,7 +779,7 @@ dependencies = [
  "arkworks-native-gadgets 0.5.3",
  "arkworks-setups 0.5.3",
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 0.16.6",
  "cosmwasm-storage",
  "cosmwasm-vm",
  "cw-storage-plus",
@@ -788,8 +810,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8eeb09d759020f5793fa7f61bb107bf651cf355735b62845b686ab05b78e164"
 dependencies = [
  "base64",
- "cosmwasm-crypto",
- "cosmwasm-derive",
+ "cosmwasm-crypto 0.16.6",
+ "cosmwasm-derive 0.16.6",
+ "forward_ref",
+ "schemars",
+ "serde",
+ "serde-json-wasm",
+ "thiserror",
+ "uint",
+]
+
+[[package]]
+name = "cosmwasm-std"
+version = "1.0.0-beta7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bcb8f99a61d0b9069e1afc80a4ffea87dcc3523edd992080923870b13a677da0"
+dependencies = [
+ "base64",
+ "cosmwasm-crypto 1.0.0-beta7",
+ "cosmwasm-derive 1.0.0-beta7",
  "forward_ref",
  "schemars",
  "serde",
@@ -804,7 +843,7 @@ version = "0.16.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db1e7100a56b84d2944bc680421125337d9c57d9650de31868cbc6547fd51155"
 dependencies = [
- "cosmwasm-std",
+ "cosmwasm-std 0.16.6",
  "serde",
 ]
 
@@ -813,10 +852,14 @@ name = "cosmwasm-tokenwrapper"
 version = "0.1.0"
 dependencies = [
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 0.16.6",
  "cosmwasm-storage",
+ "cw-controllers",
  "cw-storage-plus",
+ "cw-utils",
  "cw2",
+ "cw20",
+ "cw20-base",
  "protocol-cosmwasm",
  "schemars",
  "serde",
@@ -837,7 +880,7 @@ dependencies = [
  "arkworks-native-gadgets 1.0.0",
  "arkworks-setups 1.0.0",
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 0.16.6",
  "cosmwasm-storage",
  "cosmwasm-vm",
  "cw-storage-plus",
@@ -859,8 +902,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5fdae843ea716914fc435ab20ebba03751c0489aa2cfa937c556dfc6d5dc3522"
 dependencies = [
  "clru",
- "cosmwasm-crypto",
- "cosmwasm-std",
+ "cosmwasm-crypto 0.16.6",
+ "cosmwasm-std 0.16.6",
  "hex",
  "loupe",
  "parity-wasm",
@@ -1067,14 +1110,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw-controllers"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff50deaba22e0a37d6542ef4e4141e2cbe8f63dd9de23655762841f38517542e"
+dependencies = [
+ "cosmwasm-std 0.16.6",
+ "cw-storage-plus",
+ "cw0",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cw-storage-plus"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1e867b9972b83b32e00e878dfbff48299ba26618dabeb19b9c56fae176dc225"
 dependencies = [
- "cosmwasm-std",
+ "cosmwasm-std 0.16.6",
  "schemars",
  "serde",
+]
+
+[[package]]
+name = "cw-utils"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3396c7aff5a0e3fb6dcc6cc89f56862c1d212b40d93ed725a6962955b1887ff"
+dependencies = [
+ "cosmwasm-std 1.0.0-beta7",
+ "schemars",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -1083,7 +1152,7 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c497f885a40918a02df7d938c81809965fa05cfc21b3dc591e9950237b5de0a9"
 dependencies = [
- "cosmwasm-std",
+ "cosmwasm-std 0.16.6",
  "schemars",
  "serde",
  "thiserror",
@@ -1095,7 +1164,7 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4d48454f96494aa1018556cd457977375cc8c57ef3e5c767cfa2ea5ec24b0258"
 dependencies = [
- "cosmwasm-std",
+ "cosmwasm-std 0.16.6",
  "cw-storage-plus",
  "schemars",
  "serde",
@@ -1107,10 +1176,26 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a11a2adbd52258f5b4ed5323f62bc6e559f2cefbe52ef0e58290016fde5bb083"
 dependencies = [
- "cosmwasm-std",
+ "cosmwasm-std 0.16.6",
  "cw0",
  "schemars",
  "serde",
+]
+
+[[package]]
+name = "cw20-base"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe3791e0f6b4a0a82b86541d48dcc67c2d607da8e5691a91b40b2c06ddf09c52"
+dependencies = [
+ "cosmwasm-std 0.16.6",
+ "cw-storage-plus",
+ "cw0",
+ "cw2",
+ "cw20",
+ "schemars",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -1303,6 +1388,21 @@ dependencies = [
  "serde",
  "sha2 0.9.9",
  "thiserror",
+]
+
+[[package]]
+name = "ed25519-zebra"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "403ef3e961ab98f0ba902771d29f842058578bb1ce7e3c59dad5a6a93e784c69"
+dependencies = [
+ "curve25519-dalek 3.2.0",
+ "hex",
+ "rand_core 0.6.3",
+ "serde",
+ "sha2 0.9.9",
+ "thiserror",
+ "zeroize",
 ]
 
 [[package]]
@@ -2303,9 +2403,10 @@ dependencies = [
  "arkworks-native-gadgets 0.5.3",
  "arkworks-setups 0.5.3",
  "cosmwasm-bignumber",
- "cosmwasm-std",
+ "cosmwasm-std 0.16.6",
  "cosmwasm-storage",
  "cw20",
+ "cw20-base",
  "schemars",
  "serde",
  "sp-std 4.0.0 (git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.16)",
