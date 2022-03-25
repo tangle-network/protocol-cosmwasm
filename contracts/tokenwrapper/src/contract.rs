@@ -1,12 +1,12 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, coins, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
-    Response, StdError, StdResult, Uint128, WasmMsg,
+    attr, coins, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 
-use cw20::{Cw20ExecuteMsg, Cw20QueryMsg};
+use cw20::{Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 use cw20_base::allowances::{
     execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
     execute_transfer_from, query_allowance,
@@ -18,7 +18,7 @@ use cw20_base::contract::{
 use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::token_wrapper::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use protocol_cosmwasm::token_wrapper::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg};
 
 use crate::state::{Supply, TOTAL_SUPPLY};
 
@@ -70,6 +70,8 @@ pub fn execute(
             Some(token) => unwrap_cw20(deps, env, info, token, amount),
             None => unwrap_native(deps, env, info, amount),
         },
+
+        ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
 
         // these all come from cw20-base to implement the cw20 standard
         ExecuteMsg::Transfer { recipient, amount } => {
@@ -137,7 +139,7 @@ fn wrap_native(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, C
     execute_mint(deps, env, sub_info, info.sender.to_string(), to_mint)?;
 
     Ok(Response::new().add_attributes(vec![
-        attr("action", "wrap"),
+        attr("action", "wrap_native"),
         attr("from", info.sender),
         attr("minted", to_mint),
     ]))
@@ -231,6 +233,49 @@ fn unwrap_cw20(
     ]))
 }
 
+fn receive_cw20(
+    mut deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    cw20_msg: Cw20ReceiveMsg,
+) -> Result<Response, ContractError> {
+    // Only Cw20 token contract can execute this message.
+    if !is_valid_address(deps.branch(), info.sender) {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let sender = cw20_msg.sender;
+    let to_mint = cw20_msg.amount;
+    match from_binary(&cw20_msg.msg) {
+        Ok(Cw20HookMsg::Wrap {}) => {
+            // Validate the token amount
+            if to_mint.is_zero() {
+                return Err(ContractError::Std(StdError::GenericErr {
+                    msg: "Sent zero amount".to_string(),
+                }));
+            }
+
+            let mut supply = TOTAL_SUPPLY.load(deps.storage)?;
+            supply.issued += to_mint;
+            TOTAL_SUPPLY.save(deps.storage, &supply)?;
+
+            // call into cw20-base to mint the token, call as self as no one else is allowed
+            let sub_info = MessageInfo {
+                sender: env.contract.address.clone(),
+                funds: vec![],
+            };
+            execute_mint(deps, env, sub_info, sender.to_string(), to_mint)?;
+
+            Ok(Response::new().add_attributes(vec![
+                attr("action", "wrap_cw20"),
+                attr("from", sender),
+                attr("minted", to_mint),
+            ]))
+        }
+        Err(e) => return Err(ContractError::Std(e)),
+    }
+}
+
 fn is_valid_address(deps: DepsMut, token_address: Addr) -> bool {
     let token_info_query: StdResult<TokenInfo> = deps
         .querier
@@ -265,7 +310,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, coins, from_binary, BankQuery, Uint128};
+    use cosmwasm_std::{coin, coins, from_binary, BankQuery, Coin, Uint128};
     use cw20::{BalanceResponse, TokenInfoResponse};
 
     #[test]
@@ -314,7 +359,7 @@ mod tests {
         assert_eq!(
             res.attributes,
             vec![
-                attr("action", "wrap"),
+                attr("action", "wrap_native"),
                 attr("from", "anyone"),
                 attr("minted", "100"),
             ]
@@ -381,12 +426,11 @@ mod tests {
         .unwrap();
         let token_balance: BalanceResponse = from_binary(&query).unwrap();
         assert_eq!(token_balance.balance.u128(), 20);
-
-        let query = deps
-            .as_ref()
-            .querier
-            .query_balance("anyone".to_string(), "uusd")
-            .unwrap();
-        assert_eq!(query.amount.u128(), 80);
     }
+
+    #[test]
+    fn test_wrap_cw20() {}
+
+    #[test]
+    fn test_unwrap_cw20() {}
 }
