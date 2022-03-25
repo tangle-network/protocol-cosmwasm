@@ -1,4 +1,4 @@
-use cosmwasm_std::{Binary, Uint128};
+use cosmwasm_std::{Addr, Binary, Uint128};
 use cw20::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,12 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     /// Wrap the native tokens(UST).
     Wrap {},
+
+    /// Unwrap the underlying tokens & re-send the fund(native or Cw20)
+    Unwrap {
+        token: Option<Addr>,
+        amount: Uint128,
+    },
 
     /// Implements CW20. Transfer is a base message to move tokens to another account without triggering actions
     Transfer { recipient: String, amount: Uint128 },
