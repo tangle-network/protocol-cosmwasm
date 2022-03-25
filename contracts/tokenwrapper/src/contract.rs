@@ -123,8 +123,8 @@ fn wrap_native(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, C
     let sent_uusd = info
         .funds
         .iter()
-        .find(|token| token.denom == "uusd".to_string())
-        .ok_or_else(|| ContractError::InsufficientFunds {})?;
+        .find(|token| token.denom == *"uusd".to_string())
+        .ok_or(ContractError::InsufficientFunds {})?;
     let to_mint = sent_uusd.amount;
 
     let mut supply = TOTAL_SUPPLY.load(deps.storage)?;
@@ -163,17 +163,16 @@ fn unwrap_native(
     let remainder = total_supply.issued - amount;
 
     // burn from the original caller
-    execute_burn(deps.branch(), env.clone(), info.clone(), amount)?;
+    execute_burn(deps.branch(), env, info.clone(), amount)?;
 
     // Save the "total_supply"
     TOTAL_SUPPLY.save(deps.storage, &Supply { issued: remainder })?;
 
     // Refund the native token(UST)
-    let mut msgs: Vec<CosmosMsg> = vec![];
-    msgs.push(CosmosMsg::Bank(BankMsg::Send {
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Bank(BankMsg::Send {
         to_address: info.sender.to_string(),
         amount: coins(amount.u128(), "uusd"),
-    }));
+    })];
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("action", "unwrap_native"),
@@ -209,21 +208,20 @@ fn unwrap_cw20(
     let remainder = total_supply.issued - amount;
 
     // burn from the original caller
-    execute_burn(deps.branch(), env.clone(), info.clone(), amount)?;
+    execute_burn(deps.branch(), env, info.clone(), amount)?;
 
     // Save the "total_supply"
     TOTAL_SUPPLY.save(deps.storage, &Supply { issued: remainder })?;
 
     // Refund the Cw20 token
-    let mut msgs: Vec<CosmosMsg> = vec![];
-    msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: token.to_string(),
         funds: vec![],
         msg: to_binary(&Cw20ExecuteMsg::Transfer {
             recipient: info.sender.to_string(),
-            amount: amount,
+            amount,
         })?,
-    }));
+    })];
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("action", "unwrap_cw20"),
@@ -272,7 +270,7 @@ fn receive_cw20(
                 attr("minted", to_mint),
             ]))
         }
-        Err(e) => return Err(ContractError::Std(e)),
+        Err(e) => Err(ContractError::Std(e)),
     }
 }
 
@@ -310,7 +308,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, coins, from_binary, BankQuery, Coin, Uint128};
+    use cosmwasm_std::{coins, from_binary, Uint128};
     use cw20::{BalanceResponse, TokenInfoResponse};
 
     #[test]
