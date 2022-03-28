@@ -6,7 +6,7 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 
-use cw20::{Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
+use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 use cw20_base::allowances::{
     execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
     execute_transfer_from, query_allowance,
@@ -152,7 +152,7 @@ fn unwrap_native(
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     // Validate the "amount"
-    if !is_valid_amount(deps.branch(), amount) {
+    if !is_valid_amount(deps.branch(), info.clone(), amount) {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Invalid amount".to_string(),
         }));
@@ -197,7 +197,7 @@ fn unwrap_cw20(
     }
 
     // Validate the "token" amount
-    if !is_valid_amount(deps.branch(), amount) {
+    if !is_valid_amount(deps.branch(), info.clone(), amount) {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Invalid amount".to_string(),
         }));
@@ -282,12 +282,13 @@ fn is_valid_address(deps: DepsMut, token_address: Addr) -> bool {
     token_info_query.is_ok()
 }
 
-fn is_valid_amount(deps: DepsMut, amount: Uint128) -> bool {
-    let total_supply = TOTAL_SUPPLY.load(deps.storage).unwrap_or(Supply {
-        issued: Uint128::zero(),
-    });
-
-    amount <= total_supply.issued
+fn is_valid_amount(deps: DepsMut, info: MessageInfo, amount: Uint128) -> bool {
+    let sender_token_balance = query_balance(deps.as_ref(), info.sender.to_string())
+        .unwrap_or(BalanceResponse {
+            balance: Uint128::zero(),
+        })
+        .balance;
+    amount <= sender_token_balance
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
