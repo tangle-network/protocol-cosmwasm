@@ -6,7 +6,7 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 
-use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
+use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg, TokenInfoResponse};
 use cw20_base::allowances::{
     execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
     execute_transfer_from, query_allowance,
@@ -275,7 +275,7 @@ fn receive_cw20(
 }
 
 fn is_valid_address(deps: DepsMut, token_address: Addr) -> bool {
-    let token_info_query: StdResult<TokenInfo> = deps
+    let token_info_query: StdResult<TokenInfoResponse> = deps
         .querier
         .query_wasm_smart(token_address, &Cw20QueryMsg::TokenInfo {});
 
@@ -309,8 +309,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, Uint128};
-    use cw20::{BalanceResponse, TokenInfoResponse};
+    use cosmwasm_std::{coins, from_binary, Coin, Uint128};
+    use cw20::{BalanceResponse, Cw20ReceiveMsg, TokenInfoResponse};
 
     #[test]
     fn proper_initialization() {
@@ -428,8 +428,106 @@ mod tests {
     }
 
     #[test]
-    fn test_wrap_cw20() {}
+    fn test_wrap_cw20() {
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
+        let mut deps = crate::mock_querier::mock_dependencies(&[Coin {
+            amount: Uint128::zero(),
+            denom: cw20_address.clone(),
+        }]);
+
+        // Instantiate the tokenwrapper contract.
+        let info = mock_info("creator", &[]);
+        let instantiate_msg = InstantiateMsg {
+            name: "Webb-WRAP".to_string(),
+            symbol: "WWRP".to_string(),
+            decimals: 6u8,
+        };
+
+        let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+
+        // Try the wrapping the cw20 token
+        let info = mock_info(&cw20_address, &[]);
+        let wrap_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender: "anyone".to_string(),
+            amount: Uint128::from(100_u128),
+            msg: to_binary(&Cw20HookMsg::Wrap {}).unwrap(),
+        });
+        let res = execute(deps.as_mut(), mock_env(), info, wrap_msg).unwrap();
+
+        assert_eq!(
+            res.attributes,
+            vec![
+                attr("action", "wrap_cw20"),
+                attr("from", "anyone"),
+                attr("minted", "100"),
+            ]
+        );
+
+        // Check the "Webb_WRAP" token balance
+        let query = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::Balance {
+                address: "anyone".to_string(),
+            },
+        )
+        .unwrap();
+        let token_balance: BalanceResponse = from_binary(&query).unwrap();
+        assert_eq!(token_balance.balance.u128(), 100);
+    }
 
     #[test]
-    fn test_unwrap_cw20() {}
+    fn test_unwrap_cw20() {
+        let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
+        let mut deps = crate::mock_querier::mock_dependencies(&[]);
+
+        // Instantiate the tokenwrapper contract.
+        let info = mock_info("creator", &[]);
+        let instantiate_msg = InstantiateMsg {
+            name: "Webb-WRAP".to_string(),
+            symbol: "WWRP".to_string(),
+            decimals: 6u8,
+        };
+
+        let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+
+        // Try the wrapping the cw20 token
+        let info = mock_info(&cw20_address, &[]);
+        let wrap_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender: "anyone".to_string(),
+            amount: Uint128::from(100_u128),
+            msg: to_binary(&Cw20HookMsg::Wrap {}).unwrap(),
+        });
+        let _res = execute(deps.as_mut(), mock_env(), info, wrap_msg).unwrap();
+
+        // Try unwrapping the cw20 token
+        let info = mock_info("anyone", &[]);
+        let unwrap_msg = ExecuteMsg::Unwrap {
+            token: Some(Addr::unchecked(cw20_address)),
+            amount: Uint128::from(80_u128),
+        };
+        let res = execute(deps.as_mut(), mock_env(), info, unwrap_msg).unwrap();
+
+        assert_eq!(
+            res.attributes,
+            vec![
+                attr("action", "unwrap_cw20"),
+                attr("from", "anyone"),
+                attr("unwrap", "80"),
+                attr("refund", "80"),
+            ]
+        );
+
+        // Check the token amounts
+        let res = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::Balance {
+                address: "anyone".to_string(),
+            },
+        )
+        .unwrap();
+        let token_balance: BalanceResponse = from_binary(&res).unwrap();
+        assert_eq!(token_balance.balance.u128(), 20);
+    }
 }
