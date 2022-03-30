@@ -854,6 +854,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std 0.16.6",
  "cosmwasm-storage",
+ "cosmwasm-vm",
  "cw-controllers",
  "cw-storage-plus",
  "cw-utils",
