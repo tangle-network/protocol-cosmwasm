@@ -1,7 +1,7 @@
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
-    from_slice, to_binary, Addr, Api, CanonicalAddr, Coin, ContractResult, Empty,
-    OwnedDeps, Querier, QuerierResult, QueryRequest, SystemError, SystemResult, Uint128, WasmQuery,
+    from_slice, to_binary, Addr, Api, CanonicalAddr, Coin, ContractResult, Empty, OwnedDeps,
+    Querier, QuerierResult, QueryRequest, SystemError, SystemResult, Uint128, WasmQuery,
 };
 use cosmwasm_storage::to_length_prefixed;
 use cw20::TokenInfoResponse;
@@ -123,14 +123,15 @@ impl WasmMockQuerier {
                     panic!("DO NOT ENTER HERE")
                 }
             }
-            QueryRequest::Wasm(WasmQuery::Smart { contract_addr, msg }) => {
-                SystemResult::Ok(ContractResult::from(to_binary(&TokenInfoResponse {
-                    name: "Test Token".to_string(),
-                    symbol: "TEST".to_string(),
-                    decimals: 6u8,
-                    total_supply: Uint128::new(1_000_000_u128),
-                })))
-            }
+            QueryRequest::Wasm(WasmQuery::Smart {
+                contract_addr: _,
+                msg: _,
+            }) => SystemResult::Ok(ContractResult::from(to_binary(&TokenInfoResponse {
+                name: "Test Token".to_string(),
+                symbol: "TEST".to_string(),
+                decimals: 6u8,
+                total_supply: Uint128::new(1_000_000_u128),
+            }))),
             _ => self.base.handle_query(request),
         }
     }

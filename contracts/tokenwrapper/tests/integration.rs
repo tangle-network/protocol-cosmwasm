@@ -1,12 +1,9 @@
 //! This integration test tries to run and call the generated wasm.
 
-use cosmwasm_std::{attr, from_binary, to_binary, Coin, Response, Uint128, Uint256};
-use cosmwasm_vm::testing::{
-    execute, instantiate, mock_env, mock_info, mock_instance, query,
-};
-use cw20::{BalanceResponse, Cw20ReceiveMsg};
-use protocol_cosmwasm::token_wrapper::{InstantiateMsg, ExecuteMsg, Cw20HookMsg, QueryMsg};
-
+use cosmwasm_std::{attr, from_binary, Coin, Response, Uint128};
+use cosmwasm_vm::testing::{execute, instantiate, mock_env, mock_info, mock_instance, query};
+use cw20::BalanceResponse;
+use protocol_cosmwasm::token_wrapper::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
 // This line will test the output of cargo wasm
 // static WASM: &[u8] = include_bytes!("../../../artifacts/cosmwasm_tokenwrapper.wasm");
@@ -62,8 +59,8 @@ fn integration_test_tokenwrapper_wrap_native() {
         ]
     );
 
-     // Check the "Webb_WRAP" token balance
-     let query = query(
+    // Check the "Webb_WRAP" token balance
+    let query = query(
         &mut deps,
         mock_env(),
         QueryMsg::Balance {
