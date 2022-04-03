@@ -112,7 +112,7 @@ pub fn execute(
         },
 
         // Used to wrap cw20 tokens on behalf of a sender.
-        ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
+        ExecuteMsg::Receive(msg) => wrap_cw20(deps, env, info, msg),
 
         // these all come from cw20-base to implement the cw20 standard
         ExecuteMsg::Transfer { recipient, amount } => {
@@ -254,7 +254,7 @@ fn unwrap_cw20(
     // Validate the "token" amount
     if !is_valid_amount(deps.branch(), info.clone(), amount) {
         return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid amount".to_string(),
+            msg: "Insufficient cw20 token amount".to_string(),
         }));
     }
 
@@ -286,30 +286,35 @@ fn unwrap_cw20(
     ]))
 }
 
-fn receive_cw20(
+fn wrap_cw20(
     mut deps: DepsMut,
     env: Env,
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
     // Only Cw20 token contract can execute this message.
-    if !is_valid_address(deps.branch(), info.sender) {
+    if !is_valid_address(deps.branch(), info.sender.clone()) {
         return Err(ContractError::Unauthorized {});
     }
 
     let sender = cw20_msg.sender;
-    let to_mint = cw20_msg.amount;
+    let cw20_address = info.sender;
+
+    // Calculate the "fee" & "amount_to_wrap".
+    let config = CONFIG.load(deps.storage)?;
+    let cost_to_wrap = get_fee_from_amount(cw20_msg.amount, config.fee_percentage.numerator());
+    let left_over = cw20_msg.amount - cost_to_wrap;
     match from_binary(&cw20_msg.msg) {
         Ok(Cw20HookMsg::Wrap {}) => {
             // Validate the token amount
-            if to_mint.is_zero() {
+            if left_over.is_zero() {
                 return Err(ContractError::Std(StdError::GenericErr {
                     msg: "Sent zero amount".to_string(),
                 }));
             }
 
             let mut supply = TOTAL_SUPPLY.load(deps.storage)?;
-            supply.issued += to_mint;
+            supply.issued += left_over;
             TOTAL_SUPPLY.save(deps.storage, &supply)?;
 
             // call into cw20-base to mint the token, call as self as no one else is allowed
@@ -317,12 +322,23 @@ fn receive_cw20(
                 sender: env.contract.address.clone(),
                 funds: vec![],
             };
-            execute_mint(deps, env, sub_info, sender.to_string(), to_mint)?;
+            execute_mint(deps, env, sub_info, sender.to_string(), left_over)?;
 
-            Ok(Response::new().add_attributes(vec![
+            // Send the fee to fee_recipient.
+            let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: cw20_address.to_string(),
+                funds: vec![],
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: config.fee_recipient.to_string(),
+                    amount: cost_to_wrap,
+                })?,
+            })];
+
+            Ok(Response::new().add_messages(msgs).add_attributes(vec![
                 attr("action", "wrap_cw20"),
                 attr("from", sender),
-                attr("minted", to_mint),
+                attr("minted", left_over),
+                attr("fee", cost_to_wrap),
             ]))
         }
         Err(e) => Err(ContractError::Std(e)),
@@ -605,7 +621,8 @@ mod tests {
             vec![
                 attr("action", "wrap_cw20"),
                 attr("from", "anyone"),
-                attr("minted", "100"),
+                attr("minted", "99"),
+                attr("fee", "1")
             ]
         );
 
@@ -619,7 +636,7 @@ mod tests {
         )
         .unwrap();
         let token_balance: BalanceResponse = from_binary(&query).unwrap();
-        assert_eq!(token_balance.balance.u128(), 100);
+        assert_eq!(token_balance.balance.u128(), 99);
     }
 
     #[test]
@@ -678,7 +695,7 @@ mod tests {
         )
         .unwrap();
         let token_balance: BalanceResponse = from_binary(&res).unwrap();
-        assert_eq!(token_balance.balance.u128(), 20);
+        assert_eq!(token_balance.balance.u128(), 19);
     }
 
     #[test]
