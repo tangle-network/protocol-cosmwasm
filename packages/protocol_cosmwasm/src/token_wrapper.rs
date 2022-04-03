@@ -104,6 +104,8 @@ pub enum QueryMsg {
     /// Custom queries
     /// Returns the Config of contract
     Config {},
+    /// Calculates the "fee" from "amount_to_wrap"
+    FeeFromAmount { amount_to_wrap: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -120,4 +122,11 @@ pub struct ConfigResponse {
     pub native_token_denom: String,
     pub fee_recipient: String,
     pub fee_percentage: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct FeeFromAmountResponse {
+    pub amount_to_wrap: String,
+    pub fee_amt: String,
 }

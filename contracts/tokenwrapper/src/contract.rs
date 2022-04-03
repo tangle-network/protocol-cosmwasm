@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, coins, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Decimal, Deps, DepsMut,
-    Env, MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
+    Env, Fraction, MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 
@@ -19,7 +19,7 @@ use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::token_wrapper::{
-    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, FeeFromAmountResponse, InstantiateMsg, QueryMsg,
 };
 
 use crate::state::{Config, Supply, CONFIG, TOTAL_SUPPLY};
@@ -326,11 +326,18 @@ fn is_valid_amount(deps: DepsMut, info: MessageInfo, amount: Uint128) -> bool {
     amount <= sender_token_balance
 }
 
+fn get_fee_from_amount(amount_to_wrap: Uint128, fee_perc: u128) -> Uint128 {
+    amount_to_wrap.multiply_ratio(fee_perc, Decimal::MAX.denominator())
+}
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        // TODO: Add custom queries.
+        // Custom queries.
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::FeeFromAmount { amount_to_wrap } => {
+            to_binary(&query_fee_from_amount(deps, amount_to_wrap)?)
+        }
 
         // inherited from cw20-base
         QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
@@ -348,6 +355,20 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         native_token_denom: config.native_token_denom,
         fee_recipient: config.fee_recipient.to_string(),
         fee_percentage: config.fee_percentage.to_string(),
+    })
+}
+
+fn query_fee_from_amount(deps: Deps, amount_to_wrap: String) -> StdResult<FeeFromAmountResponse> {
+    let config = CONFIG.load(deps.storage)?;
+    let amount_to_wrap = match amount_to_wrap.parse::<u128>() {
+        Ok(v) => Uint128::from(v),
+        Err(e) => return Err(StdError::GenericErr { msg: e.to_string() }),
+    };
+    let fee_perc = config.fee_percentage.numerator();
+    let fee_amt = get_fee_from_amount(amount_to_wrap, fee_perc);
+    Ok(FeeFromAmountResponse {
+        amount_to_wrap: amount_to_wrap.to_string(),
+        fee_amt: fee_amt.to_string(),
     })
 }
 
@@ -611,5 +632,37 @@ mod tests {
         .unwrap();
         let token_balance: BalanceResponse = from_binary(&res).unwrap();
         assert_eq!(token_balance.balance.u128(), 20);
+    }
+
+    #[test]
+    fn test_query_fee_from_wrap_amt() {
+        let mut deps = crate::mock_querier::mock_dependencies(&[]);
+
+        // Instantiate the tokenwrapper contract.
+        let info = mock_info("creator", &[]);
+        let instantiate_msg = InstantiateMsg {
+            name: "Webb-WRAP".to_string(),
+            symbol: "WWRP".to_string(),
+            decimals: 6u8,
+            governer: None,
+            fee_recipient: FEE_RECIPIENT.to_string(),
+            fee_percentage: FEE_PERCENTAGE.to_string(),
+            native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+        };
+
+        let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+
+        // Check the query "query_fee_from_amount"
+        let query_bin = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::FeeFromAmount {
+                amount_to_wrap: "222".to_string(),
+            },
+        )
+        .unwrap();
+        let fee_response: FeeFromAmountResponse = from_binary(&query_bin).unwrap();
+        assert_eq!(fee_response.amount_to_wrap, "222".to_string());
+        assert_eq!(fee_response.fee_amt, "2".to_string());
     }
 }
