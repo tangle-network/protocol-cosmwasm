@@ -100,6 +100,10 @@ pub enum QueryMsg {
     /// Implements CW20 "allowance" extension.
     /// Returns how much spender can use from owner account, 0 if unset.
     Allowance { owner: String, spender: String },
+
+    /// Custom queries
+    /// Returns the Config of contract
+    Config {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -107,4 +111,13 @@ pub enum QueryMsg {
 pub enum Cw20HookMsg {
     /// Wrap Cw20 tokens
     Wrap {},
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct ConfigResponse {
+    pub governer: String,
+    pub native_token_denom: String,
+    pub fee_recipient: String,
+    pub fee_percentage: String,
 }

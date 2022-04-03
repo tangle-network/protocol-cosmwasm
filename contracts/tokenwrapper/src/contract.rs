@@ -18,7 +18,9 @@ use cw20_base::contract::{
 use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::token_wrapper::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg};
+use protocol_cosmwasm::token_wrapper::{
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg,
+};
 
 use crate::state::{Config, Supply, CONFIG, TOTAL_SUPPLY};
 
@@ -328,6 +330,7 @@ fn is_valid_amount(deps: DepsMut, info: MessageInfo, amount: Uint128) -> bool {
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         // TODO: Add custom queries.
+        QueryMsg::Config {} => to_binary(&query_config(deps)?),
 
         // inherited from cw20-base
         QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
@@ -336,6 +339,16 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             to_binary(&query_allowance(deps, owner, spender)?)
         }
     }
+}
+
+fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
+    let config = CONFIG.load(deps.storage)?;
+    Ok(ConfigResponse {
+        governer: config.governer.to_string(),
+        native_token_denom: config.native_token_denom,
+        fee_recipient: config.fee_recipient.to_string(),
+        fee_percentage: config.fee_percentage.to_string(),
+    })
 }
 
 #[cfg(test)]
@@ -368,13 +381,25 @@ mod tests {
         let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
         assert_eq!(res.messages.len(), 0);
 
-        let query = query(deps.as_ref(), mock_env(), QueryMsg::TokenInfo {}).unwrap();
-        let token_info_response: TokenInfoResponse = from_binary(&query).unwrap();
+        let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::TokenInfo {}).unwrap();
+        let token_info_response: TokenInfoResponse = from_binary(&query_bin).unwrap();
 
         assert_eq!(token_info_response.name, "Webb-WRAP".to_string());
         assert_eq!(token_info_response.symbol, "WWRP".to_string());
         assert_eq!(token_info_response.decimals, 6);
         assert_eq!(token_info_response.total_supply, Uint128::zero());
+
+        // Check the "config"
+        let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
+        let config_response: ConfigResponse = from_binary(&query_bin).unwrap();
+
+        assert_eq!(config_response.governer, "creator".to_string());
+        assert_eq!(
+            config_response.native_token_denom,
+            NATIVE_TOKEN_DENOM.to_string()
+        );
+        assert_eq!(config_response.fee_recipient, FEE_RECIPIENT.to_string());
+        assert_eq!(config_response.fee_percentage, "0.01".to_string());
     }
 
     #[test]
