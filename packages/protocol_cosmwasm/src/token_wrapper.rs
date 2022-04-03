@@ -44,6 +44,9 @@ pub enum ExecuteMsg {
     /// Sets the "governer"
     SetGoverner { new_governer: String },
 
+    /// Sets the "is_native_allowed"
+    SetNativeAllowed { is_native_allowed: u32 },
+
     /// Implements CW20. Transfer is a base message to move tokens to another account without triggering actions
     Transfer { recipient: String, amount: Uint128 },
     /// Implements CW20. Burn is a base message to destroy tokens forever

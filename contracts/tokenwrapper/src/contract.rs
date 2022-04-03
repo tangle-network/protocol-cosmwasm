@@ -129,6 +129,11 @@ pub fn execute(
         // Sets a new governer. Only the governer can execute this entry.
         ExecuteMsg::SetGoverner { new_governer } => set_governer(deps, env, info, new_governer),
 
+        // Sets the "is_native_allowed" of config
+        ExecuteMsg::SetNativeAllowed { is_native_allowed } => {
+            set_native_allowed(deps, info, is_native_allowed)
+        }
+
         // these all come from cw20-base to implement the cw20 standard
         ExecuteMsg::Transfer { recipient, amount } => {
             Ok(execute_transfer(deps, env, info, recipient, amount)?)
@@ -407,6 +412,29 @@ fn set_governer(
     Ok(Response::new().add_attributes(vec![
         attr("method", "set_governer"),
         attr("new_governer", new_governer),
+    ]))
+}
+
+fn set_native_allowed(
+    deps: DepsMut,
+    info: MessageInfo,
+    is_native_allowed: u32,
+) -> Result<Response, ContractError> {
+    let is_native_allowed = is_native_allowed != 0;
+
+    // Validate the tx sender.
+    let mut config = CONFIG.load(deps.storage)?;
+    if config.governer != deps.api.addr_validate(info.sender.as_str())? {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // Save "is_native_allowed" state
+    config.is_native_allowed = is_native_allowed;
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(Response::new().add_attributes(vec![
+        attr("method", "set_native_allowed"),
+        attr("is_native_allowed", is_native_allowed.to_string()),
     ]))
 }
 
