@@ -125,6 +125,10 @@ pub fn execute(
         // Used to wrap cw20 tokens on behalf of a sender.
         ExecuteMsg::Receive(msg) => wrap_cw20(deps, env, info, msg),
 
+        // // Governing functionality
+        // Sets a new governer. Only the governer can execute this entry.
+        ExecuteMsg::SetGoverner { new_governer } => set_governer(deps, env, info, new_governer),
+
         // these all come from cw20-base to implement the cw20 standard
         ExecuteMsg::Transfer { recipient, amount } => {
             Ok(execute_transfer(deps, env, info, recipient, amount)?)
@@ -382,6 +386,28 @@ fn get_amount_to_wrap(target_amount: Uint128, fee_perc: u128) -> Uint128 {
         Decimal::MAX.denominator(),
         Decimal::MAX.denominator() - fee_perc,
     )
+}
+
+fn set_governer(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    new_governer: String,
+) -> Result<Response, ContractError> {
+    let mut config = CONFIG.load(deps.storage)?;
+    // Validate the tx sender.
+    if config.governer != deps.api.addr_validate(info.sender.as_str())? {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // Validate & save the new governer.
+    config.governer = deps.api.addr_validate(new_governer.as_str())?;
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(Response::new().add_attributes(vec![
+        attr("method", "set_governer"),
+        attr("new_governer", new_governer),
+    ]))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

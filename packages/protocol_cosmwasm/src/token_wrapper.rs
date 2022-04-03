@@ -37,18 +37,17 @@ pub enum ExecuteMsg {
         amount: Uint128,
     },
 
-    // Wrap the Cw20 token
+    /// Wrap the Cw20 token
     Receive(Cw20ReceiveMsg),
 
+    /// Governing functionality
+    /// Sets the "governer"
+    SetGoverner { new_governer: String },
+
     /// Implements CW20. Transfer is a base message to move tokens to another account without triggering actions
-    Transfer {
-        recipient: String,
-        amount: Uint128,
-    },
+    Transfer { recipient: String, amount: Uint128 },
     /// Implements CW20. Burn is a base message to destroy tokens forever
-    Burn {
-        amount: Uint128,
-    },
+    Burn { amount: Uint128 },
     /// Implements CW20.  Send is a base message to transfer tokens to a contract and trigger an action
     /// on the receiving contract.
     Send {
@@ -88,10 +87,7 @@ pub enum ExecuteMsg {
         msg: Binary,
     },
     /// Implements CW20 "approval" extension. Destroys tokens forever
-    BurnFrom {
-        owner: String,
-        amount: Uint128,
-    },
+    BurnFrom { owner: String, amount: Uint128 },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

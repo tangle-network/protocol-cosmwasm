@@ -345,3 +345,44 @@ fn test_query_amt_to_wrap_from_target_amount() {
     assert_eq!(fee_response.target_amount, "222".to_string());
     assert_eq!(fee_response.amount_to_wrap, "224".to_string());
 }
+
+#[test]
+fn test_set_governer() {
+    let mut deps = mock_dependencies(&[]);
+
+    let info = mock_info("creator", &[]);
+    let instantiate_msg = InstantiateMsg {
+        name: "Webb-WRAP".to_string(),
+        symbol: "WWRP".to_string(),
+        decimals: 6u8,
+        governer: None,
+        fee_recipient: FEE_RECIPIENT.to_string(),
+        fee_percentage: FEE_PERCENTAGE.to_string(),
+        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+        is_native_allowed: 1,
+        wrapping_limit: "5000000".to_string(),
+    };
+
+    // We call ".unwrap()" to ensure succeed
+    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+
+    // Check the current governer.
+    let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
+    let config_response: ConfigResponse = from_binary(&query_bin).unwrap();
+    assert_eq!(config_response.governer, "creator".to_string());
+
+    // Sets a new governer
+    let info = mock_info("creator", &[]);
+    let set_governer_msg = ExecuteMsg::SetGoverner {
+        new_governer: "new_governer".to_string(),
+    };
+
+    let res = execute(deps.as_mut(), mock_env(), info, set_governer_msg).unwrap();
+    assert_eq!(
+        res.attributes,
+        vec![
+            attr("method", "set_governer"),
+            attr("new_governer", "new_governer"),
+        ]
+    );
+}
