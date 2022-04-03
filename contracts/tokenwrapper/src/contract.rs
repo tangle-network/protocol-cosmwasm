@@ -19,7 +19,8 @@ use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::token_wrapper::{
-    ConfigResponse, Cw20HookMsg, ExecuteMsg, FeeFromAmountResponse, InstantiateMsg, QueryMsg,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, FeeFromAmountResponse, GetAmountToWrapResponse,
+    InstantiateMsg, QueryMsg,
 };
 
 use crate::state::{Config, Supply, CONFIG, TOTAL_SUPPLY};
@@ -330,6 +331,13 @@ fn get_fee_from_amount(amount_to_wrap: Uint128, fee_perc: u128) -> Uint128 {
     amount_to_wrap.multiply_ratio(fee_perc, Decimal::MAX.denominator())
 }
 
+fn get_amount_to_wrap(target_amount: Uint128, fee_perc: u128) -> Uint128 {
+    target_amount.multiply_ratio(
+        Decimal::MAX.denominator(),
+        Decimal::MAX.denominator() - fee_perc,
+    )
+}
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
@@ -337,6 +345,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
         QueryMsg::FeeFromAmount { amount_to_wrap } => {
             to_binary(&query_fee_from_amount(deps, amount_to_wrap)?)
+        }
+        QueryMsg::GetAmountToWrap { target_amount } => {
+            to_binary(&query_amount_to_wrap(deps, target_amount)?)
         }
 
         // inherited from cw20-base
@@ -369,6 +380,20 @@ fn query_fee_from_amount(deps: Deps, amount_to_wrap: String) -> StdResult<FeeFro
     Ok(FeeFromAmountResponse {
         amount_to_wrap: amount_to_wrap.to_string(),
         fee_amt: fee_amt.to_string(),
+    })
+}
+
+fn query_amount_to_wrap(deps: Deps, target_amount: String) -> StdResult<GetAmountToWrapResponse> {
+    let config = CONFIG.load(deps.storage)?;
+    let target_amount = match target_amount.parse::<u128>() {
+        Ok(v) => Uint128::from(v),
+        Err(e) => return Err(StdError::GenericErr { msg: e.to_string() }),
+    };
+    let fee_perc = config.fee_percentage.numerator();
+    let amount_to_wrap = get_amount_to_wrap(target_amount, fee_perc);
+    Ok(GetAmountToWrapResponse {
+        target_amount: target_amount.to_string(),
+        amount_to_wrap: amount_to_wrap.to_string(),
     })
 }
 
@@ -664,5 +689,37 @@ mod tests {
         let fee_response: FeeFromAmountResponse = from_binary(&query_bin).unwrap();
         assert_eq!(fee_response.amount_to_wrap, "222".to_string());
         assert_eq!(fee_response.fee_amt, "2".to_string());
+    }
+
+    #[test]
+    fn test_query_amt_to_wrap_from_target_amount() {
+        let mut deps = crate::mock_querier::mock_dependencies(&[]);
+
+        // Instantiate the tokenwrapper contract.
+        let info = mock_info("creator", &[]);
+        let instantiate_msg = InstantiateMsg {
+            name: "Webb-WRAP".to_string(),
+            symbol: "WWRP".to_string(),
+            decimals: 6u8,
+            governer: None,
+            fee_recipient: FEE_RECIPIENT.to_string(),
+            fee_percentage: FEE_PERCENTAGE.to_string(),
+            native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+        };
+
+        let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+
+        // Check the query "query_fee_from_amount"
+        let query_bin = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::GetAmountToWrap {
+                target_amount: "222".to_string(),
+            },
+        )
+        .unwrap();
+        let fee_response: GetAmountToWrapResponse = from_binary(&query_bin).unwrap();
+        assert_eq!(fee_response.target_amount, "222".to_string());
+        assert_eq!(fee_response.amount_to_wrap, "224".to_string());
     }
 }

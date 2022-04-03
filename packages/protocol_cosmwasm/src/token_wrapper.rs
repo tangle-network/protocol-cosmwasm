@@ -106,6 +106,8 @@ pub enum QueryMsg {
     Config {},
     /// Calculates the "fee" from "amount_to_wrap"
     FeeFromAmount { amount_to_wrap: String },
+    /// Calculates the "amount_to_wrap" for target amt
+    GetAmountToWrap { target_amount: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -129,4 +131,11 @@ pub struct ConfigResponse {
 pub struct FeeFromAmountResponse {
     pub amount_to_wrap: String,
     pub fee_amt: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct GetAmountToWrapResponse {
+    pub target_amount: String,
+    pub amount_to_wrap: String,
 }
