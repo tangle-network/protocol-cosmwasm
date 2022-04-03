@@ -79,6 +79,14 @@ pub fn instantiate(
         }
     };
     let fee_percentage = Decimal::percent(fee_perc);
+    let wrapping_limit = match msg.wrapping_limit.parse::<u128>() {
+        Ok(v) => Uint128::from(v),
+        Err(e) => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: e.to_string(),
+            }))
+        }
+    };
     CONFIG.save(
         deps.storage,
         &Config {
@@ -86,6 +94,9 @@ pub fn instantiate(
             fee_recipient,
             fee_percentage,
             native_token_denom: msg.native_token_denom,
+            is_native_allowed: msg.is_native_allowed != 0,
+            wrapping_limit,
+            proposal_nonce: 0_u64,
         },
     )?;
 
@@ -395,12 +406,16 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
+    println!("querying");
     let config = CONFIG.load(deps.storage)?;
     Ok(ConfigResponse {
         governer: config.governer.to_string(),
         native_token_denom: config.native_token_denom,
         fee_recipient: config.fee_recipient.to_string(),
         fee_percentage: config.fee_percentage.to_string(),
+        is_native_allowed: config.is_native_allowed.to_string(),
+        wrapping_limit: config.wrapping_limit.to_string(),
+        proposal_nonce: config.proposal_nonce.to_string(),
     })
 }
 
@@ -456,6 +471,8 @@ mod tests {
             fee_recipient: FEE_RECIPIENT.to_string(),
             fee_percentage: FEE_PERCENTAGE.to_string(),
             native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+            is_native_allowed: 1,
+            wrapping_limit: "5000000".to_string(),
         };
 
         // We call ".unwrap()" to ensure succeed
@@ -497,6 +514,8 @@ mod tests {
             fee_recipient: FEE_RECIPIENT.to_string(),
             fee_percentage: FEE_PERCENTAGE.to_string(),
             native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+            is_native_allowed: 1,
+            wrapping_limit: "5000000".to_string(),
         };
 
         let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
@@ -545,6 +564,8 @@ mod tests {
             fee_recipient: FEE_RECIPIENT.to_string(),
             fee_percentage: FEE_PERCENTAGE.to_string(),
             native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+            is_native_allowed: 1,
+            wrapping_limit: "5000000".to_string(),
         };
 
         let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
@@ -603,6 +624,8 @@ mod tests {
             fee_recipient: FEE_RECIPIENT.to_string(),
             fee_percentage: FEE_PERCENTAGE.to_string(),
             native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+            is_native_allowed: 1,
+            wrapping_limit: "5000000".to_string(),
         };
 
         let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
@@ -654,6 +677,8 @@ mod tests {
             fee_recipient: FEE_RECIPIENT.to_string(),
             fee_percentage: FEE_PERCENTAGE.to_string(),
             native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+            is_native_allowed: 1,
+            wrapping_limit: "5000000".to_string(),
         };
 
         let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
@@ -712,6 +737,8 @@ mod tests {
             fee_recipient: FEE_RECIPIENT.to_string(),
             fee_percentage: FEE_PERCENTAGE.to_string(),
             native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+            is_native_allowed: 1,
+            wrapping_limit: "5000000".to_string(),
         };
 
         let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
@@ -744,6 +771,8 @@ mod tests {
             fee_recipient: FEE_RECIPIENT.to_string(),
             fee_percentage: FEE_PERCENTAGE.to_string(),
             native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+            is_native_allowed: 1,
+            wrapping_limit: "5000000".to_string(),
         };
 
         let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();

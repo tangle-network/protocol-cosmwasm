@@ -19,6 +19,10 @@ pub struct InstantiateMsg {
     pub fee_percentage: String,
     /// native token denom string to be wrapped
     pub native_token_denom: String,
+    /// flag of is_native_allowed
+    pub is_native_allowed: u32,
+    /// wrapping limit
+    pub wrapping_limit: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -124,6 +128,9 @@ pub struct ConfigResponse {
     pub native_token_denom: String,
     pub fee_recipient: String,
     pub fee_percentage: String,
+    pub is_native_allowed: String,
+    pub wrapping_limit: String,
+    pub proposal_nonce: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

@@ -31,6 +31,8 @@ fn integration_test_instantiate_tokenwrapper() {
         fee_recipient: FEE_RECIPIENT.to_string(),
         fee_percentage: FEE_PERCENTAGE.to_string(),
         native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+        is_native_allowed: 1,
+        wrapping_limit: "5000000".to_string(),
     };
 
     let info = mock_info("creator", &[]);
@@ -52,6 +54,8 @@ fn integration_test_tokenwrapper_wrap_native() {
         fee_recipient: FEE_RECIPIENT.to_string(),
         fee_percentage: FEE_PERCENTAGE.to_string(),
         native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+        is_native_allowed: 1,
+        wrapping_limit: "5000000".to_string(),
     };
 
     let info = mock_info("creator", &[]);
@@ -98,6 +102,8 @@ fn integration_test_tokenwrapper_unwrap_native() {
         fee_recipient: FEE_RECIPIENT.to_string(),
         fee_percentage: FEE_PERCENTAGE.to_string(),
         native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+        is_native_allowed: 1,
+        wrapping_limit: "5000000".to_string(),
     };
 
     let info = mock_info("creator", &[]);
