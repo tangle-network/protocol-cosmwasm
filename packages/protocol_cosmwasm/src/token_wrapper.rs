@@ -11,6 +11,14 @@ pub struct InstantiateMsg {
     pub symbol: String,
     /// decimal places of the Wrapping target token (for UI)
     pub decimals: u8,
+    /// addr of governer
+    pub governer: Option<String>,
+    /// addr of fee recipient
+    pub fee_recipient: String,
+    /// fee_percentage( 0 ~ 100 )
+    pub fee_percentage: String,
+    /// native token denom string to be wrapped
+    pub native_token_denom: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, coins, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
+    attr, coins, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Decimal, Deps, DepsMut,
+    Env, MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 
@@ -20,7 +20,7 @@ use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::token_wrapper::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg};
 
-use crate::state::{Supply, TOTAL_SUPPLY};
+use crate::state::{Config, Supply, CONFIG, TOTAL_SUPPLY};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-tokenwrapper";
@@ -30,7 +30,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -52,6 +52,39 @@ pub fn instantiate(
     // set supply to 0
     let supply = Supply::default();
     TOTAL_SUPPLY.save(deps.storage, &supply)?;
+
+    // set config
+    let governer = match msg.governer {
+        Some(v) => deps.api.addr_validate(v.as_str())?,
+        None => info.sender,
+    };
+    let fee_recipient = deps.api.addr_validate(msg.fee_recipient.as_str())?;
+    let fee_perc = match msg.fee_percentage.parse::<u64>() {
+        Ok(v) => {
+            if v > 100 {
+                return Err(ContractError::Std(StdError::GenericErr {
+                    msg: "Percentage should be in range [0, 100]".to_string(),
+                }));
+            } else {
+                v
+            }
+        }
+        Err(e) => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: e.to_string(),
+            }))
+        }
+    };
+    let fee_percentage = Decimal::percent(fee_perc);
+    CONFIG.save(
+        deps.storage,
+        &Config {
+            governer,
+            fee_recipient,
+            fee_percentage,
+            native_token_denom: msg.native_token_denom,
+        },
+    )?;
 
     Ok(Response::default())
 }
@@ -312,6 +345,10 @@ mod tests {
     use cosmwasm_std::{coins, from_binary, Coin, Uint128};
     use cw20::{BalanceResponse, Cw20ReceiveMsg, TokenInfoResponse};
 
+    const FEE_RECIPIENT: &str = "terra1qca9hs2qk2w29gqduaq9k720k9293qt7q8nszl";
+    const FEE_PERCENTAGE: &str = "1";
+    const NATIVE_TOKEN_DENOM: &str = "uusd";
+
     #[test]
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
@@ -321,6 +358,10 @@ mod tests {
             name: "Webb-WRAP".to_string(),
             symbol: "WWRP".to_string(),
             decimals: 6u8,
+            governer: None,
+            fee_recipient: FEE_RECIPIENT.to_string(),
+            fee_percentage: FEE_PERCENTAGE.to_string(),
+            native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
         };
 
         // We call ".unwrap()" to ensure succeed
@@ -346,6 +387,10 @@ mod tests {
             name: "Webb-WRAP".to_string(),
             symbol: "WWRP".to_string(),
             decimals: 6u8,
+            governer: None,
+            fee_recipient: FEE_RECIPIENT.to_string(),
+            fee_percentage: FEE_PERCENTAGE.to_string(),
+            native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
         };
 
         let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
@@ -387,6 +432,10 @@ mod tests {
             name: "Webb-WRAP".to_string(),
             symbol: "WWRP".to_string(),
             decimals: 6u8,
+            governer: None,
+            fee_recipient: FEE_RECIPIENT.to_string(),
+            fee_percentage: FEE_PERCENTAGE.to_string(),
+            native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
         };
 
         let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
@@ -441,6 +490,10 @@ mod tests {
             name: "Webb-WRAP".to_string(),
             symbol: "WWRP".to_string(),
             decimals: 6u8,
+            governer: None,
+            fee_recipient: FEE_RECIPIENT.to_string(),
+            fee_percentage: FEE_PERCENTAGE.to_string(),
+            native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
         };
 
         let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
@@ -487,6 +540,10 @@ mod tests {
             name: "Webb-WRAP".to_string(),
             symbol: "WWRP".to_string(),
             decimals: 6u8,
+            governer: None,
+            fee_recipient: FEE_RECIPIENT.to_string(),
+            fee_percentage: FEE_PERCENTAGE.to_string(),
+            native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
         };
 
         let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();

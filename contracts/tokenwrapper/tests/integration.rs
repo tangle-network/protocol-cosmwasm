@@ -15,6 +15,10 @@ use protocol_cosmwasm::token_wrapper::{ExecuteMsg, InstantiateMsg, QueryMsg};
 // For the github CI, we copy the wasm file manually & import here.
 static WASM: &[u8] = include_bytes!("./cosmwasm_tokenwrapper.wasm");
 
+const FEE_RECIPIENT: &str = "terra1qca9hs2qk2w29gqduaq9k720k9293qt7q8nszl";
+const FEE_PERCENTAGE: &str = "1";
+const NATIVE_TOKEN_DENOM: &str = "uusd";
+
 #[test]
 fn integration_test_instantiate_tokenwrapper() {
     let mut deps = mock_instance(WASM, &[]);
@@ -23,6 +27,10 @@ fn integration_test_instantiate_tokenwrapper() {
         name: "Webb-WRAP".to_string(),
         symbol: "WWRP".to_string(),
         decimals: 6u8,
+        governer: None,
+        fee_recipient: FEE_RECIPIENT.to_string(),
+        fee_percentage: FEE_PERCENTAGE.to_string(),
+        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
     };
 
     let info = mock_info("creator", &[]);
@@ -40,6 +48,10 @@ fn integration_test_tokenwrapper_wrap_native() {
         name: "Webb-WRAP".to_string(),
         symbol: "WWRP".to_string(),
         decimals: 6u8,
+        governer: None,
+        fee_recipient: FEE_RECIPIENT.to_string(),
+        fee_percentage: FEE_PERCENTAGE.to_string(),
+        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
     };
 
     let info = mock_info("creator", &[]);
@@ -81,6 +93,10 @@ fn integration_test_tokenwrapper_unwrap_native() {
         name: "Webb-WRAP".to_string(),
         symbol: "WWRP".to_string(),
         decimals: 6u8,
+        governer: None,
+        fee_recipient: FEE_RECIPIENT.to_string(),
+        fee_percentage: FEE_PERCENTAGE.to_string(),
+        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
     };
 
     let info = mock_info("creator", &[]);
