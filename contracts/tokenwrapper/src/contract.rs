@@ -100,13 +100,18 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
+        // Used to wrap native tokens on behalf of a sender.
         ExecuteMsg::Wrap {} => wrap_native(deps, env, info),
 
+        // Used to unwrap native/cw20 tokens on behalf of a sender.
         ExecuteMsg::Unwrap { token, amount } => match token {
+            // Unwrap the cw20 tokens.
             Some(token) => unwrap_cw20(deps, env, info, token, amount),
+            // Unwrap the native token.
             None => unwrap_native(deps, env, info, amount),
         },
 
+        // Used to wrap cw20 tokens on behalf of a sender.
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
 
         // these all come from cw20-base to implement the cw20 standard
@@ -155,16 +160,22 @@ pub fn execute(
 }
 
 fn wrap_native(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
-    // Check if the UST is sent.
-    let sent_uusd = info
+    // Check if the valid native token is sent.
+    let config = CONFIG.load(deps.storage)?;
+    let sent_native_token = info
         .funds
         .iter()
-        .find(|token| token.denom == *"uusd".to_string())
+        .find(|token| token.denom == *config.native_token_denom)
         .ok_or(ContractError::InsufficientFunds {})?;
-    let to_mint = sent_uusd.amount;
 
+    // Calculate the "fee" & "amount_to_wrap".
+    let cost_to_wrap =
+        get_fee_from_amount(sent_native_token.amount, config.fee_percentage.numerator());
+    let left_over = sent_native_token.amount - cost_to_wrap;
+
+    // Save the wrapped token amount.
     let mut supply = TOTAL_SUPPLY.load(deps.storage)?;
-    supply.issued += to_mint;
+    supply.issued += left_over;
     TOTAL_SUPPLY.save(deps.storage, &supply)?;
 
     // call into cw20-base to mint the token, call as self as no one else is allowed
@@ -172,12 +183,19 @@ fn wrap_native(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, C
         sender: env.contract.address.clone(),
         funds: vec![],
     };
-    execute_mint(deps, env, sub_info, info.sender.to_string(), to_mint)?;
+    execute_mint(deps, env, sub_info, info.sender.to_string(), left_over)?;
 
-    Ok(Response::new().add_attributes(vec![
+    // send "fee" to fee_recipient
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Bank(BankMsg::Send {
+        to_address: config.fee_recipient.to_string(),
+        amount: coins(cost_to_wrap.u128(), config.native_token_denom),
+    })];
+
+    Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("action", "wrap_native"),
         attr("from", info.sender),
-        attr("minted", to_mint),
+        attr("minted", left_over),
+        attr("fee", cost_to_wrap),
     ]))
 }
 
@@ -187,10 +205,11 @@ fn unwrap_native(
     info: MessageInfo,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
+    let config = CONFIG.load(deps.storage)?;
     // Validate the "amount"
     if !is_valid_amount(deps.branch(), info.clone(), amount) {
         return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid amount".to_string(),
+            msg: "Insufficient native token balance".to_string(),
         }));
     }
 
@@ -204,10 +223,10 @@ fn unwrap_native(
     // Save the "total_supply"
     TOTAL_SUPPLY.save(deps.storage, &Supply { issued: remainder })?;
 
-    // Refund the native token(UST)
+    // Refund the native token.
     let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Bank(BankMsg::Send {
         to_address: info.sender.to_string(),
-        amount: coins(amount.u128(), "uusd"),
+        amount: coins(amount.u128(), config.native_token_denom),
     })];
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
@@ -466,7 +485,7 @@ mod tests {
 
         let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
-        // Try the wrapping the ust
+        // Try the wrapping the native token
         let info = mock_info("anyone", &coins(100, "uusd"));
         let wrap_msg = ExecuteMsg::Wrap {};
         let res = execute(deps.as_mut(), mock_env(), info, wrap_msg).unwrap();
@@ -476,9 +495,12 @@ mod tests {
             vec![
                 attr("action", "wrap_native"),
                 attr("from", "anyone"),
-                attr("minted", "100"),
+                attr("minted", "99"),
+                attr("fee", "1"),
             ]
         );
+
+        assert_eq!(res.messages.len(), 1);
 
         // Check the "Webb_WRAP" token balance
         let query = query(
@@ -490,7 +512,7 @@ mod tests {
         )
         .unwrap();
         let token_balance: BalanceResponse = from_binary(&query).unwrap();
-        assert_eq!(token_balance.balance.u128(), 100);
+        assert_eq!(token_balance.balance.u128(), 99);
     }
 
     #[test]
@@ -511,12 +533,12 @@ mod tests {
 
         let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
-        // Try the wrapping the native token(UST)
+        // Try the wrapping the native token
         let info = mock_info("anyone", &coins(100, "uusd"));
         let wrap_msg = ExecuteMsg::Wrap {};
         let _res = execute(deps.as_mut(), mock_env(), info, wrap_msg).unwrap();
 
-        // Try unwrapping the native token(UST)
+        // Try unwrapping the native token
         let info = mock_info("anyone", &[]);
         let unwrap_msg = ExecuteMsg::Unwrap {
             token: None,
@@ -544,7 +566,7 @@ mod tests {
         )
         .unwrap();
         let token_balance: BalanceResponse = from_binary(&query).unwrap();
-        assert_eq!(token_balance.balance.u128(), 20);
+        assert_eq!(token_balance.balance.u128(), 19);
     }
 
     #[test]
