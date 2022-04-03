@@ -67,7 +67,8 @@ fn integration_test_tokenwrapper_wrap_native() {
         vec![
             attr("action", "wrap_native"),
             attr("from", "anyone"),
-            attr("minted", "100"),
+            attr("minted", "99"),
+            attr("fee", "1"),
         ]
     );
 
@@ -81,7 +82,7 @@ fn integration_test_tokenwrapper_wrap_native() {
     )
     .unwrap();
     let token_balance: BalanceResponse = from_binary(&query).unwrap();
-    assert_eq!(token_balance.balance.u128(), 100);
+    assert_eq!(token_balance.balance.u128(), 99);
 }
 
 #[test]
@@ -135,5 +136,5 @@ fn integration_test_tokenwrapper_unwrap_native() {
     )
     .unwrap();
     let token_balance: BalanceResponse = from_binary(&query).unwrap();
-    assert_eq!(token_balance.balance.u128(), 20);
+    assert_eq!(token_balance.balance.u128(), 19);
 }
