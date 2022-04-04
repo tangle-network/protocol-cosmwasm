@@ -12,6 +12,7 @@ use crate::contract::{execute, instantiate, query};
 const FEE_RECIPIENT: &str = "terra1qca9hs2qk2w29gqduaq9k720k9293qt7q8nszl";
 const FEE_PERCENTAGE: &str = "1";
 const NATIVE_TOKEN_DENOM: &str = "uusd";
+const CW20_TOKEN: &str = "cw20_token";
 
 #[test]
 fn proper_initialization() {
@@ -163,10 +164,9 @@ fn test_unwrap_native() {
 
 #[test]
 fn test_wrap_cw20() {
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
     let mut deps = crate::mock_querier::mock_dependencies(&[Coin {
         amount: Uint128::zero(),
-        denom: cw20_address.clone(),
+        denom: CW20_TOKEN.to_string(),
     }]);
 
     // Instantiate the tokenwrapper contract.
@@ -185,8 +185,16 @@ fn test_wrap_cw20() {
 
     let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
+    // Add a cw20 address to wrapping list.
+    let info = mock_info("creator", &[]);
+    let add_token_msg = ExecuteMsg::AddCw20TokenAddr {
+        token: CW20_TOKEN.to_string(),
+        nonce: 1,
+    };
+    let _res = execute(deps.as_mut(), mock_env(), info, add_token_msg).unwrap();
+
     // Try the wrapping the cw20 token
-    let info = mock_info(&cw20_address, &[]);
+    let info = mock_info(CW20_TOKEN, &[]);
     let wrap_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "anyone".to_string(),
         amount: Uint128::from(100_u128),
@@ -219,7 +227,6 @@ fn test_wrap_cw20() {
 
 #[test]
 fn test_unwrap_cw20() {
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
     let mut deps = crate::mock_querier::mock_dependencies(&[]);
 
     // Instantiate the tokenwrapper contract.
@@ -238,8 +245,16 @@ fn test_unwrap_cw20() {
 
     let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
+    // Add a cw20 address to wrapping list.
+    let info = mock_info("creator", &[]);
+    let add_token_msg = ExecuteMsg::AddCw20TokenAddr {
+        token: CW20_TOKEN.to_string(),
+        nonce: 1,
+    };
+    let _res = execute(deps.as_mut(), mock_env(), info, add_token_msg).unwrap();
+
     // Try the wrapping the cw20 token
-    let info = mock_info(&cw20_address, &[]);
+    let info = mock_info(CW20_TOKEN, &[]);
     let wrap_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "anyone".to_string(),
         amount: Uint128::from(100_u128),
@@ -250,7 +265,7 @@ fn test_unwrap_cw20() {
     // Try unwrapping the cw20 token
     let info = mock_info("anyone", &[]);
     let unwrap_msg = ExecuteMsg::Unwrap {
-        token: Some(Addr::unchecked(cw20_address)),
+        token: Some(Addr::unchecked(CW20_TOKEN.to_string())),
         amount: Uint128::from(80_u128),
     };
     let res = execute(deps.as_mut(), mock_env(), info, unwrap_msg).unwrap();

@@ -6,7 +6,7 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 
-use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg, TokenInfoResponse};
+use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20ReceiveMsg};
 use cw20_base::allowances::{
     execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
     execute_transfer_from, query_allowance,
@@ -23,7 +23,7 @@ use protocol_cosmwasm::token_wrapper::{
     InstantiateMsg, QueryMsg,
 };
 
-use crate::state::{Config, Supply, CONFIG, TOKENS, TOTAL_SUPPLY};
+use crate::state::{Config, Supply, CONFIG, HISTORICAL_TOKENS, TOKENS, TOTAL_SUPPLY};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-tokenwrapper";
@@ -198,19 +198,31 @@ pub fn execute(
     }
 }
 
-fn wrap_native(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
-    // Check if the valid native token is sent.
+fn wrap_native(mut deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+    // Check if the wrapping native token is allowed
     let config = CONFIG.load(deps.storage)?;
+    if !config.is_native_allowed {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Wrapping native token is not allowed in this token wrapper".to_string(),
+        }));
+    }
+
+    // Validate the wrapping amount
     let sent_native_token = info
         .funds
         .iter()
         .find(|token| token.denom == *config.native_token_denom)
         .ok_or(ContractError::InsufficientFunds {})?;
+    let wrapping_amount = sent_native_token.amount;
+    if wrapping_amount.is_zero() || !is_valid_wrap_amount(deps.branch(), wrapping_amount) {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid native token amount".to_string(),
+        }));
+    }
 
     // Calculate the "fee" & "amount_to_wrap".
-    let cost_to_wrap =
-        get_fee_from_amount(sent_native_token.amount, config.fee_percentage.numerator());
-    let left_over = sent_native_token.amount - cost_to_wrap;
+    let cost_to_wrap = get_fee_from_amount(wrapping_amount, config.fee_percentage.numerator());
+    let left_over = wrapping_amount - cost_to_wrap;
 
     // Save the wrapped token amount.
     let mut supply = TOTAL_SUPPLY.load(deps.storage)?;
@@ -245,6 +257,13 @@ fn unwrap_native(
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
+    // Validate the "is_native_allowed"
+    if !config.is_native_allowed {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Unwrapping native token is not allowed in this token wrapper".to_string(),
+        }));
+    }
+
     // Validate the "amount"
     if !is_valid_amount(deps.branch(), info.clone(), amount) {
         return Err(ContractError::Std(StdError::GenericErr {
@@ -331,27 +350,32 @@ fn wrap_cw20(
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
-    // Only Cw20 token contract can execute this message.
-    if !is_valid_address(deps.branch(), info.sender.clone()) {
-        return Err(ContractError::Unauthorized {});
-    }
-
     let sender = cw20_msg.sender;
     let cw20_address = info.sender;
+
+    // Validate the cw20 address
+    if !is_valid_address(deps.branch(), cw20_address.clone()) {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid Cw20 token address".to_string(),
+        }));
+    }
+
+    // Validate the cw20 token amount.
+    let cw20_token_amount = cw20_msg.amount;
+    if cw20_token_amount.is_zero() || !is_valid_wrap_amount(deps.branch(), cw20_token_amount) {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid cw20 token".to_string(),
+        }));
+    }
 
     // Calculate the "fee" & "amount_to_wrap".
     let config = CONFIG.load(deps.storage)?;
     let cost_to_wrap = get_fee_from_amount(cw20_msg.amount, config.fee_percentage.numerator());
     let left_over = cw20_msg.amount - cost_to_wrap;
+
     match from_binary(&cw20_msg.msg) {
         Ok(Cw20HookMsg::Wrap {}) => {
-            // Validate the token amount
-            if left_over.is_zero() {
-                return Err(ContractError::Std(StdError::GenericErr {
-                    msg: "Sent zero amount".to_string(),
-                }));
-            }
-
+            // Save the wrapping number
             let mut supply = TOTAL_SUPPLY.load(deps.storage)?;
             supply.issued += left_over;
             TOTAL_SUPPLY.save(deps.storage, &supply)?;
@@ -385,11 +409,7 @@ fn wrap_cw20(
 }
 
 fn is_valid_address(deps: DepsMut, token_address: Addr) -> bool {
-    let token_info_query: StdResult<TokenInfoResponse> = deps
-        .querier
-        .query_wasm_smart(token_address, &Cw20QueryMsg::TokenInfo {});
-
-    token_info_query.is_ok()
+    TOKENS.load(deps.storage, token_address).unwrap_or(false)
 }
 
 fn is_valid_amount(deps: DepsMut, info: MessageInfo, amount: Uint128) -> bool {
@@ -399,6 +419,12 @@ fn is_valid_amount(deps: DepsMut, info: MessageInfo, amount: Uint128) -> bool {
         })
         .balance;
     amount <= sender_token_balance
+}
+
+fn is_valid_wrap_amount(deps: DepsMut, amount: Uint128) -> bool {
+    let total_supply = TOTAL_SUPPLY.load(deps.storage).unwrap().issued;
+    let config = CONFIG.load(deps.storage).unwrap();
+    amount + total_supply <= config.wrapping_limit
 }
 
 fn get_fee_from_amount(amount_to_wrap: Uint128, fee_perc: u128) -> Uint128 {
@@ -576,6 +602,8 @@ fn add_token_addr(
 
     // Add the "token" to wrapping list
     TOKENS.save(deps.storage, token_addr.clone(), &true)?;
+
+    HISTORICAL_TOKENS.save(deps.storage, token_addr.clone(), &true)?;
 
     // Save the "proposal_nonce"
     config.proposal_nonce = nonce;
