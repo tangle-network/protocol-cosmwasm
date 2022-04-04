@@ -59,6 +59,9 @@ pub enum ExecuteMsg {
     /// Add cw20 token address to wrapping list
     AddCw20TokenAddr { token: String, nonce: u64 },
 
+    /// Remove cw20 token address from wrapping list (disallow wrapping)
+    RemoveCw20TokenAddr { token: String, nonce: u64 },
+
     /// Implements CW20. Transfer is a base message to move tokens to another account without triggering actions
     Transfer { recipient: String, amount: Uint128 },
     /// Implements CW20. Burn is a base message to destroy tokens forever

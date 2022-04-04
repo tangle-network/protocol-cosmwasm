@@ -148,6 +148,11 @@ pub fn execute(
         // Add a cw20 token address to wrapping list
         ExecuteMsg::AddCw20TokenAddr { token, nonce } => add_token_addr(deps, info, token, nonce),
 
+        // Removes a cw20 token address from wrapping list (disallow wrapping)
+        ExecuteMsg::RemoveCw20TokenAddr { token, nonce } => {
+            remove_token_addr(deps, info, token, nonce)
+        }
+
         // these all come from cw20-base to implement the cw20 standard
         ExecuteMsg::Transfer { recipient, amount } => {
             Ok(execute_transfer(deps, env, info, recipient, amount)?)
@@ -578,6 +583,49 @@ fn add_token_addr(
 
     Ok(Response::new().add_attributes(vec![
         attr("method", "add_token"),
+        attr("token", token_addr.to_string()),
+    ]))
+}
+
+fn remove_token_addr(
+    deps: DepsMut,
+    info: MessageInfo,
+    token: String,
+    nonce: u64,
+) -> Result<Response, ContractError> {
+    let token_addr = deps.api.addr_validate(token.as_str())?;
+    let is_token_already_invalid = match TOKENS.load(deps.storage, token_addr.clone()) {
+        Ok(v) => !v,
+        Err(_) => return Err(ContractError::NotInitialized),
+    };
+    if is_token_already_invalid {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Token must be valid".to_string(),
+        }));
+    }
+
+    // Validate the tx sender.
+    let mut config = CONFIG.load(deps.storage)?;
+    if config.governer != deps.api.addr_validate(info.sender.as_str())? {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // Validate the "nonce" value
+    if nonce != config.proposal_nonce + 1 {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Nonce must increment by 1".to_string(),
+        }));
+    }
+
+    // Remove the "token" from wrapping list
+    TOKENS.save(deps.storage, token_addr.clone(), &false)?;
+
+    // Save the "proposal_nonce"
+    config.proposal_nonce = nonce;
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(Response::new().add_attributes(vec![
+        attr("method", "remove_token"),
         attr("token", token_addr.to_string()),
     ]))
 }
