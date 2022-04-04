@@ -14,7 +14,9 @@ pub fn is_valid_address(deps: DepsMut, token_address: Addr) -> bool {
 pub fn is_valid_wrap_amount(deps: DepsMut, amount: Uint128) -> bool {
     let total_supply = TOTAL_SUPPLY.load(deps.storage).unwrap().issued;
     let config = CONFIG.load(deps.storage).unwrap();
-    amount + total_supply <= config.wrapping_limit
+    amount
+        .saturating_add(total_supply)
+        .le(&config.wrapping_limit)
 }
 
 // Check if the "unwrap_amount" is valid.
