@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, coins, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Decimal, Deps, DepsMut,
-    Env, Fraction, MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
+    attr, coins, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
+    Fraction, MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 
@@ -25,8 +25,8 @@ use protocol_cosmwasm::token_wrapper::{
 
 use crate::state::{Config, Supply, CONFIG, HISTORICAL_TOKENS, TOKENS, TOTAL_SUPPLY};
 use crate::utils::{
-    get_amount_to_wrap, get_fee_from_amount, is_valid_address, is_valid_unwrap_amount,
-    is_valid_wrap_amount,
+    calc_fee_perc_from_string, get_amount_to_wrap, get_fee_from_amount, is_valid_address,
+    is_valid_unwrap_amount, is_valid_wrap_amount, parse_string_to_uint128,
 };
 
 // version info for migration info
@@ -66,30 +66,10 @@ pub fn instantiate(
         None => info.sender,
     };
     let fee_recipient = deps.api.addr_validate(msg.fee_recipient.as_str())?;
-    let fee_perc = match msg.fee_percentage.parse::<u64>() {
-        Ok(v) => {
-            if v > 100 {
-                return Err(ContractError::Std(StdError::GenericErr {
-                    msg: "Percentage should be in range [0, 100]".to_string(),
-                }));
-            } else {
-                v
-            }
-        }
-        Err(e) => {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: e.to_string(),
-            }))
-        }
-    };
-    let fee_percentage = Decimal::percent(fee_perc);
-    let wrapping_limit = match msg.wrapping_limit.parse::<u128>() {
-        Ok(v) => Uint128::from(v),
-        Err(e) => {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: e.to_string(),
-            }))
-        }
+    let fee_percentage = calc_fee_perc_from_string(msg.fee_percentage)?;
+    let wrapping_limit = match parse_string_to_uint128(msg.wrapping_limit) {
+        Ok(v) => v,
+        Err(e) => return Err(ContractError::Std(e)),
     };
     CONFIG.save(
         deps.storage,
@@ -133,15 +113,15 @@ pub fn execute(
         // Resets the config. Only the governer can execute this entry.
         ExecuteMsg::UpdateConfig(msg) => update_config(deps, info, msg),
 
-        // Add a cw20 token address to wrapping list
+        // Add new cw20 token address to wrapping list
         ExecuteMsg::AddCw20TokenAddr { token, nonce } => add_token_addr(deps, info, token, nonce),
 
-        // Removes a cw20 token address from wrapping list (disallow wrapping)
+        // Remove cw20 token address from wrapping list (disallow wrapping)
         ExecuteMsg::RemoveCw20TokenAddr { token, nonce } => {
             remove_token_addr(deps, info, token, nonce)
         }
 
-        // these all come from cw20-base to implement the cw20 standard
+        // These all come from cw20-base to implement the cw20 standard
         ExecuteMsg::Transfer { recipient, amount } => {
             Ok(execute_transfer(deps, env, info, recipient, amount)?)
         }
@@ -187,8 +167,8 @@ pub fn execute(
 }
 
 fn wrap_native(mut deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
-    // Check if the wrapping native token is allowed
     let config = CONFIG.load(deps.storage)?;
+    // Validate the "is_native_allowed"
     if !config.is_native_allowed {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Wrapping native token is not allowed in this token wrapper".to_string(),
@@ -196,12 +176,12 @@ fn wrap_native(mut deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respons
     }
 
     // Validate the wrapping amount
-    let sent_native_token = info
+    let wrapping_amount = info
         .funds
         .iter()
         .find(|token| token.denom == *config.native_token_denom)
-        .ok_or(ContractError::InsufficientFunds {})?;
-    let wrapping_amount = sent_native_token.amount;
+        .ok_or(ContractError::InsufficientFunds {})?
+        .amount;
     if wrapping_amount.is_zero() || !is_valid_wrap_amount(deps.branch(), wrapping_amount) {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Invalid native token amount".to_string(),
@@ -262,14 +242,12 @@ fn unwrap_native(
     // Calculate the remainder
     let total_supply = TOTAL_SUPPLY.load(deps.storage)?;
     let remainder = total_supply.issued - amount;
+    TOTAL_SUPPLY.save(deps.storage, &Supply { issued: remainder })?;
 
     // burn from the original caller
     execute_burn(deps.branch(), env, info.clone(), amount)?;
 
-    // Save the "total_supply"
-    TOTAL_SUPPLY.save(deps.storage, &Supply { issued: remainder })?;
-
-    // Refund the native token.
+    // Send the native token to caller
     let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Bank(BankMsg::Send {
         to_address: info.sender.to_string(),
         amount: coins(amount.u128(), config.native_token_denom),
@@ -308,14 +286,12 @@ fn unwrap_cw20(
     // Calculate the remainder
     let total_supply = TOTAL_SUPPLY.load(deps.storage)?;
     let remainder = total_supply.issued - amount;
+    TOTAL_SUPPLY.save(deps.storage, &Supply { issued: remainder })?;
 
     // burn from the original caller
     execute_burn(deps.branch(), env, info.clone(), amount)?;
 
-    // Save the "total_supply"
-    TOTAL_SUPPLY.save(deps.storage, &Supply { issued: remainder })?;
-
-    // Refund the Cw20 token
+    // Send the Cw20 token to caller
     let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: token.to_string(),
         funds: vec![],
@@ -376,7 +352,7 @@ fn wrap_cw20(
             };
             execute_mint(deps, env, sub_info, sender.to_string(), left_over)?;
 
-            // Send the fee to fee_recipient.
+            // Send the "fee" to "fee_recipient".
             let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: cw20_address.to_string(),
                 funds: vec![],
@@ -430,32 +406,16 @@ fn update_config(
     }
 
     if msg.fee_percentage.is_some() {
-        let new_fee_perc = match msg.fee_percentage.unwrap().parse::<u64>() {
-            Ok(v) => {
-                if v > 100 {
-                    return Err(ContractError::Std(StdError::GenericErr {
-                        msg: "Percentage should be in range [0, 100]".to_string(),
-                    }));
-                } else {
-                    Decimal::percent(v)
-                }
-            }
-            Err(e) => {
-                return Err(ContractError::Std(StdError::GenericErr {
-                    msg: e.to_string(),
-                }))
-            }
-        };
-        config.fee_percentage = new_fee_perc;
+        config.fee_percentage = calc_fee_perc_from_string(msg.fee_percentage.unwrap())?;
     }
 
     if msg.fee_recipient.is_some() {
-        let new_recipient = deps
+        config.fee_recipient = deps
             .api
             .addr_validate(msg.fee_recipient.unwrap().as_str())?;
-        config.fee_recipient = new_recipient;
     }
 
+    // Save the new config
     CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new().add_attributes(vec![attr("method", "update_config")]))
@@ -489,7 +449,6 @@ fn add_token_addr(
 
     // Add the "token" to wrapping list
     TOKENS.save(deps.storage, token_addr.clone(), &true)?;
-
     HISTORICAL_TOKENS.save(deps.storage, token_addr.clone(), &true)?;
 
     // Save the "proposal_nonce"
@@ -548,11 +507,15 @@ fn remove_token_addr(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        // Custom queries.
+        // Query the "Config" state of the contract
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
+
+        // Query the fee amount, calculated from wrap amount
         QueryMsg::FeeFromAmount { amount_to_wrap } => {
             to_binary(&query_fee_from_amount(deps, amount_to_wrap)?)
         }
+
+        // Query the real wrap amount, calculated from total amount
         QueryMsg::GetAmountToWrap { target_amount } => {
             to_binary(&query_amount_to_wrap(deps, target_amount)?)
         }
@@ -581,10 +544,7 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 
 fn query_fee_from_amount(deps: Deps, amount_to_wrap: String) -> StdResult<FeeFromAmountResponse> {
     let config = CONFIG.load(deps.storage)?;
-    let amount_to_wrap = match amount_to_wrap.parse::<u128>() {
-        Ok(v) => Uint128::from(v),
-        Err(e) => return Err(StdError::GenericErr { msg: e.to_string() }),
-    };
+    let amount_to_wrap = parse_string_to_uint128(amount_to_wrap)?;
     let fee_perc = config.fee_percentage.numerator();
     let fee_amt = get_fee_from_amount(amount_to_wrap, fee_perc);
     Ok(FeeFromAmountResponse {
@@ -595,10 +555,7 @@ fn query_fee_from_amount(deps: Deps, amount_to_wrap: String) -> StdResult<FeeFro
 
 fn query_amount_to_wrap(deps: Deps, target_amount: String) -> StdResult<GetAmountToWrapResponse> {
     let config = CONFIG.load(deps.storage)?;
-    let target_amount = match target_amount.parse::<u128>() {
-        Ok(v) => Uint128::from(v),
-        Err(e) => return Err(StdError::GenericErr { msg: e.to_string() }),
-    };
+    let target_amount = parse_string_to_uint128(target_amount)?;
     let fee_perc = config.fee_percentage.numerator();
     let amount_to_wrap = get_amount_to_wrap(target_amount, fee_perc);
     Ok(GetAmountToWrapResponse {

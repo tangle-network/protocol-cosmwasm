@@ -1,6 +1,7 @@
-use cosmwasm_std::{Addr, Decimal, DepsMut, Fraction, MessageInfo, Uint128};
+use cosmwasm_std::{Addr, Decimal, DepsMut, Fraction, MessageInfo, StdError, Uint128};
 use cw20::BalanceResponse;
 use cw20_base::contract::query_balance;
+use protocol_cosmwasm::error::ContractError;
 
 use crate::state::{CONFIG, TOKENS, TOTAL_SUPPLY};
 
@@ -37,4 +38,32 @@ pub fn get_amount_to_wrap(target_amount: Uint128, fee_perc: u128) -> Uint128 {
         Decimal::MAX.denominator(),
         Decimal::MAX.denominator() - fee_perc,
     )
+}
+
+pub fn calc_fee_perc_from_string(v: String) -> Result<Decimal, ContractError> {
+    let res = match v.parse::<u64>() {
+        Ok(v) => {
+            if v > 100 {
+                return Err(ContractError::Std(StdError::GenericErr {
+                    msg: "Percentage should be in range [0, 100]".to_string(),
+                }));
+            } else {
+                Decimal::percent(v)
+            }
+        }
+        Err(e) => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: e.to_string(),
+            }))
+        }
+    };
+    Ok(res)
+}
+
+pub fn parse_string_to_uint128(v: String) -> Result<Uint128, StdError> {
+    let res = match v.parse::<u128>() {
+        Ok(v) => Uint128::from(v),
+        Err(e) => return Err(StdError::GenericErr { msg: e.to_string() }),
+    };
+    Ok(res)
 }
