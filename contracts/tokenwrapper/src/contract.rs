@@ -6,7 +6,7 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 
-use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20ReceiveMsg};
+use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use cw20_base::allowances::{
     execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
     execute_transfer_from, query_allowance,
@@ -24,6 +24,10 @@ use protocol_cosmwasm::token_wrapper::{
 };
 
 use crate::state::{Config, Supply, CONFIG, HISTORICAL_TOKENS, TOKENS, TOTAL_SUPPLY};
+use crate::utils::{
+    get_amount_to_wrap, get_fee_from_amount, is_valid_address, is_valid_unwrap_amount,
+    is_valid_wrap_amount,
+};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-tokenwrapper";
@@ -265,7 +269,7 @@ fn unwrap_native(
     }
 
     // Validate the "amount"
-    if !is_valid_amount(deps.branch(), info.clone(), amount) {
+    if !is_valid_unwrap_amount(deps.branch(), info.clone(), amount) {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Insufficient native token balance".to_string(),
         }));
@@ -310,7 +314,7 @@ fn unwrap_cw20(
     }
 
     // Validate the "token" amount
-    if !is_valid_amount(deps.branch(), info.clone(), amount) {
+    if !is_valid_unwrap_amount(deps.branch(), info.clone(), amount) {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Insufficient cw20 token amount".to_string(),
         }));
@@ -406,36 +410,6 @@ fn wrap_cw20(
         }
         Err(e) => Err(ContractError::Std(e)),
     }
-}
-
-fn is_valid_address(deps: DepsMut, token_address: Addr) -> bool {
-    TOKENS.load(deps.storage, token_address).unwrap_or(false)
-}
-
-fn is_valid_amount(deps: DepsMut, info: MessageInfo, amount: Uint128) -> bool {
-    let sender_token_balance = query_balance(deps.as_ref(), info.sender.to_string())
-        .unwrap_or(BalanceResponse {
-            balance: Uint128::zero(),
-        })
-        .balance;
-    amount <= sender_token_balance
-}
-
-fn is_valid_wrap_amount(deps: DepsMut, amount: Uint128) -> bool {
-    let total_supply = TOTAL_SUPPLY.load(deps.storage).unwrap().issued;
-    let config = CONFIG.load(deps.storage).unwrap();
-    amount + total_supply <= config.wrapping_limit
-}
-
-fn get_fee_from_amount(amount_to_wrap: Uint128, fee_perc: u128) -> Uint128 {
-    amount_to_wrap.multiply_ratio(fee_perc, Decimal::MAX.denominator())
-}
-
-fn get_amount_to_wrap(target_amount: Uint128, fee_perc: u128) -> Uint128 {
-    target_amount.multiply_ratio(
-        Decimal::MAX.denominator(),
-        Decimal::MAX.denominator() - fee_perc,
-    )
 }
 
 fn set_governer(
