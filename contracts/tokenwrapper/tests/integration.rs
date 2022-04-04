@@ -21,7 +21,6 @@ const DECIMALS: u8 = 6;
 const FEE_RECIPIENT: &str = "terra1qca9hs2qk2w29gqduaq9k720k9293qt7q8nszl";
 const FEE_PERCENTAGE: &str = "1";
 const NATIVE_TOKEN_DENOM: &str = "uusd";
-const CW20_TOKEN: &str = "cw20_token";
 const WRAPPING_LIMIT: &str = "5000000";
 const IS_NATIVE_ALLOWED: u32 = 1;
 
