@@ -11,8 +11,8 @@ pub struct InstantiateMsg {
     pub symbol: String,
     /// decimal places of the Wrapping target token (for UI)
     pub decimals: u8,
-    /// addr of governer
-    pub governer: Option<String>,
+    /// addr of governor
+    pub governor: Option<String>,
     /// addr of fee recipient
     pub fee_recipient: String,
     /// fee_percentage( 0 ~ 100 )
@@ -42,7 +42,7 @@ pub enum ExecuteMsg {
 
     /// Governing functionality
     /// Reset the config
-    /// "governer",       "is_native_allowed",
+    /// "governor",       "is_native_allowed",
     /// "wrapping_limit", "fee_percentage",
     /// "fee_recipient".
     UpdateConfig(UpdateConfigMsg),
@@ -129,7 +129,7 @@ pub enum Cw20HookMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct UpdateConfigMsg {
-    pub governer: Option<String>,
+    pub governor: Option<String>,
     pub is_native_allowed: Option<u32>,
     pub wrapping_limit: Option<String>,
     pub fee_percentage: Option<String>,
@@ -139,7 +139,7 @@ pub struct UpdateConfigMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct ConfigResponse {
-    pub governer: String,
+    pub governor: String,
     pub native_token_denom: String,
     pub fee_recipient: String,
     pub fee_percentage: String,

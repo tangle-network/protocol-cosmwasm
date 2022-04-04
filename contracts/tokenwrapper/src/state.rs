@@ -14,7 +14,7 @@ pub struct Supply {
 /// Config
 #[derive(Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
 pub struct Config {
-    pub governer: Addr,
+    pub governor: Addr,
     pub native_token_denom: String,
     pub fee_recipient: Addr,
     pub fee_percentage: Decimal,

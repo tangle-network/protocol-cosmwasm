@@ -61,7 +61,7 @@ pub fn instantiate(
     TOTAL_SUPPLY.save(deps.storage, &supply)?;
 
     // set config
-    let governer = match msg.governer {
+    let governor = match msg.governor {
         Some(v) => deps.api.addr_validate(v.as_str())?,
         None => info.sender,
     };
@@ -74,7 +74,7 @@ pub fn instantiate(
     CONFIG.save(
         deps.storage,
         &Config {
-            governer,
+            governor,
             fee_recipient,
             fee_percentage,
             native_token_denom: msg.native_token_denom,
@@ -110,7 +110,7 @@ pub fn execute(
         ExecuteMsg::Receive(msg) => wrap_cw20(deps, env, info, msg),
 
         // // Governing functionality
-        // Resets the config. Only the governer can execute this entry.
+        // Resets the config. Only the governor can execute this entry.
         ExecuteMsg::UpdateConfig(msg) => update_config(deps, info, msg),
 
         // Add new cw20 token address to wrapping list
@@ -380,13 +380,13 @@ fn update_config(
 ) -> Result<Response, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
     // Validate the tx sender.
-    if config.governer != deps.api.addr_validate(info.sender.as_str())? {
+    if config.governor != deps.api.addr_validate(info.sender.as_str())? {
         return Err(ContractError::Unauthorized {});
     }
 
     // Update the config
-    if msg.governer.is_some() {
-        config.governer = deps.api.addr_validate(msg.governer.unwrap().as_str())?;
+    if msg.governor.is_some() {
+        config.governor = deps.api.addr_validate(msg.governor.unwrap().as_str())?;
     }
 
     if msg.is_native_allowed.is_some() {
@@ -436,7 +436,7 @@ fn add_token_addr(
 
     // Validate the tx sender.
     let mut config = CONFIG.load(deps.storage)?;
-    if config.governer != deps.api.addr_validate(info.sender.as_str())? {
+    if config.governor != deps.api.addr_validate(info.sender.as_str())? {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -480,7 +480,7 @@ fn remove_token_addr(
 
     // Validate the tx sender.
     let mut config = CONFIG.load(deps.storage)?;
-    if config.governer != deps.api.addr_validate(info.sender.as_str())? {
+    if config.governor != deps.api.addr_validate(info.sender.as_str())? {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -532,7 +532,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let config = CONFIG.load(deps.storage)?;
     Ok(ConfigResponse {
-        governer: config.governer.to_string(),
+        governor: config.governor.to_string(),
         native_token_denom: config.native_token_denom,
         fee_recipient: config.fee_recipient.to_string(),
         fee_percentage: config.fee_percentage.to_string(),

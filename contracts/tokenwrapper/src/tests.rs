@@ -29,7 +29,7 @@ fn init_tokenwrapper(coins: Vec<Coin>) -> OwnedDeps<MockStorage, MockApi, MockQu
         name: NAME.to_string(),
         symbol: SYMBOL.to_string(),
         decimals: DECIMALS,
-        governer: None,
+        governor: None,
         fee_recipient: FEE_RECIPIENT.to_string(),
         fee_percentage: FEE_PERCENTAGE.to_string(),
         native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
@@ -51,7 +51,7 @@ fn proper_initialization() {
         name: NAME.to_string(),
         symbol: SYMBOL.to_string(),
         decimals: DECIMALS,
-        governer: None,
+        governor: None,
         fee_recipient: FEE_RECIPIENT.to_string(),
         fee_percentage: FEE_PERCENTAGE.to_string(),
         native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
@@ -75,7 +75,7 @@ fn proper_initialization() {
     let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
     let config_response: ConfigResponse = from_binary(&query_bin).unwrap();
 
-    assert_eq!(config_response.governer, "creator".to_string());
+    assert_eq!(config_response.governor, "creator".to_string());
     assert_eq!(
         config_response.native_token_denom,
         NATIVE_TOKEN_DENOM.to_string()
@@ -295,15 +295,15 @@ fn test_query_amt_to_wrap_from_target_amount() {
 fn test_update_config() {
     let mut deps = init_tokenwrapper([].to_vec());
 
-    // Check the current governer.
+    // Check the current governor.
     let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
     let config_response: ConfigResponse = from_binary(&query_bin).unwrap();
-    assert_eq!(config_response.governer, "creator".to_string());
+    assert_eq!(config_response.governor, "creator".to_string());
 
     // Update the config
     let info = mock_info("creator", &[]);
     let update_config_msg = ExecuteMsg::UpdateConfig(UpdateConfigMsg {
-        governer: Some("new_governer".to_string()),
+        governor: Some("new_governor".to_string()),
         is_native_allowed: None,
         wrapping_limit: None,
         fee_percentage: None,
@@ -313,10 +313,10 @@ fn test_update_config() {
     let res = execute(deps.as_mut(), mock_env(), info, update_config_msg).unwrap();
     assert_eq!(res.attributes, vec![attr("method", "update_config"),]);
 
-    // Check the new governer
+    // Check the new governor
     let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
     let config_response: ConfigResponse = from_binary(&query_bin).unwrap();
-    assert_eq!(config_response.governer, "new_governer".to_string());
+    assert_eq!(config_response.governor, "new_governor".to_string());
 }
 
 #[test]
