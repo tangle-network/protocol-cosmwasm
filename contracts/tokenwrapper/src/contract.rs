@@ -134,6 +134,9 @@ pub fn execute(
             set_native_allowed(deps, info, is_native_allowed)
         }
 
+        // Updates the "wrapping_limit"
+        ExecuteMsg::UpdateLimit { new_limit } => update_wrapping_limit(deps, info, new_limit),
+
         // these all come from cw20-base to implement the cw20 standard
         ExecuteMsg::Transfer { recipient, amount } => {
             Ok(execute_transfer(deps, env, info, recipient, amount)?)
@@ -435,6 +438,36 @@ fn set_native_allowed(
     Ok(Response::new().add_attributes(vec![
         attr("method", "set_native_allowed"),
         attr("is_native_allowed", is_native_allowed.to_string()),
+    ]))
+}
+
+fn update_wrapping_limit(
+    deps: DepsMut,
+    info: MessageInfo,
+    new_limit: String,
+) -> Result<Response, ContractError> {
+    let new_wrapping_limit = match new_limit.parse::<u128>() {
+        Ok(v) => Uint128::from(v),
+        Err(e) => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: e.to_string(),
+            }))
+        }
+    };
+
+    // Validate the tx sender.
+    let mut config = CONFIG.load(deps.storage)?;
+    if config.governer != deps.api.addr_validate(info.sender.as_str())? {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // Save a new "wrapping_limit" state
+    config.wrapping_limit = new_wrapping_limit;
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(Response::new().add_attributes(vec![
+        attr("method", "set_wrapping_limit"),
+        attr("new_limit", new_wrapping_limit.to_string()),
     ]))
 }
 

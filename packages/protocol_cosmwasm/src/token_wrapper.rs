@@ -47,6 +47,9 @@ pub enum ExecuteMsg {
     /// Sets the "is_native_allowed"
     SetNativeAllowed { is_native_allowed: u32 },
 
+    /// Update the wrapping_limit
+    UpdateLimit { new_limit: String },
+
     /// Implements CW20. Transfer is a base message to move tokens to another account without triggering actions
     Transfer { recipient: String, amount: Uint128 },
     /// Implements CW20. Burn is a base message to destroy tokens forever
