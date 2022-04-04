@@ -6,7 +6,7 @@ use cw20::{BalanceResponse, Cw20ReceiveMsg, TokenInfoResponse};
 
 use protocol_cosmwasm::token_wrapper::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, FeeFromAmountResponse, GetAmountToWrapResponse,
-    InstantiateMsg, QueryMsg,
+    InstantiateMsg, QueryMsg, UpdateConfigMsg,
 };
 
 use crate::contract::{execute, instantiate, query};
@@ -292,7 +292,7 @@ fn test_query_amt_to_wrap_from_target_amount() {
 }
 
 #[test]
-fn test_set_governer() {
+fn test_update_config() {
     let mut deps = init_tokenwrapper([].to_vec());
 
     // Check the current governer.
@@ -300,117 +300,23 @@ fn test_set_governer() {
     let config_response: ConfigResponse = from_binary(&query_bin).unwrap();
     assert_eq!(config_response.governer, "creator".to_string());
 
-    // Sets a new governer
+    // Update the config
     let info = mock_info("creator", &[]);
-    let set_governer_msg = ExecuteMsg::SetGoverner {
-        new_governer: "new_governer".to_string(),
-    };
+    let update_config_msg = ExecuteMsg::UpdateConfig(UpdateConfigMsg {
+        governer: Some("new_governer".to_string()),
+        is_native_allowed: None,
+        wrapping_limit: None,
+        fee_percentage: None,
+        fee_recipient: None,
+    });
 
-    let res = execute(deps.as_mut(), mock_env(), info, set_governer_msg).unwrap();
-    assert_eq!(
-        res.attributes,
-        vec![
-            attr("method", "set_governer"),
-            attr("new_governer", "new_governer"),
-        ]
-    );
-}
+    let res = execute(deps.as_mut(), mock_env(), info, update_config_msg).unwrap();
+    assert_eq!(res.attributes, vec![attr("method", "update_config"),]);
 
-#[test]
-fn test_set_native_allowed() {
-    let mut deps = init_tokenwrapper([].to_vec());
-
-    // Check the current "is_native_allowed".
+    // Check the new governer
     let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
     let config_response: ConfigResponse = from_binary(&query_bin).unwrap();
-    assert_eq!(config_response.is_native_allowed, "true".to_string());
-
-    // Sets "is_native_allowed"
-    let info = mock_info("creator", &[]);
-    let set_native_allowed_msg = ExecuteMsg::SetNativeAllowed {
-        is_native_allowed: 0,
-    };
-
-    let res = execute(deps.as_mut(), mock_env(), info, set_native_allowed_msg).unwrap();
-    assert_eq!(
-        res.attributes,
-        vec![
-            attr("method", "set_native_allowed"),
-            attr("is_native_allowed", "false"),
-        ]
-    );
-}
-
-#[test]
-fn test_set_new_wrapping_limit() {
-    let mut deps = init_tokenwrapper([].to_vec());
-
-    // Check the current "wrapping_limit".
-    let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
-    let config_response: ConfigResponse = from_binary(&query_bin).unwrap();
-    assert_eq!(config_response.wrapping_limit, WRAPPING_LIMIT.to_string());
-
-    // Sets a new "wrapping_limit"
-    let info = mock_info("creator", &[]);
-    let set_new_limit_msg = ExecuteMsg::UpdateLimit {
-        new_limit: "20000".to_string(),
-    };
-
-    let res = execute(deps.as_mut(), mock_env(), info, set_new_limit_msg).unwrap();
-    assert_eq!(
-        res.attributes,
-        vec![
-            attr("method", "set_wrapping_limit"),
-            attr("new_limit", "20000"),
-        ]
-    );
-}
-
-#[test]
-fn test_set_new_fee_perc() {
-    let mut deps = init_tokenwrapper([].to_vec());
-
-    // Check the current "fee_percentage".
-    let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
-    let config_response: ConfigResponse = from_binary(&query_bin).unwrap();
-    assert_eq!(config_response.fee_percentage, "0.01".to_string());
-
-    // Sets a new "fee_percentage"
-    let info = mock_info("creator", &[]);
-    let set_new_fee_perc_msg = ExecuteMsg::SetFee {
-        new_fee_perc: "2".to_string(),
-    };
-
-    let res = execute(deps.as_mut(), mock_env(), info, set_new_fee_perc_msg).unwrap();
-    assert_eq!(
-        res.attributes,
-        vec![attr("method", "set_fee"), attr("new_fee_perc", "0.02"),]
-    );
-}
-
-#[test]
-fn test_set_new_fee_recipient() {
-    let mut deps = init_tokenwrapper([].to_vec());
-
-    // Check the current "fee_recipient".
-    let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
-    let config_response: ConfigResponse = from_binary(&query_bin).unwrap();
-    assert_eq!(config_response.fee_recipient, FEE_RECIPIENT.to_string());
-
-    // Sets a new "fee_recipient"
-    let info = mock_info("creator", &[]);
-    let set_new_fee_recpt_msg = ExecuteMsg::SetFeeRecipient {
-        new_recipient: "new_recipient".to_string(),
-    };
-
-    let res = execute(deps.as_mut(), mock_env(), info, set_new_fee_recpt_msg).unwrap();
-    assert_eq!(
-        res.attributes,
-        vec![
-            attr("method", "set_fee_recipient"),
-            attr("new_recipient", "new_recipient"),
-        ]
-    );
+    assert_eq!(config_response.governer, "new_governer".to_string());
 }
 
 #[test]

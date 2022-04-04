@@ -20,7 +20,7 @@ use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::token_wrapper::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, FeeFromAmountResponse, GetAmountToWrapResponse,
-    InstantiateMsg, QueryMsg,
+    InstantiateMsg, QueryMsg, UpdateConfigMsg,
 };
 
 use crate::state::{Config, Supply, CONFIG, HISTORICAL_TOKENS, TOKENS, TOTAL_SUPPLY};
@@ -130,24 +130,8 @@ pub fn execute(
         ExecuteMsg::Receive(msg) => wrap_cw20(deps, env, info, msg),
 
         // // Governing functionality
-        // Sets a new governer. Only the governer can execute this entry.
-        ExecuteMsg::SetGoverner { new_governer } => set_governer(deps, env, info, new_governer),
-
-        // Sets the "is_native_allowed" of config
-        ExecuteMsg::SetNativeAllowed { is_native_allowed } => {
-            set_native_allowed(deps, info, is_native_allowed)
-        }
-
-        // Updates the "wrapping_limit"
-        ExecuteMsg::UpdateLimit { new_limit } => update_wrapping_limit(deps, info, new_limit),
-
-        // Sets a new "fee_percentage"
-        ExecuteMsg::SetFee { new_fee_perc } => update_fee_perc(deps, info, new_fee_perc),
-
-        // Sets a new "fee_recipient"
-        ExecuteMsg::SetFeeRecipient { new_recipient } => {
-            update_fee_recipient(deps, info, new_recipient)
-        }
+        // Resets the config. Only the governer can execute this entry.
+        ExecuteMsg::UpdateConfig(msg) => update_config(deps, info, msg),
 
         // Add a cw20 token address to wrapping list
         ExecuteMsg::AddCw20TokenAddr { token, nonce } => add_token_addr(deps, info, token, nonce),
@@ -307,7 +291,8 @@ fn unwrap_cw20(
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     // Validate the "token" address
-    if !is_valid_address(deps.branch(), token.clone()) {
+    let is_valid_unwrap_address = HISTORICAL_TOKENS.has(deps.storage, token.clone());
+    if !is_valid_unwrap_address {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Invalid Cw20 token address".to_string(),
         }));
@@ -412,11 +397,10 @@ fn wrap_cw20(
     }
 }
 
-fn set_governer(
+fn update_config(
     deps: DepsMut,
-    _env: Env,
     info: MessageInfo,
-    new_governer: String,
+    msg: UpdateConfigMsg,
 ) -> Result<Response, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
     // Validate the tx sender.
@@ -424,128 +408,57 @@ fn set_governer(
         return Err(ContractError::Unauthorized {});
     }
 
-    // Validate & save the new governer.
-    config.governer = deps.api.addr_validate(new_governer.as_str())?;
-    CONFIG.save(deps.storage, &config)?;
-
-    Ok(Response::new().add_attributes(vec![
-        attr("method", "set_governer"),
-        attr("new_governer", new_governer),
-    ]))
-}
-
-fn set_native_allowed(
-    deps: DepsMut,
-    info: MessageInfo,
-    is_native_allowed: u32,
-) -> Result<Response, ContractError> {
-    let is_native_allowed = is_native_allowed != 0;
-
-    // Validate the tx sender.
-    let mut config = CONFIG.load(deps.storage)?;
-    if config.governer != deps.api.addr_validate(info.sender.as_str())? {
-        return Err(ContractError::Unauthorized {});
+    // Update the config
+    if msg.governer.is_some() {
+        config.governer = deps.api.addr_validate(msg.governer.unwrap().as_str())?;
     }
 
-    // Save "is_native_allowed" state
-    config.is_native_allowed = is_native_allowed;
-    CONFIG.save(deps.storage, &config)?;
-
-    Ok(Response::new().add_attributes(vec![
-        attr("method", "set_native_allowed"),
-        attr("is_native_allowed", is_native_allowed.to_string()),
-    ]))
-}
-
-fn update_wrapping_limit(
-    deps: DepsMut,
-    info: MessageInfo,
-    new_limit: String,
-) -> Result<Response, ContractError> {
-    let new_wrapping_limit = match new_limit.parse::<u128>() {
-        Ok(v) => Uint128::from(v),
-        Err(e) => {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: e.to_string(),
-            }))
-        }
-    };
-
-    // Validate the tx sender.
-    let mut config = CONFIG.load(deps.storage)?;
-    if config.governer != deps.api.addr_validate(info.sender.as_str())? {
-        return Err(ContractError::Unauthorized {});
+    if msg.is_native_allowed.is_some() {
+        config.is_native_allowed = msg.is_native_allowed.unwrap() != 0;
     }
 
-    // Save a new "wrapping_limit" state
-    config.wrapping_limit = new_wrapping_limit;
-    CONFIG.save(deps.storage, &config)?;
-
-    Ok(Response::new().add_attributes(vec![
-        attr("method", "set_wrapping_limit"),
-        attr("new_limit", new_wrapping_limit.to_string()),
-    ]))
-}
-
-fn update_fee_perc(
-    deps: DepsMut,
-    info: MessageInfo,
-    new_fee_perc: String,
-) -> Result<Response, ContractError> {
-    let new_fee_perc = match new_fee_perc.parse::<u64>() {
-        Ok(v) => {
-            if v > 100 {
+    if msg.wrapping_limit.is_some() {
+        let new_wrapping_limit = match msg.wrapping_limit.unwrap().parse::<u128>() {
+            Ok(v) => Uint128::from(v),
+            Err(e) => {
                 return Err(ContractError::Std(StdError::GenericErr {
-                    msg: "Percentage should be in range [0, 100]".to_string(),
-                }));
-            } else {
-                v
+                    msg: e.to_string(),
+                }))
             }
-        }
-        Err(e) => {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: e.to_string(),
-            }))
-        }
-    };
-
-    // Validate the tx sender.
-    let mut config = CONFIG.load(deps.storage)?;
-    if config.governer != deps.api.addr_validate(info.sender.as_str())? {
-        return Err(ContractError::Unauthorized {});
+        };
+        config.wrapping_limit = new_wrapping_limit;
     }
 
-    // Save a new "new_fee_perc" state
-    config.fee_percentage = Decimal::percent(new_fee_perc);
-    CONFIG.save(deps.storage, &config)?;
-
-    Ok(Response::new().add_attributes(vec![
-        attr("method", "set_fee"),
-        attr("new_fee_perc", config.fee_percentage.to_string()),
-    ]))
-}
-
-fn update_fee_recipient(
-    deps: DepsMut,
-    info: MessageInfo,
-    new_recipient: String,
-) -> Result<Response, ContractError> {
-    let new_recipient = deps.api.addr_validate(new_recipient.as_str())?;
-
-    // Validate the tx sender.
-    let mut config = CONFIG.load(deps.storage)?;
-    if config.governer != deps.api.addr_validate(info.sender.as_str())? {
-        return Err(ContractError::Unauthorized {});
+    if msg.fee_percentage.is_some() {
+        let new_fee_perc = match msg.fee_percentage.unwrap().parse::<u64>() {
+            Ok(v) => {
+                if v > 100 {
+                    return Err(ContractError::Std(StdError::GenericErr {
+                        msg: "Percentage should be in range [0, 100]".to_string(),
+                    }));
+                } else {
+                    Decimal::percent(v)
+                }
+            }
+            Err(e) => {
+                return Err(ContractError::Std(StdError::GenericErr {
+                    msg: e.to_string(),
+                }))
+            }
+        };
+        config.fee_percentage = new_fee_perc;
     }
 
-    // Save a new "fee_recipient" state
-    config.fee_recipient = new_recipient;
+    if msg.fee_recipient.is_some() {
+        let new_recipient = deps
+            .api
+            .addr_validate(msg.fee_recipient.unwrap().as_str())?;
+        config.fee_recipient = new_recipient;
+    }
+
     CONFIG.save(deps.storage, &config)?;
 
-    Ok(Response::new().add_attributes(vec![
-        attr("method", "set_fee_recipient"),
-        attr("new_recipient", config.fee_recipient.to_string()),
-    ]))
+    Ok(Response::new().add_attributes(vec![attr("method", "update_config")]))
 }
 
 fn add_token_addr(
@@ -654,7 +567,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
-    println!("querying");
     let config = CONFIG.load(deps.storage)?;
     Ok(ConfigResponse {
         governer: config.governer.to_string(),
