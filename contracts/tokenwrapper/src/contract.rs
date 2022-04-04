@@ -140,6 +140,11 @@ pub fn execute(
         // Sets a new "fee_percentage"
         ExecuteMsg::SetFee { new_fee_perc } => update_fee_perc(deps, info, new_fee_perc),
 
+        // Sets a new "fee_recipient"
+        ExecuteMsg::SetFeeRecipient { new_recipient } => {
+            update_fee_recipient(deps, info, new_recipient)
+        }
+
         // these all come from cw20-base to implement the cw20 standard
         ExecuteMsg::Transfer { recipient, amount } => {
             Ok(execute_transfer(deps, env, info, recipient, amount)?)
@@ -509,6 +514,29 @@ fn update_fee_perc(
     Ok(Response::new().add_attributes(vec![
         attr("method", "set_fee"),
         attr("new_fee_perc", config.fee_percentage.to_string()),
+    ]))
+}
+
+fn update_fee_recipient(
+    deps: DepsMut,
+    info: MessageInfo,
+    new_recipient: String,
+) -> Result<Response, ContractError> {
+    let new_recipient = deps.api.addr_validate(new_recipient.as_str())?;
+
+    // Validate the tx sender.
+    let mut config = CONFIG.load(deps.storage)?;
+    if config.governer != deps.api.addr_validate(info.sender.as_str())? {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // Save a new "fee_recipient" state
+    config.fee_recipient = new_recipient;
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(Response::new().add_attributes(vec![
+        attr("method", "set_fee_recipient"),
+        attr("new_recipient", config.fee_recipient.to_string()),
     ]))
 }
 

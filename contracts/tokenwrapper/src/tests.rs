@@ -506,3 +506,44 @@ fn test_set_new_fee_perc() {
         vec![attr("method", "set_fee"), attr("new_fee_perc", "0.02"),]
     );
 }
+
+#[test]
+fn test_set_new_fee_recipient() {
+    let mut deps = mock_dependencies(&[]);
+
+    let info = mock_info("creator", &[]);
+    let instantiate_msg = InstantiateMsg {
+        name: "Webb-WRAP".to_string(),
+        symbol: "WWRP".to_string(),
+        decimals: 6u8,
+        governer: None,
+        fee_recipient: FEE_RECIPIENT.to_string(),
+        fee_percentage: FEE_PERCENTAGE.to_string(),
+        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+        is_native_allowed: 1,
+        wrapping_limit: "5000000".to_string(),
+    };
+
+    // We call ".unwrap()" to ensure succeed
+    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+
+    // Check the current "fee_recipient".
+    let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
+    let config_response: ConfigResponse = from_binary(&query_bin).unwrap();
+    assert_eq!(config_response.fee_recipient, FEE_RECIPIENT.to_string());
+
+    // Sets a new "fee_recipient"
+    let info = mock_info("creator", &[]);
+    let set_new_fee_recpt_msg = ExecuteMsg::SetFeeRecipient {
+        new_recipient: "new_recipient".to_string(),
+    };
+
+    let res = execute(deps.as_mut(), mock_env(), info, set_new_fee_recpt_msg).unwrap();
+    assert_eq!(
+        res.attributes,
+        vec![
+            attr("method", "set_fee_recipient"),
+            attr("new_recipient", "new_recipient"),
+        ]
+    );
+}
