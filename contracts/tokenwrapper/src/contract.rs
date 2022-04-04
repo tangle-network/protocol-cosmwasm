@@ -23,7 +23,7 @@ use protocol_cosmwasm::token_wrapper::{
     InstantiateMsg, QueryMsg,
 };
 
-use crate::state::{Config, Supply, CONFIG, TOTAL_SUPPLY};
+use crate::state::{Config, Supply, CONFIG, TOKENS, TOTAL_SUPPLY};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-tokenwrapper";
@@ -144,6 +144,9 @@ pub fn execute(
         ExecuteMsg::SetFeeRecipient { new_recipient } => {
             update_fee_recipient(deps, info, new_recipient)
         }
+
+        // Add a cw20 token address to wrapping list
+        ExecuteMsg::AddCw20TokenAddr { token, nonce } => add_token_addr(deps, info, token, nonce),
 
         // these all come from cw20-base to implement the cw20 standard
         ExecuteMsg::Transfer { recipient, amount } => {
@@ -537,6 +540,45 @@ fn update_fee_recipient(
     Ok(Response::new().add_attributes(vec![
         attr("method", "set_fee_recipient"),
         attr("new_recipient", config.fee_recipient.to_string()),
+    ]))
+}
+
+fn add_token_addr(
+    deps: DepsMut,
+    info: MessageInfo,
+    token: String,
+    nonce: u64,
+) -> Result<Response, ContractError> {
+    let token_addr = deps.api.addr_validate(token.as_str())?;
+    if TOKENS.has(deps.storage, token_addr.clone()) {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Token must not be valid".to_string(),
+        }));
+    }
+
+    // Validate the tx sender.
+    let mut config = CONFIG.load(deps.storage)?;
+    if config.governer != deps.api.addr_validate(info.sender.as_str())? {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // Validate the "nonce" value
+    if nonce != config.proposal_nonce + 1 {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Nonce must increment by 1".to_string(),
+        }));
+    }
+
+    // Add the "token" to wrapping list
+    TOKENS.save(deps.storage, token_addr.clone(), &true)?;
+
+    // Save the "proposal_nonce"
+    config.proposal_nonce = nonce;
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(Response::new().add_attributes(vec![
+        attr("method", "add_token"),
+        attr("token", token_addr.to_string()),
     ]))
 }
 

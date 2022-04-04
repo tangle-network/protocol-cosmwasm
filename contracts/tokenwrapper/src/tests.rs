@@ -547,3 +547,51 @@ fn test_set_new_fee_recipient() {
         ]
     );
 }
+
+#[test]
+fn test_add_token_addr() {
+    let mut deps = mock_dependencies(&[]);
+
+    let info = mock_info("creator", &[]);
+    let instantiate_msg = InstantiateMsg {
+        name: "Webb-WRAP".to_string(),
+        symbol: "WWRP".to_string(),
+        decimals: 6u8,
+        governer: None,
+        fee_recipient: FEE_RECIPIENT.to_string(),
+        fee_percentage: FEE_PERCENTAGE.to_string(),
+        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+        is_native_allowed: 1,
+        wrapping_limit: "5000000".to_string(),
+    };
+
+    // We call ".unwrap()" to ensure succeed
+    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+
+    // Add a new cw20 token addr.
+    let info = mock_info("creator", &[]);
+    let add_token_msg = ExecuteMsg::AddCw20TokenAddr {
+        token: "new_cw20_token".to_string(),
+        nonce: 2,
+    };
+
+    // Failure since the invalid nonce value
+    let err = execute(deps.as_mut(), mock_env(), info, add_token_msg).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "Generic error: Nonce must increment by 1".to_string()
+    );
+
+    // Success
+    let info = mock_info("creator", &[]);
+    let add_token_msg = ExecuteMsg::AddCw20TokenAddr {
+        token: "new_cw20_token".to_string(),
+        nonce: 1,
+    };
+
+    let res = execute(deps.as_mut(), mock_env(), info, add_token_msg).unwrap();
+    assert_eq!(
+        res.attributes,
+        vec![attr("method", "add_token"), attr("token", "new_cw20_token"),]
+    );
+}
