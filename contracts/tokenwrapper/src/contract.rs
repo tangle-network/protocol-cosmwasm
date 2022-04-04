@@ -137,6 +137,9 @@ pub fn execute(
         // Updates the "wrapping_limit"
         ExecuteMsg::UpdateLimit { new_limit } => update_wrapping_limit(deps, info, new_limit),
 
+        // Sets a new "fee_percentage"
+        ExecuteMsg::SetFee { new_fee_perc } => update_fee_perc(deps, info, new_fee_perc),
+
         // these all come from cw20-base to implement the cw20 standard
         ExecuteMsg::Transfer { recipient, amount } => {
             Ok(execute_transfer(deps, env, info, recipient, amount)?)
@@ -468,6 +471,44 @@ fn update_wrapping_limit(
     Ok(Response::new().add_attributes(vec![
         attr("method", "set_wrapping_limit"),
         attr("new_limit", new_wrapping_limit.to_string()),
+    ]))
+}
+
+fn update_fee_perc(
+    deps: DepsMut,
+    info: MessageInfo,
+    new_fee_perc: String,
+) -> Result<Response, ContractError> {
+    let new_fee_perc = match new_fee_perc.parse::<u64>() {
+        Ok(v) => {
+            if v > 100 {
+                return Err(ContractError::Std(StdError::GenericErr {
+                    msg: "Percentage should be in range [0, 100]".to_string(),
+                }));
+            } else {
+                v
+            }
+        }
+        Err(e) => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: e.to_string(),
+            }))
+        }
+    };
+
+    // Validate the tx sender.
+    let mut config = CONFIG.load(deps.storage)?;
+    if config.governer != deps.api.addr_validate(info.sender.as_str())? {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // Save a new "new_fee_perc" state
+    config.fee_percentage = Decimal::percent(new_fee_perc);
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(Response::new().add_attributes(vec![
+        attr("method", "set_fee"),
+        attr("new_fee_perc", config.fee_percentage.to_string()),
     ]))
 }
 
