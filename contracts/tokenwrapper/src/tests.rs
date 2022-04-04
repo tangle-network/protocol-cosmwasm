@@ -1,5 +1,7 @@
-use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-use cosmwasm_std::{attr, coins, from_binary, to_binary, Addr, Coin, Uint128};
+use cosmwasm_std::testing::{
+    mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
+};
+use cosmwasm_std::{attr, coins, from_binary, to_binary, Addr, Coin, OwnedDeps, Uint128};
 use cw20::{BalanceResponse, Cw20ReceiveMsg, TokenInfoResponse};
 
 use protocol_cosmwasm::token_wrapper::{
@@ -9,10 +11,36 @@ use protocol_cosmwasm::token_wrapper::{
 
 use crate::contract::{execute, instantiate, query};
 
+const NAME: &str = "Webb-WRAP";
+const SYMBOL: &str = "WWRP";
+const DECIMALS: u8 = 6;
 const FEE_RECIPIENT: &str = "terra1qca9hs2qk2w29gqduaq9k720k9293qt7q8nszl";
 const FEE_PERCENTAGE: &str = "1";
 const NATIVE_TOKEN_DENOM: &str = "uusd";
 const CW20_TOKEN: &str = "cw20_token";
+const WRAPPING_LIMIT: &str = "5000000";
+const IS_NATIVE_ALLOWED: u32 = 1;
+
+fn init_tokenwrapper(coins: Vec<Coin>) -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
+    let mut deps = mock_dependencies(&coins);
+
+    let info = mock_info("creator", &[]);
+    let instantiate_msg = InstantiateMsg {
+        name: NAME.to_string(),
+        symbol: SYMBOL.to_string(),
+        decimals: DECIMALS,
+        governer: None,
+        fee_recipient: FEE_RECIPIENT.to_string(),
+        fee_percentage: FEE_PERCENTAGE.to_string(),
+        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
+        is_native_allowed: IS_NATIVE_ALLOWED,
+        wrapping_limit: WRAPPING_LIMIT.to_string(),
+    };
+
+    // We call ".unwrap()" to ensure succeed
+    let _ = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+    deps
+}
 
 #[test]
 fn proper_initialization() {
@@ -20,15 +48,15 @@ fn proper_initialization() {
 
     let info = mock_info("creator", &[]);
     let instantiate_msg = InstantiateMsg {
-        name: "Webb-WRAP".to_string(),
-        symbol: "WWRP".to_string(),
-        decimals: 6u8,
+        name: NAME.to_string(),
+        symbol: SYMBOL.to_string(),
+        decimals: DECIMALS,
         governer: None,
         fee_recipient: FEE_RECIPIENT.to_string(),
         fee_percentage: FEE_PERCENTAGE.to_string(),
         native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
-        is_native_allowed: 1,
-        wrapping_limit: "5000000".to_string(),
+        is_native_allowed: IS_NATIVE_ALLOWED,
+        wrapping_limit: WRAPPING_LIMIT.to_string(),
     };
 
     // We call ".unwrap()" to ensure succeed
@@ -38,8 +66,8 @@ fn proper_initialization() {
     let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::TokenInfo {}).unwrap();
     let token_info_response: TokenInfoResponse = from_binary(&query_bin).unwrap();
 
-    assert_eq!(token_info_response.name, "Webb-WRAP".to_string());
-    assert_eq!(token_info_response.symbol, "WWRP".to_string());
+    assert_eq!(token_info_response.name, NAME.to_string());
+    assert_eq!(token_info_response.symbol, SYMBOL.to_string());
     assert_eq!(token_info_response.decimals, 6);
     assert_eq!(token_info_response.total_supply, Uint128::zero());
 
@@ -58,23 +86,7 @@ fn proper_initialization() {
 
 #[test]
 fn test_wrap_native() {
-    let mut deps = mock_dependencies(&[]);
-
-    // Instantiate the tokenwrapper contract.
-    let info = mock_info("creator", &[]);
-    let instantiate_msg = InstantiateMsg {
-        name: "Webb-WRAP".to_string(),
-        symbol: "WWRP".to_string(),
-        decimals: 6u8,
-        governer: None,
-        fee_recipient: FEE_RECIPIENT.to_string(),
-        fee_percentage: FEE_PERCENTAGE.to_string(),
-        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
-        is_native_allowed: 1,
-        wrapping_limit: "5000000".to_string(),
-    };
-
-    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+    let mut deps = init_tokenwrapper([].to_vec());
 
     // Try the wrapping the native token
     let info = mock_info("anyone", &coins(100, "uusd"));
@@ -108,23 +120,8 @@ fn test_wrap_native() {
 
 #[test]
 fn test_unwrap_native() {
-    let mut deps = mock_dependencies(&coins(100_u128, "uusd"));
-
-    // Instantiate the tokenwrapper contract.
-    let info = mock_info("creator", &[]);
-    let instantiate_msg = InstantiateMsg {
-        name: "Webb-WRAP".to_string(),
-        symbol: "WWRP".to_string(),
-        decimals: 6u8,
-        governer: None,
-        fee_recipient: FEE_RECIPIENT.to_string(),
-        fee_percentage: FEE_PERCENTAGE.to_string(),
-        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
-        is_native_allowed: 1,
-        wrapping_limit: "5000000".to_string(),
-    };
-
-    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+    let ctx_coins = coins(100_u128, "uusd");
+    let mut deps = init_tokenwrapper(ctx_coins);
 
     // Try the wrapping the native token
     let info = mock_info("anyone", &coins(100, "uusd"));
@@ -164,26 +161,7 @@ fn test_unwrap_native() {
 
 #[test]
 fn test_wrap_cw20() {
-    let mut deps = crate::mock_querier::mock_dependencies(&[Coin {
-        amount: Uint128::zero(),
-        denom: CW20_TOKEN.to_string(),
-    }]);
-
-    // Instantiate the tokenwrapper contract.
-    let info = mock_info("creator", &[]);
-    let instantiate_msg = InstantiateMsg {
-        name: "Webb-WRAP".to_string(),
-        symbol: "WWRP".to_string(),
-        decimals: 6u8,
-        governer: None,
-        fee_recipient: FEE_RECIPIENT.to_string(),
-        fee_percentage: FEE_PERCENTAGE.to_string(),
-        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
-        is_native_allowed: 1,
-        wrapping_limit: "5000000".to_string(),
-    };
-
-    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+    let mut deps = init_tokenwrapper([].to_vec());
 
     // Add a cw20 address to wrapping list.
     let info = mock_info("creator", &[]);
@@ -227,23 +205,7 @@ fn test_wrap_cw20() {
 
 #[test]
 fn test_unwrap_cw20() {
-    let mut deps = crate::mock_querier::mock_dependencies(&[]);
-
-    // Instantiate the tokenwrapper contract.
-    let info = mock_info("creator", &[]);
-    let instantiate_msg = InstantiateMsg {
-        name: "Webb-WRAP".to_string(),
-        symbol: "WWRP".to_string(),
-        decimals: 6u8,
-        governer: None,
-        fee_recipient: FEE_RECIPIENT.to_string(),
-        fee_percentage: FEE_PERCENTAGE.to_string(),
-        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
-        is_native_allowed: 1,
-        wrapping_limit: "5000000".to_string(),
-    };
-
-    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+    let mut deps = init_tokenwrapper([].to_vec());
 
     // Add a cw20 address to wrapping list.
     let info = mock_info("creator", &[]);
@@ -295,23 +257,7 @@ fn test_unwrap_cw20() {
 
 #[test]
 fn test_query_fee_from_wrap_amt() {
-    let mut deps = crate::mock_querier::mock_dependencies(&[]);
-
-    // Instantiate the tokenwrapper contract.
-    let info = mock_info("creator", &[]);
-    let instantiate_msg = InstantiateMsg {
-        name: "Webb-WRAP".to_string(),
-        symbol: "WWRP".to_string(),
-        decimals: 6u8,
-        governer: None,
-        fee_recipient: FEE_RECIPIENT.to_string(),
-        fee_percentage: FEE_PERCENTAGE.to_string(),
-        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
-        is_native_allowed: 1,
-        wrapping_limit: "5000000".to_string(),
-    };
-
-    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+    let deps = init_tokenwrapper([].to_vec());
 
     // Check the query "query_fee_from_amount"
     let query_bin = query(
@@ -329,23 +275,7 @@ fn test_query_fee_from_wrap_amt() {
 
 #[test]
 fn test_query_amt_to_wrap_from_target_amount() {
-    let mut deps = crate::mock_querier::mock_dependencies(&[]);
-
-    // Instantiate the tokenwrapper contract.
-    let info = mock_info("creator", &[]);
-    let instantiate_msg = InstantiateMsg {
-        name: "Webb-WRAP".to_string(),
-        symbol: "WWRP".to_string(),
-        decimals: 6u8,
-        governer: None,
-        fee_recipient: FEE_RECIPIENT.to_string(),
-        fee_percentage: FEE_PERCENTAGE.to_string(),
-        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
-        is_native_allowed: 1,
-        wrapping_limit: "5000000".to_string(),
-    };
-
-    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+    let deps = init_tokenwrapper([].to_vec());
 
     // Check the query "query_fee_from_amount"
     let query_bin = query(
@@ -363,23 +293,7 @@ fn test_query_amt_to_wrap_from_target_amount() {
 
 #[test]
 fn test_set_governer() {
-    let mut deps = mock_dependencies(&[]);
-
-    let info = mock_info("creator", &[]);
-    let instantiate_msg = InstantiateMsg {
-        name: "Webb-WRAP".to_string(),
-        symbol: "WWRP".to_string(),
-        decimals: 6u8,
-        governer: None,
-        fee_recipient: FEE_RECIPIENT.to_string(),
-        fee_percentage: FEE_PERCENTAGE.to_string(),
-        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
-        is_native_allowed: 1,
-        wrapping_limit: "5000000".to_string(),
-    };
-
-    // We call ".unwrap()" to ensure succeed
-    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+    let mut deps = init_tokenwrapper([].to_vec());
 
     // Check the current governer.
     let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
@@ -404,23 +318,7 @@ fn test_set_governer() {
 
 #[test]
 fn test_set_native_allowed() {
-    let mut deps = mock_dependencies(&[]);
-
-    let info = mock_info("creator", &[]);
-    let instantiate_msg = InstantiateMsg {
-        name: "Webb-WRAP".to_string(),
-        symbol: "WWRP".to_string(),
-        decimals: 6u8,
-        governer: None,
-        fee_recipient: FEE_RECIPIENT.to_string(),
-        fee_percentage: FEE_PERCENTAGE.to_string(),
-        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
-        is_native_allowed: 1,
-        wrapping_limit: "5000000".to_string(),
-    };
-
-    // We call ".unwrap()" to ensure succeed
-    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+    let mut deps = init_tokenwrapper([].to_vec());
 
     // Check the current "is_native_allowed".
     let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
@@ -445,28 +343,12 @@ fn test_set_native_allowed() {
 
 #[test]
 fn test_set_new_wrapping_limit() {
-    let mut deps = mock_dependencies(&[]);
-
-    let info = mock_info("creator", &[]);
-    let instantiate_msg = InstantiateMsg {
-        name: "Webb-WRAP".to_string(),
-        symbol: "WWRP".to_string(),
-        decimals: 6u8,
-        governer: None,
-        fee_recipient: FEE_RECIPIENT.to_string(),
-        fee_percentage: FEE_PERCENTAGE.to_string(),
-        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
-        is_native_allowed: 1,
-        wrapping_limit: "5000000".to_string(),
-    };
-
-    // We call ".unwrap()" to ensure succeed
-    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+    let mut deps = init_tokenwrapper([].to_vec());
 
     // Check the current "wrapping_limit".
     let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
     let config_response: ConfigResponse = from_binary(&query_bin).unwrap();
-    assert_eq!(config_response.wrapping_limit, "5000000".to_string());
+    assert_eq!(config_response.wrapping_limit, WRAPPING_LIMIT.to_string());
 
     // Sets a new "wrapping_limit"
     let info = mock_info("creator", &[]);
@@ -486,23 +368,7 @@ fn test_set_new_wrapping_limit() {
 
 #[test]
 fn test_set_new_fee_perc() {
-    let mut deps = mock_dependencies(&[]);
-
-    let info = mock_info("creator", &[]);
-    let instantiate_msg = InstantiateMsg {
-        name: "Webb-WRAP".to_string(),
-        symbol: "WWRP".to_string(),
-        decimals: 6u8,
-        governer: None,
-        fee_recipient: FEE_RECIPIENT.to_string(),
-        fee_percentage: FEE_PERCENTAGE.to_string(),
-        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
-        is_native_allowed: 1,
-        wrapping_limit: "5000000".to_string(),
-    };
-
-    // We call ".unwrap()" to ensure succeed
-    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+    let mut deps = init_tokenwrapper([].to_vec());
 
     // Check the current "fee_percentage".
     let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
@@ -524,23 +390,7 @@ fn test_set_new_fee_perc() {
 
 #[test]
 fn test_set_new_fee_recipient() {
-    let mut deps = mock_dependencies(&[]);
-
-    let info = mock_info("creator", &[]);
-    let instantiate_msg = InstantiateMsg {
-        name: "Webb-WRAP".to_string(),
-        symbol: "WWRP".to_string(),
-        decimals: 6u8,
-        governer: None,
-        fee_recipient: FEE_RECIPIENT.to_string(),
-        fee_percentage: FEE_PERCENTAGE.to_string(),
-        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
-        is_native_allowed: 1,
-        wrapping_limit: "5000000".to_string(),
-    };
-
-    // We call ".unwrap()" to ensure succeed
-    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+    let mut deps = init_tokenwrapper([].to_vec());
 
     // Check the current "fee_recipient".
     let query_bin = query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap();
@@ -565,23 +415,7 @@ fn test_set_new_fee_recipient() {
 
 #[test]
 fn test_add_token_addr() {
-    let mut deps = mock_dependencies(&[]);
-
-    let info = mock_info("creator", &[]);
-    let instantiate_msg = InstantiateMsg {
-        name: "Webb-WRAP".to_string(),
-        symbol: "WWRP".to_string(),
-        decimals: 6u8,
-        governer: None,
-        fee_recipient: FEE_RECIPIENT.to_string(),
-        fee_percentage: FEE_PERCENTAGE.to_string(),
-        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
-        is_native_allowed: 1,
-        wrapping_limit: "5000000".to_string(),
-    };
-
-    // We call ".unwrap()" to ensure succeed
-    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+    let mut deps = init_tokenwrapper([].to_vec());
 
     // Add a new cw20 token addr.
     let info = mock_info("creator", &[]);
@@ -613,23 +447,7 @@ fn test_add_token_addr() {
 
 #[test]
 fn test_remove_token_addr() {
-    let mut deps = mock_dependencies(&[]);
-
-    let info = mock_info("creator", &[]);
-    let instantiate_msg = InstantiateMsg {
-        name: "Webb-WRAP".to_string(),
-        symbol: "WWRP".to_string(),
-        decimals: 6u8,
-        governer: None,
-        fee_recipient: FEE_RECIPIENT.to_string(),
-        fee_percentage: FEE_PERCENTAGE.to_string(),
-        native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
-        is_native_allowed: 1,
-        wrapping_limit: "5000000".to_string(),
-    };
-
-    // We call ".unwrap()" to ensure succeed
-    let _res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+    let mut deps = init_tokenwrapper([].to_vec());
 
     // Add a new cw20 token addr.
     let info = mock_info("creator", &[]);
