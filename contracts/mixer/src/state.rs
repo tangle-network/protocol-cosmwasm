@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, StdResult, Storage, Uint256};
+use cosmwasm_std::{Addr, StdResult, Storage, Uint128};
 use cw_storage_plus::{Item, Map};
 
 use protocol_cosmwasm::error::ContractError;
@@ -14,22 +14,11 @@ pub const ROOT_HISTORY_SIZE: u32 = 100;
 // Mixer
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Mixer {
-    pub initialized: bool,
-    pub deposit_size: Uint256,
+    pub deposit_size: Uint128,
+    pub cw20_address: Option<Addr>,
+    pub native_token_denom: Option<String>,
     pub merkle_tree: MerkleTree,
-    pub cw20_address: Option<CanonicalAddr>,
 }
-
-pub const MIXER: Item<Mixer> = Item::new("mixer");
-
-// "used nullifier" which stores if the "nullifier" is used or not.
-pub const USED_NULLIFIERS: Map<Vec<u8>, bool> = Map::new("used_nullifers");
-
-// "Poseidon hasher"
-pub const POSEIDON: Item<Poseidon> = Item::new("poseidon");
-
-// "MixerVerifier"
-pub const MIXERVERIFIER: Item<MixerVerifier> = Item::new("mixer_verifier");
 
 // MerkleTree
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -37,28 +26,6 @@ pub struct MerkleTree {
     pub levels: u32,
     pub current_root_index: u32,
     pub next_index: u32,
-}
-
-// MerkleTree "filled_subtrees" Map
-pub const FILLED_SUBTREES: Map<String, [u8; 32]> = Map::new("filled_subtrees");
-
-pub fn save_subtree(store: &mut dyn Storage, k: u32, data: &[u8; 32]) -> StdResult<()> {
-    FILLED_SUBTREES.save(store, k.to_string(), data)
-}
-
-pub fn read_subtree(store: &dyn Storage, k: u32) -> StdResult<[u8; 32]> {
-    FILLED_SUBTREES.load(store, k.to_string())
-}
-
-// MerkleTree Roots Map
-pub const MERKLE_ROOTS: Map<String, [u8; 32]> = Map::new("merkle_roots");
-
-pub fn save_root(store: &mut dyn Storage, k: u32, data: &[u8; 32]) -> StdResult<()> {
-    MERKLE_ROOTS.save(store, k.to_string(), data)
-}
-
-pub fn read_root(store: &dyn Storage, k: u32) -> StdResult<[u8; 32]> {
-    MERKLE_ROOTS.load(store, k.to_string())
 }
 
 impl MerkleTree {
@@ -132,3 +99,27 @@ impl MerkleTree {
         false
     }
 }
+
+pub fn save_subtree(store: &mut dyn Storage, k: u32, data: &[u8; 32]) -> StdResult<()> {
+    FILLED_SUBTREES.save(store, k.to_string(), data)
+}
+
+pub fn read_subtree(store: &dyn Storage, k: u32) -> StdResult<[u8; 32]> {
+    FILLED_SUBTREES.load(store, k.to_string())
+}
+
+pub fn save_root(store: &mut dyn Storage, k: u32, data: &[u8; 32]) -> StdResult<()> {
+    MERKLE_ROOTS.save(store, k.to_string(), data)
+}
+
+pub fn read_root(store: &dyn Storage, k: u32) -> StdResult<[u8; 32]> {
+    MERKLE_ROOTS.load(store, k.to_string())
+}
+
+pub const MIXER: Item<Mixer> = Item::new("mixer");
+pub const POSEIDON: Item<Poseidon> = Item::new("poseidon");
+pub const MIXERVERIFIER: Item<MixerVerifier> = Item::new("mixer_verifier");
+
+pub const MERKLE_ROOTS: Map<String, [u8; 32]> = Map::new("merkle_roots");
+pub const FILLED_SUBTREES: Map<String, [u8; 32]> = Map::new("filled_subtrees");
+pub const USED_NULLIFIERS: Map<Vec<u8>, bool> = Map::new("used_nullifers");
