@@ -5,14 +5,11 @@ use cosmwasm_vm::testing::{
     execute, instantiate, mock_env, mock_info, mock_instance_with_gas_limit, query,
 };
 use cw20::Cw20ReceiveMsg;
-use protocol_cosmwasm::mixer::{
-    Cw20HookMsg, DepositMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg,
-};
+use protocol_cosmwasm::mixer::{Cw20HookMsg, DepositMsg, ExecuteMsg, InstantiateMsg, QueryMsg};
 
 use ark_bn254::Fr;
-use ark_crypto_primitives::CRH as CRHTrait;
+use ark_ff::BigInteger;
 use ark_ff::PrimeField;
-use ark_ff::{BigInteger, Field};
 use ark_std::One;
 use arkworks_native_gadgets::poseidon::{FieldHasher, Poseidon};
 use arkworks_setups::common::setup_params;
@@ -28,17 +25,21 @@ use arkworks_setups::Curve;
 // For the github CI, we copy the wasm file manually & import here.
 static WASM: &[u8] = include_bytes!("./cosmwasm_mixer.wasm");
 
+const MERKLE_TREE_LEVELS: u32 = 30;
+const DEPOSIT_SIZE: &str = "1000000";
+const CW20_ADDRESS: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
+const NATIVE_TOKEN_DENOM: &str = "uusd";
+
 #[test]
 fn integration_test_instantiate_mixer() {
     // "Gas_limit" should be set high manually, since the low value can cause "GasDepletion" error.
     let mut deps = mock_instance_with_gas_limit(WASM, 100_000_000);
 
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
-
     let msg = InstantiateMsg {
-        merkletree_levels: 30,
-        deposit_size: Uint128::from(1_000_000_u128),
-        cw20_address: Some(cw20_address.clone()),
+        merkletree_levels: MERKLE_TREE_LEVELS,
+        deposit_size: DEPOSIT_SIZE.to_string(),
+        cw20_address: Some(CW20_ADDRESS.to_string()),
+        native_token_denom: None,
     };
 
     let info = mock_info("anyone", &[]);
@@ -48,10 +49,6 @@ fn integration_test_instantiate_mixer() {
         response.attributes,
         vec![attr("method", "instantiate"), attr("owner", "anyone"),]
     );
-
-    let query = query(&mut deps, mock_env(), QueryMsg::GetCw20Address {}).unwrap();
-    let info: InfoResponse = from_binary(&query).unwrap();
-    assert_eq!(info.cw20_address, cw20_address);
 }
 
 #[test]
@@ -62,9 +59,10 @@ fn integration_test_mixer_deposit_native_token() {
     let env = mock_env();
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
-        merkletree_levels: 30,
-        deposit_size: Uint128::from(1_000_000_u128),
+        merkletree_levels: MERKLE_TREE_LEVELS,
+        deposit_size: DEPOSIT_SIZE.to_string(),
         cw20_address: None,
+        native_token_denom: Some(NATIVE_TOKEN_DENOM.to_string()),
     };
 
     let _res: Response = instantiate(&mut deps, env, info, instantiate_msg).unwrap();
@@ -77,11 +75,12 @@ fn integration_test_mixer_deposit_native_token() {
     element.copy_from_slice(&res.into_repr().to_bytes_le());
 
     // Try the deposit for success
-    let info = mock_info("depositor", &[Coin::new(1_000_000_u128, "uusd")]);
+    let info = mock_info(
+        "depositor",
+        &[Coin::new(1_000_000_u128, NATIVE_TOKEN_DENOM)],
+    );
     let deposit_msg = ExecuteMsg::Deposit(DepositMsg {
-        from: None,
         commitment: Some(element),
-        value: Uint256::from(0_u128),
     });
 
     let response: Response = execute(&mut deps, mock_env(), info, deposit_msg).unwrap();
@@ -93,17 +92,16 @@ fn integration_test_mixer_deposit_native_token() {
 
 #[test]
 fn integration_test_mixer_deposit_cw20_token() {
-    let cw20_address = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3".to_string();
-
     let mut deps = mock_instance_with_gas_limit(WASM, 200_000_000);
 
     // Initialize the contract
     let env = mock_env();
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
-        merkletree_levels: 30,
-        deposit_size: Uint128::from(1_000_000_u128),
-        cw20_address: Some(cw20_address.clone()),
+        merkletree_levels: MERKLE_TREE_LEVELS,
+        deposit_size: DEPOSIT_SIZE.to_string(),
+        cw20_address: Some(CW20_ADDRESS.to_string()),
+        native_token_denom: None,
     };
 
     let _res: Response = instantiate(&mut deps, env, info, instantiate_msg).unwrap();
@@ -116,9 +114,9 @@ fn integration_test_mixer_deposit_cw20_token() {
     element.copy_from_slice(&res.into_repr().to_bytes_le());
 
     // Try the deposit for success
-    let info = mock_info(cw20_address.as_str(), &[]);
+    let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: cw20_address.clone(),
+        sender: CW20_ADDRESS.to_string(),
         amount: Uint128::from(1_000_000_u128),
         msg: to_binary(&Cw20HookMsg::DepositCw20 {
             commitment: Some(element),
