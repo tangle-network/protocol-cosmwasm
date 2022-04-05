@@ -38,4 +38,25 @@ pub enum ContractError {
     // Returned if a mapping item is not found
     #[error("Mapping item not found")]
     ItemNotFound,
+    // TokenWrapper-related error
+    // For simplicity, it just converts all the cw20_base errors to Std error.
+}
+
+impl From<cw20_base::ContractError> for ContractError {
+    fn from(err: cw20_base::ContractError) -> Self {
+        match err {
+            cw20_base::ContractError::Std(error) => ContractError::Std(error),
+            cw20_base::ContractError::Unauthorized {}
+            | cw20_base::ContractError::CannotSetOwnAccount {}
+            | cw20_base::ContractError::InvalidZeroAmount {}
+            | cw20_base::ContractError::Expired {}
+            | cw20_base::ContractError::NoAllowance {}
+            | cw20_base::ContractError::CannotExceedCap {}
+            | cw20_base::ContractError::LogoTooBig {}
+            | cw20_base::ContractError::InvalidPngHeader {}
+            | cw20_base::ContractError::InvalidXmlPreamble {} => {
+                ContractError::Std(StdError::generic_err(err.to_string()))
+            }
+        }
+    }
 }
