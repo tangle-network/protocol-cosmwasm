@@ -490,27 +490,15 @@ fn test_mixer_should_withdraw_cw20_token() {
     assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
 
     let expected_recipient = RECIPIENT.to_string();
-    let expected_relayer = RELAYER.to_string();
-    let expected_messages: Vec<CosmosMsg> = vec![
-        CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: CW20_ADDRESS.to_string(),
-            funds: [].to_vec(),
-            msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: expected_recipient,
-                amount: Uint128::from(1_000_000_u128),
-            })
-            .unwrap(),
-        }),
-        CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: CW20_ADDRESS.to_string(),
-            funds: [].to_vec(),
-            msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: expected_relayer,
-                amount: Uint128::from(0_u128),
-            })
-            .unwrap(),
-        }),
-    ];
+    let expected_messages: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: CW20_ADDRESS.to_string(),
+        funds: [].to_vec(),
+        msg: to_binary(&Cw20ExecuteMsg::Transfer {
+            recipient: expected_recipient,
+            amount: Uint128::from(1_000_000_u128),
+        })
+        .unwrap(),
+    })];
     assert_eq!(response.messages.len(), expected_messages.len());
 }
 

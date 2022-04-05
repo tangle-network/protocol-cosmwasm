@@ -306,24 +306,27 @@ pub fn withdraw(
                 msg: "Invalid cw20 address".to_string(),
             }));
         }
+        if !amt_to_recipient.is_zero() {
+            msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: cw20_address.clone(),
+                funds: [].to_vec(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: recipient.clone(),
+                    amount: amt_to_recipient,
+                })?,
+            }));
+        }
 
-        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: cw20_address.clone(),
-            funds: [].to_vec(),
-            msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: recipient.clone(),
-                amount: amt_to_recipient,
-            })?,
-        }));
-
-        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: cw20_address.clone(),
-            funds: [].to_vec(),
-            msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: relayer,
-                amount: fee,
-            })?,
-        }));
+        if !fee.is_zero() {
+            msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: cw20_address.clone(),
+                funds: [].to_vec(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: relayer,
+                    amount: fee,
+                })?,
+            }));
+        }
 
         if !refund.is_zero() {
             msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
@@ -337,21 +340,24 @@ pub fn withdraw(
         }
     } else {
         let native_token_denom = mixer.native_token_denom.unwrap();
-        msgs.push(CosmosMsg::Bank(BankMsg::Send {
-            to_address: recipient.clone(),
-            amount: vec![Coin {
-                denom: native_token_denom.clone(),
-                amount: amt_to_recipient,
-            }],
-        }));
-
-        msgs.push(CosmosMsg::Bank(BankMsg::Send {
-            to_address: relayer,
-            amount: vec![Coin {
-                denom: native_token_denom.clone(),
-                amount: fee,
-            }],
-        }));
+        if !amt_to_recipient.is_zero() {
+            msgs.push(CosmosMsg::Bank(BankMsg::Send {
+                to_address: recipient.clone(),
+                amount: vec![Coin {
+                    denom: native_token_denom.clone(),
+                    amount: amt_to_recipient,
+                }],
+            }));
+        }
+        if !fee.is_zero() {
+            msgs.push(CosmosMsg::Bank(BankMsg::Send {
+                to_address: relayer,
+                amount: vec![Coin {
+                    denom: native_token_denom.clone(),
+                    amount: fee,
+                }],
+            }));
+        }
 
         if !refund.is_zero() {
             msgs.push(CosmosMsg::Bank(BankMsg::Send {
