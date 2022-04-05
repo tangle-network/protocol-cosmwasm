@@ -1,4 +1,3 @@
-use cosmwasm_std::Uint256;
 use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -46,11 +45,26 @@ pub struct WithdrawMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    GetCw20Address {},
+    Config {},
+    MerkleTreeInfo {},
+    MerkleRoot { id: u32 },
 }
 
-// We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InfoResponse {
+pub struct ConfigResponse {
+    pub native_token_denom: String,
     pub cw20_address: String,
+    pub deposit_size: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MerkleTreeInfoResponse {
+    pub levels: u32,
+    pub current_root_index: u32,
+    pub next_index: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MerkleRootResponse {
+    pub root: [u8; 32],
 }

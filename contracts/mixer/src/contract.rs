@@ -5,12 +5,12 @@ use cosmwasm_std::{
     MessageInfo, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
-use std::convert::TryFrom;
 
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::mixer::{
-    Cw20HookMsg, DepositMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg, WithdrawMsg,
+    ConfigResponse, Cw20HookMsg, DepositMsg, ExecuteMsg, InstantiateMsg, MerkleRootResponse,
+    MerkleTreeInfoResponse, QueryMsg, WithdrawMsg,
 };
 use protocol_cosmwasm::mixer_verifier::MixerVerifier;
 use protocol_cosmwasm::poseidon::Poseidon;
@@ -20,7 +20,8 @@ use codec::Encode;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use crate::state::{
-    save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, POSEIDON, USED_NULLIFIERS,
+    read_root, save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, POSEIDON,
+    USED_NULLIFIERS,
 };
 
 // version info for migration info
@@ -287,11 +288,11 @@ pub fn withdraw(
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     // Send the funds to "recipient"
-    let amt_to_recipient = match Uint128::try_from(mixer.deposit_size - fee) {
+    let amt_to_recipient = match mixer.deposit_size.checked_sub(fee) {
         Ok(v) => v,
-        Err(_) => {
+        Err(e) => {
             return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Cannot compute amount".to_string(),
+                msg: e.to_string(),
             }))
         }
     };
@@ -319,7 +320,7 @@ pub fn withdraw(
             contract_addr: cw20_address.clone(),
             funds: [].to_vec(),
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: relayer.clone(),
+                recipient: relayer,
                 amount: fee,
             })?,
         }));
@@ -329,7 +330,7 @@ pub fn withdraw(
                 contract_addr: cw20_address,
                 funds: [].to_vec(),
                 msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                    recipient: recipient.clone(),
+                    recipient,
                     amount: refund,
                 })?,
             }));
@@ -391,19 +392,42 @@ pub fn truncate_and_pad(t: &[u8]) -> Vec<u8> {
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCw20Address {} => to_binary(&get_cw20_address(deps)?),
+        QueryMsg::Config {} => to_binary(&get_config(deps)?),
+        QueryMsg::MerkleTreeInfo {} => to_binary(&get_merkle_tree_info(deps)?),
+        QueryMsg::MerkleRoot { id } => to_binary(&get_merkle_root(deps, id)?),
     }
 }
 
-fn get_cw20_address(deps: Deps) -> StdResult<InfoResponse> {
+fn get_config(deps: Deps) -> StdResult<ConfigResponse> {
     let mixer = MIXER.load(deps.storage)?;
-
-    let cw20_address = match mixer.cw20_address {
-        Some(cw20_address) => cw20_address.to_string(),
+    let native_token_denom = match mixer.native_token_denom {
+        Some(v) => v,
         None => "".to_string(),
     };
+    let cw20_address = match mixer.cw20_address {
+        Some(v) => v.to_string(),
+        None => "".to_string(),
+    };
+    let deposit_size = mixer.deposit_size.to_string();
+    Ok(ConfigResponse {
+        native_token_denom,
+        cw20_address,
+        deposit_size,
+    })
+}
 
-    Ok(InfoResponse { cw20_address })
+fn get_merkle_tree_info(deps: Deps) -> StdResult<MerkleTreeInfoResponse> {
+    let mixer = MIXER.load(deps.storage)?;
+    Ok(MerkleTreeInfoResponse {
+        levels: mixer.merkle_tree.levels,
+        current_root_index: mixer.merkle_tree.current_root_index,
+        next_index: mixer.merkle_tree.next_index,
+    })
+}
+
+fn get_merkle_root(deps: Deps, id: u32) -> StdResult<MerkleRootResponse> {
+    let root = read_root(deps.storage, id)?;
+    Ok(MerkleRootResponse { root })
 }
 
 pub fn parse_string_to_uint128(v: String) -> Result<Uint128, StdError> {
