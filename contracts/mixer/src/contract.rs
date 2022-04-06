@@ -226,13 +226,25 @@ pub fn withdraw(
 ) -> Result<Response, ContractError> {
     let recipient = deps.api.addr_validate(msg.recipient.as_str())?.to_string();
     let relayer = deps.api.addr_validate(msg.relayer.as_str())?.to_string();
+    let fee = match parse_string_to_uint128(msg.fee) {
+        Ok(v) => v,
+        Err(e) => return Err(ContractError::Std(e)),
+    };
+    let refund = match parse_string_to_uint128(msg.refund) {
+        Ok(v) => v,
+        Err(e) => return Err(ContractError::Std(e)),
+    };
 
     let mixer = MIXER.load(deps.storage)?;
-    if !info.funds.is_empty() {
-        return Err(ContractError::UnnecessaryFunds {});
-    }
 
     // Validations
+    let sent_funds = info.funds;
+    if !refund.is_zero() && (sent_funds.len() != 1 || sent_funds[0].amount != refund) {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Sent insufficent refund".to_string(),
+        }));
+    }
+
     let merkle_tree = mixer.merkle_tree;
     if !merkle_tree.is_known_root(msg.root, deps.storage) {
         return Err(ContractError::Std(StdError::GenericErr {
@@ -249,14 +261,6 @@ pub fn withdraw(
     // Format the public input bytes
     let recipient_bytes = truncate_and_pad(recipient.as_bytes());
     let relayer_bytes = truncate_and_pad(relayer.as_bytes());
-    let fee = match parse_string_to_uint128(msg.fee) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
-    let refund = match parse_string_to_uint128(msg.refund) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
 
     let mut arbitrary_data_bytes = Vec::new();
     arbitrary_data_bytes.extend_from_slice(&recipient_bytes);
@@ -271,6 +275,7 @@ pub fn withdraw(
     bytes.extend_from_slice(&msg.nullifier_hash);
     bytes.extend_from_slice(&msg.root);
     bytes.extend_from_slice(&arbitrary_input);
+
     // Verify the proof
     let verifier = MIXERVERIFIER.load(deps.storage)?;
     let result = verify(verifier, bytes, msg.proof_bytes)?;
@@ -319,22 +324,11 @@ pub fn withdraw(
 
         if !fee.is_zero() {
             msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: cw20_address.clone(),
+                contract_addr: cw20_address,
                 funds: [].to_vec(),
                 msg: to_binary(&Cw20ExecuteMsg::Transfer {
                     recipient: relayer,
                     amount: fee,
-                })?,
-            }));
-        }
-
-        if !refund.is_zero() {
-            msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: cw20_address,
-                funds: [].to_vec(),
-                msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                    recipient,
-                    amount: refund,
                 })?,
             }));
         }
@@ -353,21 +347,18 @@ pub fn withdraw(
             msgs.push(CosmosMsg::Bank(BankMsg::Send {
                 to_address: relayer,
                 amount: vec![Coin {
-                    denom: native_token_denom.clone(),
+                    denom: native_token_denom,
                     amount: fee,
                 }],
             }));
         }
+    }
 
-        if !refund.is_zero() {
-            msgs.push(CosmosMsg::Bank(BankMsg::Send {
-                to_address: recipient,
-                amount: vec![Coin {
-                    denom: native_token_denom,
-                    amount: refund,
-                }],
-            }));
-        }
+    if !refund.is_zero() {
+        msgs.push(CosmosMsg::Bank(BankMsg::Send {
+            to_address: recipient,
+            amount: sent_funds,
+        }));
     }
 
     Ok(Response::new()
