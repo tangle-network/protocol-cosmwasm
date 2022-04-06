@@ -4,7 +4,7 @@ use std::fs::create_dir_all;
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
 use protocol_cosmwasm::anchor::{
-    Cw20HookMsg, ExecuteMsg, ConfigResponse, InstantiateMsg, QueryMsg, WithdrawMsg,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, WithdrawMsg,
 };
 
 fn main() {
