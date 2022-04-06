@@ -122,7 +122,7 @@ pub fn deposit_native(
     // Validations
     if mixer.native_token_denom.is_none() {
         return Err(ContractError::Std(StdError::GenericErr {
-            msg: "This mixer is for cw20 tokens".to_string(),
+            msg: "This mixer is for native tokens".to_string(),
         }));
     }
     let native_token_denom = mixer.native_token_denom.unwrap();
@@ -170,7 +170,7 @@ pub fn receive_cw20(
     // Validations
     if mixer.cw20_address.is_none() {
         return Err(ContractError::Std(StdError::GenericErr {
-            msg: "This mixer is for native token".to_string(),
+            msg: "This mixer is for cw20 token".to_string(),
         }));
     }
     let cw20_address = mixer.cw20_address.unwrap();
