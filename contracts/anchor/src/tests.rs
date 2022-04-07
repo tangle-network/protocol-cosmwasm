@@ -25,12 +25,12 @@ use crate::test_util::Element;
 const MAX_EDGES: u32 = 2;
 const CHAIN_ID: u64 = 1;
 const LEVELS: u32 = 30;
-const CW20_ADDRESS: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
+const CW20_ADDRESS: &str = "terra1340t6lqq6jxhm8d6gtz0hzz5jzcszvm27urkn2";
 const DEPOSIT_SIZE: u128 = 1_000_000;
 const DEPOSITOR: &str = "depositor";
 
 const RECIPIENT: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
-const RELAYER: &str = "terra1jrj2vh6cstqwk3pg8nkmdf0r9z0n3q3f3jk5xn";
+const RELAYER: &str = "terra17cz29kl6z5wj04ledes9jdmn6pgkelffjxglky";
 const FEE: u128 = 0;
 const REFUND: u128 = 0;
 
@@ -190,8 +190,8 @@ fn test_anchor_fail_when_invalid_merkle_roots() {
     let curve = Curve::Bn254;
     let (pk_bytes, _) = crate::test_util::setup_environment(curve);
     let src_chain_id = compute_chain_id_type(1u64, &COSMOS_CHAIN_TYPE);
-    let recipient_bytes = [2u8; 32];
-    let relayer_bytes = [0u8; 32];
+    let recipient_bytes = RECIPIENT.as_bytes();
+    let relayer_bytes = RELAYER.as_bytes();
     let fee_value = 0;
     let refund_value = 0;
     let commitment_bytes = [0u8; 32];
@@ -444,8 +444,8 @@ fn test_anchor_works() {
 fn test_anchor_fail_when_relayer_is_diff_from_that_in_proof_generation() {
     let curve = Curve::Bn254;
     let (pk_bytes, _) = crate::test_util::setup_environment(curve);
-    let recipient_bytes = [1u8; 32];
-    let relayer_bytes = [2u8; 32];
+    let recipient_bytes = RECIPIENT.as_bytes();
+    let relayer_bytes = RELAYER.as_bytes();
     let fee_value = 0;
     let refund_value = 0;
     let src_chain_id = compute_chain_id_type(1, &COSMOS_CHAIN_TYPE);
@@ -523,8 +523,8 @@ fn test_anchor_fail_when_relayer_is_diff_from_that_in_proof_generation() {
 fn test_anchor_fail_when_fee_submitted_is_changed() {
     let curve = Curve::Bn254;
     let (pk_bytes, _) = crate::test_util::setup_environment(curve);
-    let recipient_bytes = [1u8; 32];
-    let relayer_bytes = [2u8; 32];
+    let recipient_bytes = RECIPIENT.as_bytes();
+    let relayer_bytes = RELAYER.as_bytes();
     let fee_value = 0;
     let refund_value = 0;
     let src_chain_id = compute_chain_id_type(1, &COSMOS_CHAIN_TYPE);
