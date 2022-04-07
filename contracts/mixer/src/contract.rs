@@ -2,15 +2,15 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, from_binary, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Response, StdError, StdResult, Storage, Uint128, Uint256, WasmMsg,
+    MessageInfo, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
-use std::convert::TryFrom;
 
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::mixer::{
-    Cw20HookMsg, DepositMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg, WithdrawMsg,
+    ConfigResponse, Cw20HookMsg, DepositMsg, ExecuteMsg, InstantiateMsg, MerkleRootResponse,
+    MerkleTreeInfoResponse, QueryMsg, WithdrawMsg,
 };
 use protocol_cosmwasm::mixer_verifier::MixerVerifier;
 use protocol_cosmwasm::poseidon::Poseidon;
@@ -20,19 +20,14 @@ use codec::Encode;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use crate::state::{
-    save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, POSEIDON, USED_NULLIFIERS,
+    read_root, save_root, save_subtree, MerkleTree, Mixer, MIXER, MIXERVERIFIER, POSEIDON,
+    USED_NULLIFIERS,
 };
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-mixer";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// User instantiates the "mixer" contract.
-/// IMPORTANT:
-///     Every individual mixer is for either native(UST) token or CW20 token.
-///     For example, when instantiating:
-///         If the "cw20_address" field is empty, then the mixer is for native(UST) token.
-///         If the "cw20_address" field is set,   then the mixer is for CW20 token.
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -47,25 +42,39 @@ pub fn instantiate(
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    // Initialize the merkle tree
+    // Initialize the "Mixer"
     let merkle_tree: MerkleTree = MerkleTree {
         levels: msg.merkletree_levels,
         current_root_index: 0,
         next_index: 0,
     };
-
-    // Check the validity of "cw20_address" if exists.
+    let native_token_denom = msg.native_token_denom;
     let cw20_address = match msg.cw20_address {
-        Some(addr) => Some(deps.api.addr_canonicalize(addr.as_str())?),
+        Some(addr) => Some(deps.api.addr_validate(addr.as_str())?),
         None => None,
     };
+    if native_token_denom.is_some() && cw20_address.is_some() {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Both the native_token_denom and cw20_address cannot be set at the same time"
+                .to_string(),
+        }));
+    }
+    if native_token_denom.is_none() && cw20_address.is_none() {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Both the native_token_denom and cw20_address cannot be empty at the same time"
+                .to_string(),
+        }));
+    }
+    let deposit_size = match parse_string_to_uint128(msg.deposit_size) {
+        Ok(v) => v,
+        Err(e) => return Err(ContractError::Std(e)),
+    };
 
-    // Initialize the Mixer
     let mixer: Mixer = Mixer {
-        initialized: true,
-        deposit_size: Uint256::from(msg.deposit_size.u128()),
-        merkle_tree,
         cw20_address,
+        native_token_denom,
+        deposit_size,
+        merkle_tree,
     };
     MIXER.save(deps.storage, &mixer)?;
 
@@ -94,45 +103,39 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Deposit(msg) => deposit(deps, info, msg),
+        // Deposit the "native" tokens with commitment
+        ExecuteMsg::Deposit(msg) => deposit_native(deps, info, msg),
+        // Withdraw either "native" tokens or cw20 tokens.
         ExecuteMsg::Withdraw(msg) => withdraw(deps, info, msg),
+        // Deposit the cw20 tokens with commitment
         ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
     }
 }
 
-/// User deposits the fund(UST) with its commitment.
-/// It checks the validity of the fund(UST) sent.
-/// It also checks the merkle tree availiability.
-/// It saves the commitment in "merkle tree".
-pub fn deposit(
+pub fn deposit_native(
     deps: DepsMut,
     info: MessageInfo,
     msg: DepositMsg,
 ) -> Result<Response, ContractError> {
     let mixer = MIXER.load(deps.storage)?;
 
-    // Validation 1. Check if the enough UST are sent.
-    let sent_uusd: Vec<Coin> = info
+    // Validations
+    if mixer.native_token_denom.is_none() {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "This mixer is for native tokens".to_string(),
+        }));
+    }
+    let native_token_denom = mixer.native_token_denom.unwrap();
+    let sent_tokens: Vec<Coin> = info
         .funds
         .into_iter()
-        .filter(|x| x.denom == "uusd")
+        .filter(|x| x.denom == native_token_denom)
         .collect();
-    if sent_uusd.is_empty() || Uint256::from(sent_uusd[0].amount) < mixer.deposit_size {
+    if sent_tokens.is_empty() || sent_tokens[0].amount < mixer.deposit_size {
         return Err(ContractError::InsufficientFunds {});
     }
 
-    // Validation 2. Check if the mixer is initialized
-    if !mixer.initialized {
-        return Err(ContractError::NotInitialized {});
-    }
-
-    // Validation 3. Check if the mixer is for native(UST) token.
-    if mixer.cw20_address.is_some() {
-        return Err(ContractError::Std(StdError::generic_err(
-            "This mixer is for CW20 token",
-        )));
-    }
-
+    // Handle the "deposit"
     if let Some(commitment) = msg.commitment {
         let mut merkle_tree = mixer.merkle_tree;
         let poseidon = POSEIDON.load(deps.storage)?;
@@ -140,9 +143,9 @@ pub fn deposit(
         MIXER.save(
             deps.storage,
             &Mixer {
-                initialized: mixer.initialized,
-                deposit_size: mixer.deposit_size,
+                native_token_denom: Some(native_token_denom),
                 cw20_address: mixer.cw20_address,
+                deposit_size: mixer.deposit_size,
                 merkle_tree,
             },
         )?;
@@ -157,37 +160,32 @@ pub fn deposit(
     }
 }
 
-/// User deposits the Cw20 tokens with its commitments.
-/// The deposit starts from executing the hook message
-/// coming from the Cw20 token contract.
-/// It checks the validity of the Cw20 tokens sent.
-/// It also checks the merkle tree availiability.
-/// It saves the commitment in "merkle tree".
 pub fn receive_cw20(
     deps: DepsMut,
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
-    // Only Cw20 token contract can execute this message.
     let mixer: Mixer = MIXER.load(deps.storage)?;
-    let cw20_address = mixer.cw20_address.clone();
-    if cw20_address.is_none() {
-        return Err(ContractError::Std(StdError::generic_err(
-            "This mixer is for native(UST) token",
-        )));
-    }
 
-    if cw20_address.unwrap() != deps.api.addr_canonicalize(info.sender.as_str())? {
+    // Validations
+    if mixer.cw20_address.is_none() {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "This mixer is for cw20 token".to_string(),
+        }));
+    }
+    let cw20_address = mixer.cw20_address.unwrap();
+    if cw20_address != deps.api.addr_validate(info.sender.as_str())? {
         return Err(ContractError::Unauthorized {});
     }
 
-    let tokens_sent = cw20_msg.amount;
+    let sent_cw20_token_amt = cw20_msg.amount;
+    if sent_cw20_token_amt < mixer.deposit_size {
+        return Err(ContractError::InsufficientFunds {});
+    }
+
     match from_binary(&cw20_msg.msg) {
         Ok(Cw20HookMsg::DepositCw20 { commitment }) => {
-            if Uint256::from(tokens_sent) < mixer.deposit_size {
-                return Err(ContractError::InsufficientFunds {});
-            }
-            // Checks the validity of
+            // Handle the "deposit"
             if let Some(commitment) = commitment {
                 let mut merkle_tree = mixer.merkle_tree;
                 let poseidon = POSEIDON.load(deps.storage)?;
@@ -198,9 +196,9 @@ pub fn receive_cw20(
                 MIXER.save(
                     deps.storage,
                     &Mixer {
-                        initialized: mixer.initialized,
+                        native_token_denom: mixer.native_token_denom,
+                        cw20_address: Some(cw20_address),
                         deposit_size: mixer.deposit_size,
-                        cw20_address: mixer.cw20_address,
                         merkle_tree,
                     },
                 )?;
@@ -221,28 +219,33 @@ pub fn receive_cw20(
     }
 }
 
-/// User withdraws the native(UST) token or CW20 token
-/// to "recipient" address by providing the "proof" for
-/// the "commitment".
-/// It verifies the "withdraw" by verifying the "proof"
-/// with "commitment" saved in prior.
-/// If success on verify, then it performs "withdraw" action
-/// which sends the native(UST) token or CW20 token
-/// to "recipient" & "relayer" address.
 pub fn withdraw(
     deps: DepsMut,
     info: MessageInfo,
     msg: WithdrawMsg,
 ) -> Result<Response, ContractError> {
-    // Validation 1. Check if the funds are sent.
-    if !info.funds.is_empty() {
-        return Err(ContractError::UnnecessaryFunds {});
+    let recipient = deps.api.addr_validate(msg.recipient.as_str())?.to_string();
+    let relayer = deps.api.addr_validate(msg.relayer.as_str())?.to_string();
+    let fee = match parse_string_to_uint128(msg.fee) {
+        Ok(v) => v,
+        Err(e) => return Err(ContractError::Std(e)),
+    };
+    let refund = match parse_string_to_uint128(msg.refund) {
+        Ok(v) => v,
+        Err(e) => return Err(ContractError::Std(e)),
+    };
+
+    let mixer = MIXER.load(deps.storage)?;
+
+    // Validations
+    let sent_funds = info.funds;
+    if !refund.is_zero() && (sent_funds.len() != 1 || sent_funds[0].amount != refund) {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Sent insufficent refund".to_string(),
+        }));
     }
 
-    // Validation 2. Check if the root is known to merkle tree
-    let mixer = MIXER.load(deps.storage)?;
     let merkle_tree = mixer.merkle_tree;
-
     if !merkle_tree.is_known_root(msg.root, deps.storage) {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Root is not known".to_string(),
@@ -256,32 +259,14 @@ pub fn withdraw(
     }
 
     // Format the public input bytes
-    let recipient_bytes =
-        truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);
-    let relayer_bytes =
-        truncate_and_pad(&hex::decode(&msg.relayer).map_err(|_| ContractError::DecodeError)?);
-    let fee_u128 = match Uint128::try_from(msg.fee) {
-        Ok(v) => v,
-        Err(_) => {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Cannot convert fee".to_string(),
-            }))
-        }
-    };
-    let refund_u128 = match Uint128::try_from(msg.refund) {
-        Ok(v) => v,
-        Err(_) => {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Cannot convert refund".to_string(),
-            }))
-        }
-    };
+    let recipient_bytes = truncate_and_pad(recipient.as_bytes());
+    let relayer_bytes = truncate_and_pad(relayer.as_bytes());
 
     let mut arbitrary_data_bytes = Vec::new();
     arbitrary_data_bytes.extend_from_slice(&recipient_bytes);
     arbitrary_data_bytes.extend_from_slice(&relayer_bytes);
-    arbitrary_data_bytes.extend_from_slice(&fee_u128.u128().encode());
-    arbitrary_data_bytes.extend_from_slice(&refund_u128.u128().encode());
+    arbitrary_data_bytes.extend_from_slice(&fee.u128().encode());
+    arbitrary_data_bytes.extend_from_slice(&refund.u128().encode());
     let arbitrary_input =
         Keccak256::hash(&arbitrary_data_bytes).map_err(|_| ContractError::HashError)?;
 
@@ -290,6 +275,7 @@ pub fn withdraw(
     bytes.extend_from_slice(&msg.nullifier_hash);
     bytes.extend_from_slice(&msg.root);
     bytes.extend_from_slice(&arbitrary_input);
+
     // Verify the proof
     let verifier = MIXERVERIFIER.load(deps.storage)?;
     let result = verify(verifier, bytes, msg.proof_bytes)?;
@@ -307,103 +293,72 @@ pub fn withdraw(
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     // Send the funds to "recipient"
-    let amt_to_recipient = match Uint128::try_from(mixer.deposit_size - msg.fee) {
+    let amt_to_recipient = match mixer.deposit_size.checked_sub(fee) {
         Ok(v) => v,
-        Err(_) => {
+        Err(e) => {
             return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Cannot compute amount".to_string(),
+                msg: e.to_string(),
             }))
         }
     };
-
-    // Send the funds to "relayer"
-    let amt_to_relayer = match Uint128::try_from(msg.fee) {
-        Ok(v) => v,
-        Err(_) => {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Cannot compute amount".to_string(),
-            }))
-        }
-    };
-
-    // If "refund" field is non-zero, send the funds to "recipient"
-    let mut amt_refund: Uint128 = Uint128::zero();
-    if msg.refund > Uint256::zero() {
-        amt_refund = match Uint128::try_from(msg.refund) {
-            Ok(v) => v,
-            Err(_) => {
-                return Err(ContractError::Std(StdError::GenericErr {
-                    msg: "Cannot compute amount".to_string(),
-                }))
-            }
-        };
-    }
 
     // If the "cw20_address" is set, then send the Cw20 tokens.
     // Otherwise, send the native tokens.
     if let Some(cw20_address) = msg.cw20_address {
         // Validate the "cw20_address".
-        if mixer.cw20_address.unwrap() != deps.api.addr_canonicalize(cw20_address.as_str())? {
-            return Err(ContractError::Std(StdError::generic_err(
-                "Invalid cw20 address",
-            )));
+        if mixer.cw20_address.unwrap() != deps.api.addr_validate(cw20_address.as_str())? {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Invalid cw20 address".to_string(),
+            }));
         }
-        let cw20_token_contract = cw20_address;
-
-        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: cw20_token_contract.clone(),
-            funds: [].to_vec(),
-            msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: msg.recipient.clone(),
-                amount: amt_to_recipient,
-            })?,
-        }));
-
-        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: cw20_token_contract.clone(),
-            funds: [].to_vec(),
-            msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: msg.relayer.clone(),
-                amount: amt_to_relayer,
-            })?,
-        }));
-
-        if msg.refund > Uint256::zero() {
+        if !amt_to_recipient.is_zero() {
             msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: cw20_token_contract,
+                contract_addr: cw20_address.clone(),
                 funds: [].to_vec(),
                 msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                    recipient: msg.recipient.clone(),
-                    amount: amt_refund,
+                    recipient: recipient.clone(),
+                    amount: amt_to_recipient,
+                })?,
+            }));
+        }
+
+        if !fee.is_zero() {
+            msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: cw20_address,
+                funds: [].to_vec(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: relayer,
+                    amount: fee,
                 })?,
             }));
         }
     } else {
-        msgs.push(CosmosMsg::Bank(BankMsg::Send {
-            to_address: msg.recipient.clone(),
-            amount: vec![Coin {
-                denom: "uusd".to_string(),
-                amount: amt_to_recipient,
-            }],
-        }));
-
-        msgs.push(CosmosMsg::Bank(BankMsg::Send {
-            to_address: msg.relayer,
-            amount: vec![Coin {
-                denom: "uusd".to_string(),
-                amount: amt_to_relayer,
-            }],
-        }));
-
-        if msg.refund > Uint256::zero() {
+        let native_token_denom = mixer.native_token_denom.unwrap();
+        if !amt_to_recipient.is_zero() {
             msgs.push(CosmosMsg::Bank(BankMsg::Send {
-                to_address: msg.recipient,
+                to_address: recipient.clone(),
                 amount: vec![Coin {
-                    denom: "uusd".to_string(),
-                    amount: amt_refund,
+                    denom: native_token_denom.clone(),
+                    amount: amt_to_recipient,
                 }],
             }));
         }
+        if !fee.is_zero() {
+            msgs.push(CosmosMsg::Bank(BankMsg::Send {
+                to_address: relayer,
+                amount: vec![Coin {
+                    denom: native_token_denom,
+                    amount: fee,
+                }],
+            }));
+        }
+    }
+
+    if !refund.is_zero() {
+        msgs.push(CosmosMsg::Bank(BankMsg::Send {
+            to_address: recipient,
+            amount: sent_funds,
+        }));
     }
 
     Ok(Response::new()
@@ -434,17 +389,48 @@ pub fn truncate_and_pad(t: &[u8]) -> Vec<u8> {
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCw20Address {} => to_binary(&get_cw20_address(deps)?),
+        QueryMsg::Config {} => to_binary(&get_config(deps)?),
+        QueryMsg::MerkleTreeInfo {} => to_binary(&get_merkle_tree_info(deps)?),
+        QueryMsg::MerkleRoot { id } => to_binary(&get_merkle_root(deps, id)?),
     }
 }
 
-fn get_cw20_address(deps: Deps) -> StdResult<InfoResponse> {
+fn get_config(deps: Deps) -> StdResult<ConfigResponse> {
     let mixer = MIXER.load(deps.storage)?;
-
-    let cw20_address = match mixer.cw20_address {
-        Some(cw20_address) => deps.api.addr_humanize(&cw20_address)?.to_string(),
+    let native_token_denom = match mixer.native_token_denom {
+        Some(v) => v,
         None => "".to_string(),
     };
+    let cw20_address = match mixer.cw20_address {
+        Some(v) => v.to_string(),
+        None => "".to_string(),
+    };
+    let deposit_size = mixer.deposit_size.to_string();
+    Ok(ConfigResponse {
+        native_token_denom,
+        cw20_address,
+        deposit_size,
+    })
+}
 
-    Ok(InfoResponse { cw20_address })
+fn get_merkle_tree_info(deps: Deps) -> StdResult<MerkleTreeInfoResponse> {
+    let mixer = MIXER.load(deps.storage)?;
+    Ok(MerkleTreeInfoResponse {
+        levels: mixer.merkle_tree.levels,
+        current_root_index: mixer.merkle_tree.current_root_index,
+        next_index: mixer.merkle_tree.next_index,
+    })
+}
+
+fn get_merkle_root(deps: Deps, id: u32) -> StdResult<MerkleRootResponse> {
+    let root = read_root(deps.storage, id)?;
+    Ok(MerkleRootResponse { root })
+}
+
+pub fn parse_string_to_uint128(v: String) -> Result<Uint128, StdError> {
+    let res = match v.parse::<u128>() {
+        Ok(v) => Uint128::from(v),
+        Err(e) => return Err(StdError::GenericErr { msg: e.to_string() }),
+    };
+    Ok(res)
 }
