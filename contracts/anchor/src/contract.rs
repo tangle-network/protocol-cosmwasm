@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult, Storage, Uint128, WasmMsg,
+    attr, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
+    Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 
@@ -171,12 +171,23 @@ pub fn withdraw(
     info: MessageInfo,
     msg: WithdrawMsg,
 ) -> Result<Response, ContractError> {
-    if !info.funds.is_empty() {
-        return Err(ContractError::UnnecessaryFunds {});
-    }
-
     let recipient = msg.recipient;
     let relayer = msg.relayer;
+    let fee = match parse_string_to_uint128(msg.fee) {
+        Ok(v) => v,
+        Err(e) => return Err(ContractError::Std(e)),
+    };
+    let refund = match parse_string_to_uint128(msg.refund) {
+        Ok(v) => v,
+        Err(e) => return Err(ContractError::Std(e)),
+    };
+    let sent_funds = info.funds;
+    if !refund.is_zero() && (sent_funds.len() != 1 || sent_funds[0].amount != refund) {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Sent insufficent refund".to_string(),
+        }));
+    }
+
     let anchor = ANCHOR.load(deps.storage)?;
 
     // Validation 1. Check if the root is known to merkle tree.
@@ -202,6 +213,7 @@ pub fn withdraw(
         }));
     }
 
+    //
     let element_encoder = |v: &[u8]| {
         let mut output = [0u8; 32];
         output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
@@ -213,14 +225,6 @@ pub fn withdraw(
         element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
     let recipient_bytes = truncate_and_pad(recipient.as_bytes());
     let relayer_bytes = truncate_and_pad(relayer.as_bytes());
-    let fee = match parse_string_to_uint128(msg.fee) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
-    let refund = match parse_string_to_uint128(msg.refund) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
 
     let mut arbitrary_data_bytes = Vec::new();
     arbitrary_data_bytes.extend_from_slice(&recipient_bytes);
@@ -288,7 +292,7 @@ pub fn withdraw(
     // Send the funds to "relayer"
     if !fee.is_zero() {
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: cw20_address.clone(),
+            contract_addr: cw20_address,
             funds: [].to_vec(),
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: relayer,
@@ -299,13 +303,9 @@ pub fn withdraw(
 
     // If "refund" field is non-zero, send the funds to "recipient"
     if !refund.is_zero() {
-        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: cw20_address,
-            funds: [].to_vec(),
-            msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient,
-                amount: refund,
-            })?,
+        msgs.push(CosmosMsg::Bank(BankMsg::Send {
+            to_address: recipient,
+            amount: sent_funds,
         }));
     }
 
