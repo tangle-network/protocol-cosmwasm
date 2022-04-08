@@ -1,0 +1,20 @@
+{
+  "name": "protocol-cosmwasm-launcher",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "test": "ts-node ./src/index.ts",
+    "test:setup-mixer": "npm run test --mode=testnet_setup_mixer",
+    "test:test-mixer": "npm run test --mode=testnet_test_mixer",
+    "test:setup-anchor": "npm run test --mode=testnet_setup_anchor",
+    "test:test-anchor": "npm run test --mode=testnet_test_anchor"
+  },
+  "dependencies": {
+    "@terra-money/terra.js": "^2.0.14",
+    "chalk": "4.1.2",
+    "fs": "^0.0.1-security",
+    "ts-node": "^10.4.0",
+    "typescript": "^4.4.4"
+  }
+}
