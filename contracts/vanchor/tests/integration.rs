@@ -23,9 +23,6 @@ const MIN_WITHDRAW_AMT: u128 = 0;
 const MAX_EXT_AMT: u128 = 20;
 const MAX_FEE: u128 = 10;
 const CW20_ADDRESS: &str = "terra1340t6lqq6jxhm8d6gtz0hzz5jzcszvm27urkn2";
-const TRANSACTOR: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
-const RECIPIENT: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
-const RELAYER: &str = "terra1jrj2vh6cstqwk3pg8nkmdf0r9z0n3q3f3jk5xn";
 
 #[test]
 fn integration_test_instantiate_mixer() {

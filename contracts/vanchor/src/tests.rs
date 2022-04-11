@@ -1,24 +1,28 @@
 use ark_ff::BigInteger;
 use ark_ff::PrimeField;
 use arkworks_setups::Curve;
-use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+use cosmwasm_std::testing::{
+    mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
+};
+use cosmwasm_std::OwnedDeps;
 use cosmwasm_std::{attr, to_binary, Uint128};
 use cw20::Cw20ReceiveMsg;
 use sp_core::hashing::keccak_256;
 
 use crate::contract::{compute_chain_id_type, execute, instantiate};
-use protocol_cosmwasm::vanchor::{
-    Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, UpdateConfigMsg,
-};
+use protocol_cosmwasm::vanchor::{Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, UpdateConfigMsg};
 use protocol_cosmwasm::zeroes::zeroes;
 
-const CHAIN_ID: u64 = 1;
+const CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
+const TEST_CHAIN_ID: u64 = 1;
+
 const MAX_EDGES: u32 = 2;
 const LEVELS: u32 = 30;
-const MAX_DEPOSIT_AMT: u128 = 40;
+const MAX_DEPOSIT_AMT: u128 = 400;
 const MIN_WITHDRAW_AMT: u128 = 0;
-const MAX_EXT_AMT: u128 = 20;
-const MAX_FEE: u128 = 10;
+const MAX_EXT_AMT: u128 = 200;
+const MAX_FEE: u128 = 100;
+
 const CW20_ADDRESS: &str = "terra1340t6lqq6jxhm8d6gtz0hzz5jzcszvm27urkn2";
 const TRANSACTOR: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
 const RECIPIENT: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
@@ -30,12 +34,50 @@ fn element_encoder(v: &[u8]) -> [u8; 32] {
     output
 }
 
+fn create_vanchor() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
+    let mut deps = mock_dependencies(&[]);
+
+    let msg = InstantiateMsg {
+        chain_id: TEST_CHAIN_ID,
+        max_edges: MAX_EDGES,
+        levels: LEVELS,
+        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
+        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
+        max_ext_amt: Uint128::from(MAX_EXT_AMT),
+        max_fee: Uint128::from(MAX_FEE),
+        cw20_address: CW20_ADDRESS.to_string(),
+    };
+    let info = mock_info("creator", &[]);
+
+    // we can just call .unwrap() to assert this was a success
+    let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    deps
+}
+
+fn hash_ext_data(ext_data: ExtData, ext_amount: i128, fee: u128) -> [u8; 32] {
+    let mut ext_data_args = Vec::new();
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
+    let fee_bytes = element_encoder(&fee.to_le_bytes());
+    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
+    ext_data_args.extend_from_slice(&recipient_bytes);
+    ext_data_args.extend_from_slice(&relayer_bytes);
+    ext_data_args.extend_from_slice(&ext_amt_bytes);
+    ext_data_args.extend_from_slice(&fee_bytes);
+    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
+    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
+
+    keccak_256(&ext_data_args)
+}
+
+
 #[test]
 fn test_vanchor_proper_initialization() {
     let mut deps = mock_dependencies(&[]);
 
     let msg = InstantiateMsg {
-        chain_id: CHAIN_ID,
+        chain_id: TEST_CHAIN_ID,
         max_edges: MAX_EDGES,
         levels: LEVELS,
         max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
@@ -53,22 +95,7 @@ fn test_vanchor_proper_initialization() {
 
 #[test]
 fn test_vanchor_update_config() {
-    let mut deps = mock_dependencies(&[]);
-
-    let msg = InstantiateMsg {
-        chain_id: CHAIN_ID,
-        max_edges: MAX_EDGES,
-        levels: LEVELS,
-        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
-        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
-        max_ext_amt: Uint128::from(MAX_EXT_AMT),
-        max_fee: Uint128::from(MAX_FEE),
-        cw20_address: CW20_ADDRESS.to_string(),
-    };
-    let info = mock_info("creator", &[]);
-
-    // we can just call .unwrap() to assert this was a success
-    let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let mut deps = create_vanchor();
 
     // Fail to update the config with "unauthorized" error.
     let update_config_msg = UpdateConfigMsg {
@@ -109,26 +136,10 @@ fn test_vanchor_update_config() {
 #[test]
 fn test_vanchor_should_complete_2x2_transaction_with_deposit_cw20() {
     // Instantiate the "vanchor" contract.
-    let mut deps = mock_dependencies(&[]);
-
-    let msg = InstantiateMsg {
-        chain_id: CHAIN_ID,
-        max_edges: MAX_EDGES,
-        levels: LEVELS,
-        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
-        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
-        max_ext_amt: Uint128::from(MAX_EXT_AMT),
-        max_fee: Uint128::from(MAX_FEE),
-        cw20_address: CW20_ADDRESS.to_string(),
-    };
-    let info = mock_info("creator", &[]);
-
-    // we can just call .unwrap() to assert this was a success
-    let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let mut deps = create_vanchor();
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_2_2(Curve::Bn254);
-    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 10_i128;
     let fee = 0_u128;
 
@@ -159,19 +170,8 @@ fn test_vanchor_should_complete_2x2_transaction_with_deposit_cw20() {
         encrypted_output2: element_encoder(&output2),
     };
 
-    let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
-    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
-    ext_data_args.extend_from_slice(&recipient_bytes);
-    ext_data_args.extend_from_slice(&relayer_bytes);
-    ext_data_args.extend_from_slice(&ext_amt_bytes);
-    ext_data_args.extend_from_slice(&fee_bytes);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
 
-    let ext_data_hash = keccak_256(&ext_data_args);
     let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_2_2(
         public_amount,
@@ -203,7 +203,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_deposit_cw20() {
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: hex::encode(transactor_bytes),
+        sender: TRANSACTOR.to_string(),
         amount: Uint128::from(10_u128),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
@@ -227,26 +227,10 @@ fn test_vanchor_should_complete_2x2_transaction_with_deposit_cw20() {
 #[test]
 fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
     // Instantiate the "vanchor" contract.
-    let mut deps = mock_dependencies(&[]);
-
-    let msg = InstantiateMsg {
-        chain_id: CHAIN_ID,
-        max_edges: MAX_EDGES,
-        levels: LEVELS,
-        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
-        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
-        max_ext_amt: Uint128::from(MAX_EXT_AMT),
-        max_fee: Uint128::from(MAX_FEE),
-        cw20_address: CW20_ADDRESS.to_string(),
-    };
-    let info = mock_info("creator", &[]);
-
-    // we can just call .unwrap() to assert this was a success
-    let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let mut deps = create_vanchor();
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_2_2(Curve::Bn254);
-    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 10_i128;
     let fee = 0_u128;
 
@@ -277,19 +261,8 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
         encrypted_output2: element_encoder(&output2),
     };
 
-    let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
-    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
-    ext_data_args.extend_from_slice(&recipient_bytes);
-    ext_data_args.extend_from_slice(&relayer_bytes);
-    ext_data_args.extend_from_slice(&ext_amt_bytes);
-    ext_data_args.extend_from_slice(&fee_bytes);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
 
-    let ext_data_hash = keccak_256(&ext_data_args);
     let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_2_2(
         public_amount,
@@ -321,7 +294,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: hex::encode(transactor_bytes),
+        sender: TRANSACTOR.to_string(),
         amount: Uint128::from(10_u128),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
@@ -341,8 +314,8 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
 
     let public_amount = -7_i128;
 
-    let chain_id = compute_chain_id_type(CHAIN_ID, &chain_type);
-    let out_chain_ids = [CHAIN_ID; 2];
+    let chain_id = compute_chain_id_type(TEST_CHAIN_ID, &CHAIN_TYPE);
+    let out_chain_ids = [TEST_CHAIN_ID; 2];
     // After withdrawing -7
     let out_amounts = [1, 2];
 
@@ -361,19 +334,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
         encrypted_output2: element_encoder(&output2),
     };
 
-    let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
-    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
-    ext_data_args.extend_from_slice(&recipient_bytes);
-    ext_data_args.extend_from_slice(&relayer_bytes);
-    ext_data_args.extend_from_slice(&ext_amt_bytes);
-    ext_data_args.extend_from_slice(&fee_bytes);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
-
-    let ext_data_hash = keccak_256(&ext_data_args);
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
 
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_2_2(
         public_amount,
@@ -406,7 +367,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
     let withdraw_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: hex::encode(transactor_bytes),
+        sender: TRANSACTOR.to_string(),
         amount: Uint128::zero(),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
@@ -431,26 +392,10 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
 #[test]
 fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
     // Instantiate the "vanchor" contract.
-    let mut deps = mock_dependencies(&[]);
-
-    let msg = InstantiateMsg {
-        chain_id: CHAIN_ID,
-        max_edges: MAX_EDGES,
-        levels: LEVELS,
-        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
-        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
-        max_ext_amt: Uint128::from(MAX_EXT_AMT),
-        max_fee: Uint128::from(MAX_FEE),
-        cw20_address: CW20_ADDRESS.to_string(),
-    };
-    let info = mock_info("creator", &[]);
-
-    // we can just call .unwrap() to assert this was a success
-    let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let mut deps = create_vanchor();
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_2_2(Curve::Bn254);
-    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 10_i128;
     let fee = 0_u128;
 
@@ -481,19 +426,8 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
         encrypted_output2: element_encoder(&output2),
     };
 
-    let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
-    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
-    ext_data_args.extend_from_slice(&recipient_bytes);
-    ext_data_args.extend_from_slice(&relayer_bytes);
-    ext_data_args.extend_from_slice(&ext_amt_bytes);
-    ext_data_args.extend_from_slice(&fee_bytes);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
 
-    let ext_data_hash = keccak_256(&ext_data_args);
     let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_2_2(
         public_amount,
@@ -525,7 +459,7 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: hex::encode(transactor_bytes),
+        sender: TRANSACTOR.to_string(),
         amount: Uint128::from(10_u128),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
@@ -545,8 +479,8 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
 
     let public_amount = -7_i128;
 
-    let chain_id = compute_chain_id_type(CHAIN_ID, &chain_type);
-    let out_chain_ids = [CHAIN_ID; 2];
+    let chain_id = compute_chain_id_type(TEST_CHAIN_ID, &CHAIN_TYPE);
+    let out_chain_ids = [TEST_CHAIN_ID; 2];
     // After withdrawing -7
     let out_amounts = [1, 2];
 
@@ -565,19 +499,7 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
         encrypted_output2: element_encoder(&output2),
     };
 
-    let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
-    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
-    ext_data_args.extend_from_slice(&recipient_bytes);
-    ext_data_args.extend_from_slice(&relayer_bytes);
-    ext_data_args.extend_from_slice(&ext_amt_bytes);
-    ext_data_args.extend_from_slice(&fee_bytes);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
-
-    let ext_data_hash = keccak_256(&ext_data_args);
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
 
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_2_2(
         public_amount,
@@ -620,7 +542,7 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
     // Should fail with "invalid ext data".
     let info = mock_info(CW20_ADDRESS, &[]);
     let withdraw_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: hex::encode(transactor_bytes),
+        sender: TRANSACTOR.to_string(),
         amount: Uint128::zero(),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
@@ -639,26 +561,10 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
 #[test]
 fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
     // Instantiate the "vanchor" contract.
-    let mut deps = mock_dependencies(&[]);
-
-    let msg = InstantiateMsg {
-        chain_id: CHAIN_ID,
-        max_edges: MAX_EDGES,
-        levels: LEVELS,
-        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
-        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
-        max_ext_amt: Uint128::from(MAX_EXT_AMT),
-        max_fee: Uint128::from(MAX_FEE),
-        cw20_address: CW20_ADDRESS.to_string(),
-    };
-    let info = mock_info("creator", &[]);
-
-    // we can just call .unwrap() to assert this was a success
-    let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let mut deps = create_vanchor();
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_2_2(Curve::Bn254);
-    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 10_i128;
     let fee = 0_u128;
 
@@ -689,19 +595,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
         encrypted_output2: element_encoder(&output2),
     };
 
-    let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
-    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
-    ext_data_args.extend_from_slice(&recipient_bytes);
-    ext_data_args.extend_from_slice(&relayer_bytes);
-    ext_data_args.extend_from_slice(&ext_amt_bytes);
-    ext_data_args.extend_from_slice(&fee_bytes);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
 
-    let ext_data_hash = keccak_256(&ext_data_args);
     let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_2_2(
         public_amount,
@@ -733,7 +628,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: hex::encode(transactor_bytes),
+        sender: TRANSACTOR.to_string(),
         amount: Uint128::from(10_u128),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
@@ -753,8 +648,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
 
     let public_amount = -7_i128;
 
-    let chain_id = compute_chain_id_type(CHAIN_ID, &chain_type);
-    let out_chain_ids = [CHAIN_ID; 2];
+    let chain_id = compute_chain_id_type(TEST_CHAIN_ID, &CHAIN_TYPE);
+    let out_chain_ids = [TEST_CHAIN_ID; 2];
     // After withdrawing -7
     let out_amounts = [100, 200];
 
@@ -773,19 +668,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
         encrypted_output2: element_encoder(&output2),
     };
 
-    let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
-    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
-    ext_data_args.extend_from_slice(&recipient_bytes);
-    ext_data_args.extend_from_slice(&relayer_bytes);
-    ext_data_args.extend_from_slice(&ext_amt_bytes);
-    ext_data_args.extend_from_slice(&fee_bytes);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
-
-    let ext_data_hash = keccak_256(&ext_data_args);
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
 
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_2_2(
         public_amount,
@@ -818,7 +701,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
     // Should fail with "Invalid ext amount".
     let info = mock_info(CW20_ADDRESS, &[]);
     let withdraw_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: hex::encode(transactor_bytes),
+        sender: TRANSACTOR.to_string(),
         amount: Uint128::zero(),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
@@ -837,26 +720,10 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
 #[test]
 fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
     // Instantiate the "vanchor" contract.
-    let mut deps = mock_dependencies(&[]);
-
-    let msg = InstantiateMsg {
-        chain_id: CHAIN_ID,
-        max_edges: MAX_EDGES,
-        levels: LEVELS,
-        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
-        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
-        max_ext_amt: Uint128::from(MAX_EXT_AMT),
-        max_fee: Uint128::from(MAX_FEE),
-        cw20_address: CW20_ADDRESS.to_string(),
-    };
-    let info = mock_info("creator", &[]);
-
-    // we can just call .unwrap() to assert this was a success
-    let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let mut deps = create_vanchor();
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_2_2(Curve::Bn254);
-    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 10_i128;
     let fee = 0_u128;
 
@@ -887,19 +754,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
         encrypted_output2: element_encoder(&output2),
     };
 
-    let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
-    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
-    ext_data_args.extend_from_slice(&recipient_bytes);
-    ext_data_args.extend_from_slice(&relayer_bytes);
-    ext_data_args.extend_from_slice(&ext_amt_bytes);
-    ext_data_args.extend_from_slice(&fee_bytes);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
 
-    let ext_data_hash = keccak_256(&ext_data_args);
     let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_2_2(
         public_amount,
@@ -931,7 +787,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: hex::encode(transactor_bytes),
+        sender: TRANSACTOR.to_string(),
         amount: Uint128::from(10_u128),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
@@ -951,8 +807,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
 
     let public_amount = -7_i128;
 
-    let chain_id = compute_chain_id_type(CHAIN_ID, &chain_type);
-    let out_chain_ids = [CHAIN_ID; 2];
+    let chain_id = compute_chain_id_type(TEST_CHAIN_ID, &CHAIN_TYPE);
+    let out_chain_ids = [TEST_CHAIN_ID; 2];
     // Too small out amounts
     let out_amounts = [1, 0];
 
@@ -971,19 +827,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
         encrypted_output2: element_encoder(&output2),
     };
 
-    let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
-    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
-    ext_data_args.extend_from_slice(&recipient_bytes);
-    ext_data_args.extend_from_slice(&relayer_bytes);
-    ext_data_args.extend_from_slice(&ext_amt_bytes);
-    ext_data_args.extend_from_slice(&fee_bytes);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
-
-    let ext_data_hash = keccak_256(&ext_data_args);
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
 
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_2_2(
         public_amount,
@@ -1016,7 +860,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
     // Should fail with "Invalid ext amount".
     let info = mock_info(CW20_ADDRESS, &[]);
     let withdraw_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: hex::encode(transactor_bytes),
+        sender: TRANSACTOR.to_string(),
         amount: Uint128::zero(),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
@@ -1035,26 +879,10 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
 #[test]
 fn test_vanchor_should_not_be_able_to_double_spend() {
     // Instantiate the "vanchor" contract.
-    let mut deps = mock_dependencies(&[]);
-
-    let msg = InstantiateMsg {
-        chain_id: CHAIN_ID,
-        max_edges: MAX_EDGES,
-        levels: LEVELS,
-        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
-        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
-        max_ext_amt: Uint128::from(MAX_EXT_AMT),
-        max_fee: Uint128::from(MAX_FEE),
-        cw20_address: CW20_ADDRESS.to_string(),
-    };
-    let info = mock_info("creator", &[]);
-
-    // we can just call .unwrap() to assert this was a success
-    let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let mut deps = create_vanchor();
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_2_2(Curve::Bn254);
-    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 10_i128;
     let fee = 0_u128;
 
@@ -1085,19 +913,8 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
         encrypted_output2: element_encoder(&output2),
     };
 
-    let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
-    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
-    ext_data_args.extend_from_slice(&recipient_bytes);
-    ext_data_args.extend_from_slice(&relayer_bytes);
-    ext_data_args.extend_from_slice(&ext_amt_bytes);
-    ext_data_args.extend_from_slice(&fee_bytes);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
 
-    let ext_data_hash = keccak_256(&ext_data_args);
     let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_2_2(
         public_amount,
@@ -1129,7 +946,7 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: hex::encode(transactor_bytes),
+        sender: TRANSACTOR.to_string(),
         amount: Uint128::from(10_u128),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
@@ -1149,8 +966,8 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
 
     let public_amount = -7_i128;
 
-    let chain_id = compute_chain_id_type(CHAIN_ID, &chain_type);
-    let out_chain_ids = [CHAIN_ID; 2];
+    let chain_id = compute_chain_id_type(TEST_CHAIN_ID, &CHAIN_TYPE);
+    let out_chain_ids = [TEST_CHAIN_ID; 2];
     // After withdraw -7
     let out_amounts = [1, 2];
 
@@ -1169,19 +986,7 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
         encrypted_output2: element_encoder(&output2),
     };
 
-    let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
-    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
-    ext_data_args.extend_from_slice(&recipient_bytes);
-    ext_data_args.extend_from_slice(&relayer_bytes);
-    ext_data_args.extend_from_slice(&ext_amt_bytes);
-    ext_data_args.extend_from_slice(&fee_bytes);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
-
-    let ext_data_hash = keccak_256(&ext_data_args);
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
 
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_2_2(
         public_amount,
@@ -1214,7 +1019,7 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
     // Should succeed first, & fail second attempt.
     let info = mock_info(CW20_ADDRESS, &[]);
     let withdraw_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: hex::encode(transactor_bytes),
+        sender: TRANSACTOR.to_string(),
         amount: Uint128::zero(),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
@@ -1243,33 +1048,16 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
 #[test]
 fn test_vanchor_should_complete_16x2_transaction_with_deposit_cw20() {
     // Instantiate the "vanchor" contract.
-    let mut deps = mock_dependencies(&[]);
-
-    let msg = InstantiateMsg {
-        chain_id: CHAIN_ID,
-        max_edges: MAX_EDGES,
-        levels: LEVELS,
-        max_deposit_amt: Uint128::from(200_u128),
-        min_withdraw_amt: Uint128::from(0_u128),
-        max_ext_amt: Uint128::from(200_u128),
-        max_fee: Uint128::from(50_u128),
-        cw20_address: CW20_ADDRESS.to_string(),
-    };
-    let info = mock_info("creator", &[]);
-
-    // we can just call .unwrap() to assert this was a success
-    let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let mut deps = create_vanchor();
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_16_2(Curve::Bn254);
-    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 160_i128;
     let fee = 0_u128;
 
     let public_amount = 160_i128;
 
-    let chain_type = [4, 0];
-    let chain_id = compute_chain_id_type(1, &chain_type);
+    let chain_id = compute_chain_id_type(1, &CHAIN_TYPE);
     let in_chain_ids = [chain_id; 16];
     let in_amounts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     let in_indices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
@@ -1294,19 +1082,8 @@ fn test_vanchor_should_complete_16x2_transaction_with_deposit_cw20() {
         encrypted_output2: element_encoder(&output2),
     };
 
-    let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
-    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
-    ext_data_args.extend_from_slice(&recipient_bytes);
-    ext_data_args.extend_from_slice(&relayer_bytes);
-    ext_data_args.extend_from_slice(&ext_amt_bytes);
-    ext_data_args.extend_from_slice(&fee_bytes);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
 
-    let ext_data_hash = keccak_256(&ext_data_args);
     let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_16_2(
         public_amount,
@@ -1338,7 +1115,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_deposit_cw20() {
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: hex::encode(transactor_bytes),
+        sender: TRANSACTOR.to_string(),
         amount: Uint128::from(160_u128),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
@@ -1362,33 +1139,16 @@ fn test_vanchor_should_complete_16x2_transaction_with_deposit_cw20() {
 #[test]
 fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
     // Instantiate the "vanchor" contract.
-    let mut deps = mock_dependencies(&[]);
-
-    let msg = InstantiateMsg {
-        chain_id: CHAIN_ID,
-        max_edges: MAX_EDGES,
-        levels: LEVELS,
-        max_deposit_amt: Uint128::from(200_u128),
-        min_withdraw_amt: Uint128::from(0_u128),
-        max_ext_amt: Uint128::from(200_u128),
-        max_fee: Uint128::from(50_u128),
-        cw20_address: CW20_ADDRESS.to_string(),
-    };
-    let info = mock_info("creator", &[]);
-
-    // we can just call .unwrap() to assert this was a success
-    let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+    let mut deps = create_vanchor();
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_16_2(Curve::Bn254);
-    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 160_i128;
     let fee = 0_u128;
 
     let public_amount = 160_i128;
 
-    let chain_type = [4, 0];
-    let chain_id = compute_chain_id_type(1, &chain_type);
+    let chain_id = compute_chain_id_type(1, &CHAIN_TYPE);
     let in_chain_ids = [chain_id; 16];
     let in_amounts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     let in_indices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
@@ -1413,19 +1173,8 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
         encrypted_output2: element_encoder(&output2),
     };
 
-    let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
-    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
-    ext_data_args.extend_from_slice(&recipient_bytes);
-    ext_data_args.extend_from_slice(&relayer_bytes);
-    ext_data_args.extend_from_slice(&ext_amt_bytes);
-    ext_data_args.extend_from_slice(&fee_bytes);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
 
-    let ext_data_hash = keccak_256(&ext_data_args);
     let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_16_2(
         public_amount,
@@ -1457,7 +1206,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: hex::encode(transactor_bytes),
+        sender: TRANSACTOR.to_string(),
         amount: Uint128::from(160_u128),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
@@ -1477,8 +1226,8 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
 
     let public_amount = -80_i128;
 
-    let chain_id = compute_chain_id_type(CHAIN_ID, &chain_type);
-    let out_chain_ids = [CHAIN_ID; 2];
+    let chain_id = compute_chain_id_type(TEST_CHAIN_ID, &CHAIN_TYPE);
+    let out_chain_ids = [TEST_CHAIN_ID; 2];
     // After withdrawing -7
     let out_amounts = [40, 40];
 
@@ -1497,19 +1246,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
         encrypted_output2: element_encoder(&output2),
     };
 
-    let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
-    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
-    ext_data_args.extend_from_slice(&recipient_bytes);
-    ext_data_args.extend_from_slice(&relayer_bytes);
-    ext_data_args.extend_from_slice(&ext_amt_bytes);
-    ext_data_args.extend_from_slice(&fee_bytes);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
-    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
-
-    let ext_data_hash = keccak_256(&ext_data_args);
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
 
     let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_2_2(
         public_amount,
@@ -1542,7 +1279,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
     let withdraw_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: hex::encode(transactor_bytes),
+        sender: TRANSACTOR.to_string(),
         amount: Uint128::zero(),
         msg: to_binary(&Cw20HookMsg::Transact {
             proof_data: proof_data,
