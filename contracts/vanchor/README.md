@@ -48,3 +48,4 @@ since it needs the `cw20` token transfer first & tx execution next.
 But, `transact-withdraw` does not need to be using `Send/Receive` mechanism, since there is no `cw20`  
 token transfer before tx execution. Also, if we use `Send/Receive` mechanism for `transact-withdraw`,  
 it always runs into error, since `amount` is always zero.
+Reference: `https://github.com/CosmWasm/cw-plus/blob/main/packages/cw20/README.md#messages`
