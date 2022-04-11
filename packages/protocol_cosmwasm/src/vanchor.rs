@@ -1,4 +1,4 @@
-use cosmwasm_std::Uint256;
+use cosmwasm_std::Uint128;
 use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -9,10 +9,10 @@ pub struct InstantiateMsg {
     pub levels: u32,
     pub max_edges: u32,
     pub cw20_address: String,
-    pub max_deposit_amt: Uint256,
-    pub min_withdraw_amt: Uint256,
-    pub max_ext_amt: Uint256,
-    pub max_fee: Uint256,
+    pub max_deposit_amt: Uint128,
+    pub min_withdraw_amt: Uint128,
+    pub max_ext_amt: Uint128,
+    pub max_fee: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -34,10 +34,10 @@ pub enum ExecuteMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UpdateConfigMsg {
-    pub max_deposit_amt: Option<Uint256>,
-    pub min_withdraw_amt: Option<Uint256>,
-    pub max_ext_amt: Option<Uint256>,
-    pub max_fee: Option<Uint256>,
+    pub max_deposit_amt: Option<Uint128>,
+    pub min_withdraw_amt: Option<Uint128>,
+    pub max_ext_amt: Option<Uint128>,
+    pub max_fee: Option<Uint128>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

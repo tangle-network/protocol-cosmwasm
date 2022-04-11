@@ -2,7 +2,7 @@ use ark_ff::BigInteger;
 use ark_ff::PrimeField;
 use arkworks_setups::Curve;
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-use cosmwasm_std::{attr, to_binary, Uint128, Uint256};
+use cosmwasm_std::{attr, to_binary, Uint128};
 use cw20::Cw20ReceiveMsg;
 use sp_core::hashing::keccak_256;
 
@@ -19,7 +19,10 @@ const MAX_DEPOSIT_AMT: u128 = 40;
 const MIN_WITHDRAW_AMT: u128 = 0;
 const MAX_EXT_AMT: u128 = 20;
 const MAX_FEE: u128 = 10;
-const CW20_ADDRESS: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
+const CW20_ADDRESS: &str = "terra1340t6lqq6jxhm8d6gtz0hzz5jzcszvm27urkn2";
+const TRANSACTOR: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
+const RECIPIENT: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
+const RELAYER: &str = "terra1jrj2vh6cstqwk3pg8nkmdf0r9z0n3q3f3jk5xn";
 
 fn element_encoder(v: &[u8]) -> [u8; 32] {
     let mut output = [0u8; 32];
@@ -35,10 +38,10 @@ fn test_vanchor_proper_initialization() {
         chain_id: CHAIN_ID,
         max_edges: MAX_EDGES,
         levels: LEVELS,
-        max_deposit_amt: Uint256::from(MAX_DEPOSIT_AMT),
-        min_withdraw_amt: Uint256::from(MIN_WITHDRAW_AMT),
-        max_ext_amt: Uint256::from(MAX_EXT_AMT),
-        max_fee: Uint256::from(MAX_FEE),
+        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
+        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
+        max_ext_amt: Uint128::from(MAX_EXT_AMT),
+        max_fee: Uint128::from(MAX_FEE),
         cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("creator", &[]);
@@ -56,10 +59,10 @@ fn test_vanchor_update_config() {
         chain_id: CHAIN_ID,
         max_edges: MAX_EDGES,
         levels: LEVELS,
-        max_deposit_amt: Uint256::from(MAX_DEPOSIT_AMT),
-        min_withdraw_amt: Uint256::from(MIN_WITHDRAW_AMT),
-        max_ext_amt: Uint256::from(MAX_EXT_AMT),
-        max_fee: Uint256::from(MAX_FEE),
+        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
+        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
+        max_ext_amt: Uint128::from(MAX_EXT_AMT),
+        max_fee: Uint128::from(MAX_FEE),
         cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("creator", &[]);
@@ -69,10 +72,10 @@ fn test_vanchor_update_config() {
 
     // Fail to update the config with "unauthorized" error.
     let update_config_msg = UpdateConfigMsg {
-        max_deposit_amt: Some(Uint256::from(1u128)),
-        min_withdraw_amt: Some(Uint256::from(1u128)),
-        max_ext_amt: Some(Uint256::from(1u128)),
-        max_fee: Some(Uint256::from(1u128)),
+        max_deposit_amt: Some(Uint128::from(1u128)),
+        min_withdraw_amt: Some(Uint128::from(1u128)),
+        max_ext_amt: Some(Uint128::from(1u128)),
+        max_fee: Some(Uint128::from(1u128)),
     };
     let info = mock_info("intruder", &[]);
     assert!(
@@ -88,10 +91,10 @@ fn test_vanchor_update_config() {
 
     // We can just call .unwrap() to assert "execute" was success
     let update_config_msg = UpdateConfigMsg {
-        max_deposit_amt: Some(Uint256::from(1u128)),
-        min_withdraw_amt: Some(Uint256::from(1u128)),
-        max_ext_amt: Some(Uint256::from(1u128)),
-        max_fee: Some(Uint256::from(1u128)),
+        max_deposit_amt: Some(Uint128::from(1u128)),
+        min_withdraw_amt: Some(Uint128::from(1u128)),
+        max_ext_amt: Some(Uint128::from(1u128)),
+        max_fee: Some(Uint128::from(1u128)),
     };
     let info = mock_info("creator", &[]);
     let _ = execute(
@@ -112,10 +115,10 @@ fn test_vanchor_should_complete_2x2_transaction_with_deposit_cw20() {
         chain_id: CHAIN_ID,
         max_edges: MAX_EDGES,
         levels: LEVELS,
-        max_deposit_amt: Uint256::from(MAX_DEPOSIT_AMT),
-        min_withdraw_amt: Uint256::from(MIN_WITHDRAW_AMT),
-        max_ext_amt: Uint256::from(MAX_EXT_AMT),
-        max_fee: Uint256::from(MAX_FEE),
+        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
+        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
+        max_ext_amt: Uint128::from(MAX_EXT_AMT),
+        max_fee: Uint128::from(MAX_FEE),
         cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("creator", &[]);
@@ -125,9 +128,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_deposit_cw20() {
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_2_2(Curve::Bn254);
-    let transactor_bytes = [1u8; 32];
-    let recipient_bytes = [2u8; 32];
-    let relayer_bytes = [0u8; 32];
+    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 10_i128;
     let fee = 0_u128;
 
@@ -150,8 +151,8 @@ fn test_vanchor_should_complete_2x2_transaction_with_deposit_cw20() {
     let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
 
     let ext_data = ExtData {
-        recipient: hex::encode(recipient_bytes),
-        relayer: hex::encode(relayer_bytes),
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
@@ -159,8 +160,8 @@ fn test_vanchor_should_complete_2x2_transaction_with_deposit_cw20() {
     };
 
     let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
-    let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
     let fee_bytes = element_encoder(&fee.to_le_bytes());
     let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
@@ -232,10 +233,10 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
         chain_id: CHAIN_ID,
         max_edges: MAX_EDGES,
         levels: LEVELS,
-        max_deposit_amt: Uint256::from(MAX_DEPOSIT_AMT),
-        min_withdraw_amt: Uint256::from(MIN_WITHDRAW_AMT),
-        max_ext_amt: Uint256::from(MAX_EXT_AMT),
-        max_fee: Uint256::from(MAX_FEE),
+        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
+        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
+        max_ext_amt: Uint128::from(MAX_EXT_AMT),
+        max_fee: Uint128::from(MAX_FEE),
         cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("creator", &[]);
@@ -245,9 +246,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_2_2(Curve::Bn254);
-    let transactor_bytes = [1u8; 32];
-    let recipient_bytes = [2u8; 32];
-    let relayer_bytes = [0u8; 32];
+    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 10_i128;
     let fee = 0_u128;
 
@@ -270,8 +269,8 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
     let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
 
     let ext_data = ExtData {
-        recipient: hex::encode(recipient_bytes),
-        relayer: hex::encode(relayer_bytes),
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
@@ -279,8 +278,8 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
     };
 
     let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
-    let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
     let fee_bytes = element_encoder(&fee.to_le_bytes());
     let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
@@ -354,8 +353,8 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
     let output1 = out_utxos[0].commitment.into_repr().to_bytes_le();
     let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
     let ext_data = ExtData {
-        recipient: hex::encode(recipient_bytes),
-        relayer: hex::encode(relayer_bytes),
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
@@ -363,8 +362,8 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
     };
 
     let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
-    let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
     let fee_bytes = element_encoder(&fee.to_le_bytes());
     let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
@@ -438,10 +437,10 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
         chain_id: CHAIN_ID,
         max_edges: MAX_EDGES,
         levels: LEVELS,
-        max_deposit_amt: Uint256::from(MAX_DEPOSIT_AMT),
-        min_withdraw_amt: Uint256::from(MIN_WITHDRAW_AMT),
-        max_ext_amt: Uint256::from(MAX_EXT_AMT),
-        max_fee: Uint256::from(MAX_FEE),
+        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
+        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
+        max_ext_amt: Uint128::from(MAX_EXT_AMT),
+        max_fee: Uint128::from(MAX_FEE),
         cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("creator", &[]);
@@ -451,9 +450,7 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_2_2(Curve::Bn254);
-    let transactor_bytes = [1u8; 32];
-    let recipient_bytes = [2u8; 32];
-    let relayer_bytes = [0u8; 32];
+    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 10_i128;
     let fee = 0_u128;
 
@@ -476,8 +473,8 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
     let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
 
     let ext_data = ExtData {
-        recipient: hex::encode(recipient_bytes),
-        relayer: hex::encode(relayer_bytes),
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
@@ -485,8 +482,8 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
     };
 
     let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
-    let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
     let fee_bytes = element_encoder(&fee.to_le_bytes());
     let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
@@ -560,8 +557,8 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
     let output1 = out_utxos[0].commitment.into_repr().to_bytes_le();
     let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
     let ext_data = ExtData {
-        recipient: hex::encode(recipient_bytes),
-        relayer: hex::encode(relayer_bytes),
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
@@ -569,8 +566,8 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
     };
 
     let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
-    let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
     let fee_bytes = element_encoder(&fee.to_le_bytes());
     let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
@@ -598,8 +595,8 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
 
     // Invalid ext data.
     let ext_data = ExtData {
-        recipient: hex::encode(recipient_bytes),
-        relayer: hex::encode(relayer_bytes),
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
@@ -648,10 +645,10 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
         chain_id: CHAIN_ID,
         max_edges: MAX_EDGES,
         levels: LEVELS,
-        max_deposit_amt: Uint256::from(MAX_DEPOSIT_AMT),
-        min_withdraw_amt: Uint256::from(MIN_WITHDRAW_AMT),
-        max_ext_amt: Uint256::from(MAX_EXT_AMT),
-        max_fee: Uint256::from(MAX_FEE),
+        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
+        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
+        max_ext_amt: Uint128::from(MAX_EXT_AMT),
+        max_fee: Uint128::from(MAX_FEE),
         cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("creator", &[]);
@@ -661,9 +658,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_2_2(Curve::Bn254);
-    let transactor_bytes = [1u8; 32];
-    let recipient_bytes = [2u8; 32];
-    let relayer_bytes = [0u8; 32];
+    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 10_i128;
     let fee = 0_u128;
 
@@ -686,8 +681,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
     let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
 
     let ext_data = ExtData {
-        recipient: hex::encode(recipient_bytes),
-        relayer: hex::encode(relayer_bytes),
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
@@ -695,8 +690,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
     };
 
     let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
-    let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
     let fee_bytes = element_encoder(&fee.to_le_bytes());
     let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
@@ -770,8 +765,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
     let output1 = out_utxos[0].commitment.into_repr().to_bytes_le();
     let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
     let ext_data = ExtData {
-        recipient: hex::encode(recipient_bytes),
-        relayer: hex::encode(relayer_bytes),
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
@@ -779,8 +774,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
     };
 
     let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
-    let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
     let fee_bytes = element_encoder(&fee.to_le_bytes());
     let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
@@ -848,10 +843,10 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
         chain_id: CHAIN_ID,
         max_edges: MAX_EDGES,
         levels: LEVELS,
-        max_deposit_amt: Uint256::from(MAX_DEPOSIT_AMT),
-        min_withdraw_amt: Uint256::from(MIN_WITHDRAW_AMT),
-        max_ext_amt: Uint256::from(MAX_EXT_AMT),
-        max_fee: Uint256::from(MAX_FEE),
+        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
+        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
+        max_ext_amt: Uint128::from(MAX_EXT_AMT),
+        max_fee: Uint128::from(MAX_FEE),
         cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("creator", &[]);
@@ -861,9 +856,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_2_2(Curve::Bn254);
-    let transactor_bytes = [1u8; 32];
-    let recipient_bytes = [2u8; 32];
-    let relayer_bytes = [0u8; 32];
+    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 10_i128;
     let fee = 0_u128;
 
@@ -886,8 +879,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
     let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
 
     let ext_data = ExtData {
-        recipient: hex::encode(recipient_bytes),
-        relayer: hex::encode(relayer_bytes),
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
@@ -895,8 +888,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
     };
 
     let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
-    let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
     let fee_bytes = element_encoder(&fee.to_le_bytes());
     let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
@@ -970,8 +963,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
     let output1 = out_utxos[0].commitment.into_repr().to_bytes_le();
     let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
     let ext_data = ExtData {
-        recipient: hex::encode(recipient_bytes),
-        relayer: hex::encode(relayer_bytes),
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
@@ -979,8 +972,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
     };
 
     let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
-    let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
     let fee_bytes = element_encoder(&fee.to_le_bytes());
     let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
@@ -1048,10 +1041,10 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
         chain_id: CHAIN_ID,
         max_edges: MAX_EDGES,
         levels: LEVELS,
-        max_deposit_amt: Uint256::from(MAX_DEPOSIT_AMT),
-        min_withdraw_amt: Uint256::from(MIN_WITHDRAW_AMT),
-        max_ext_amt: Uint256::from(MAX_EXT_AMT),
-        max_fee: Uint256::from(MAX_FEE),
+        max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
+        min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
+        max_ext_amt: Uint128::from(MAX_EXT_AMT),
+        max_fee: Uint128::from(MAX_FEE),
         cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("creator", &[]);
@@ -1061,9 +1054,7 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_2_2(Curve::Bn254);
-    let transactor_bytes = [1u8; 32];
-    let recipient_bytes = [2u8; 32];
-    let relayer_bytes = [0u8; 32];
+    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 10_i128;
     let fee = 0_u128;
 
@@ -1086,8 +1077,8 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
     let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
 
     let ext_data = ExtData {
-        recipient: hex::encode(recipient_bytes),
-        relayer: hex::encode(relayer_bytes),
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
@@ -1095,8 +1086,8 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
     };
 
     let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
-    let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
     let fee_bytes = element_encoder(&fee.to_le_bytes());
     let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
@@ -1170,8 +1161,8 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
     let output1 = out_utxos[0].commitment.into_repr().to_bytes_le();
     let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
     let ext_data = ExtData {
-        recipient: hex::encode(recipient_bytes),
-        relayer: hex::encode(relayer_bytes),
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
@@ -1179,8 +1170,8 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
     };
 
     let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
-    let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
     let fee_bytes = element_encoder(&fee.to_le_bytes());
     let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
@@ -1258,10 +1249,10 @@ fn test_vanchor_should_complete_16x2_transaction_with_deposit_cw20() {
         chain_id: CHAIN_ID,
         max_edges: MAX_EDGES,
         levels: LEVELS,
-        max_deposit_amt: Uint256::from(200_u128),
-        min_withdraw_amt: Uint256::from(0_u128),
-        max_ext_amt: Uint256::from(200_u128),
-        max_fee: Uint256::from(50_u128),
+        max_deposit_amt: Uint128::from(200_u128),
+        min_withdraw_amt: Uint128::from(0_u128),
+        max_ext_amt: Uint128::from(200_u128),
+        max_fee: Uint128::from(50_u128),
         cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("creator", &[]);
@@ -1271,9 +1262,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_deposit_cw20() {
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_16_2(Curve::Bn254);
-    let transactor_bytes = [1u8; 32];
-    let recipient_bytes = [2u8; 32];
-    let relayer_bytes = [0u8; 32];
+    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 160_i128;
     let fee = 0_u128;
 
@@ -1297,8 +1286,8 @@ fn test_vanchor_should_complete_16x2_transaction_with_deposit_cw20() {
     let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
 
     let ext_data = ExtData {
-        recipient: hex::encode(recipient_bytes),
-        relayer: hex::encode(relayer_bytes),
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
@@ -1306,8 +1295,8 @@ fn test_vanchor_should_complete_16x2_transaction_with_deposit_cw20() {
     };
 
     let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
-    let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
     let fee_bytes = element_encoder(&fee.to_le_bytes());
     let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
@@ -1379,10 +1368,10 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
         chain_id: CHAIN_ID,
         max_edges: MAX_EDGES,
         levels: LEVELS,
-        max_deposit_amt: Uint256::from(200_u128),
-        min_withdraw_amt: Uint256::from(0_u128),
-        max_ext_amt: Uint256::from(200_u128),
-        max_fee: Uint256::from(50_u128),
+        max_deposit_amt: Uint128::from(200_u128),
+        min_withdraw_amt: Uint128::from(0_u128),
+        max_ext_amt: Uint128::from(200_u128),
+        max_fee: Uint128::from(50_u128),
         cw20_address: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("creator", &[]);
@@ -1392,9 +1381,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
 
     // Initialize the vanchor
     let (pk_bytes, _) = crate::test_util::setup_environment_2_16_2(Curve::Bn254);
-    let transactor_bytes = [1u8; 32];
-    let recipient_bytes = [2u8; 32];
-    let relayer_bytes = [0u8; 32];
+    let transactor_bytes = element_encoder(TRANSACTOR.as_bytes());
     let ext_amount = 160_i128;
     let fee = 0_u128;
 
@@ -1418,8 +1405,8 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
     let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
 
     let ext_data = ExtData {
-        recipient: hex::encode(recipient_bytes),
-        relayer: hex::encode(relayer_bytes),
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
@@ -1427,8 +1414,8 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
     };
 
     let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
-    let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
     let fee_bytes = element_encoder(&fee.to_le_bytes());
     let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
@@ -1502,8 +1489,8 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
     let output1 = out_utxos[0].commitment.into_repr().to_bytes_le();
     let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
     let ext_data = ExtData {
-        recipient: hex::encode(recipient_bytes),
-        relayer: hex::encode(relayer_bytes),
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: fee.to_string(),
         encrypted_output1: element_encoder(&output1),
@@ -1511,8 +1498,8 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
     };
 
     let mut ext_data_args = Vec::new();
-    let recipient_bytes = element_encoder(&hex::decode(&ext_data.recipient).unwrap());
-    let relayer_bytes = element_encoder(&hex::decode(&ext_data.relayer).unwrap());
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
     let fee_bytes = element_encoder(&fee.to_le_bytes());
     let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);

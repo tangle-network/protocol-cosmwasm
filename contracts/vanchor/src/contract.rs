@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, from_binary, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult, Storage, Uint128, Uint256, WasmMsg,
+    StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 
@@ -81,12 +81,12 @@ pub fn instantiate(
         chain_id_list: Vec::new(),
     };
     // Get the "cw20_address"
-    let cw20_address = deps.api.addr_canonicalize(&msg.cw20_address)?;
+    let cw20_address = deps.api.addr_validate(&msg.cw20_address)?;
 
     // Initialize the VAnchor
     let anchor = VAnchor {
         chain_id: msg.chain_id,
-        creator: deps.api.addr_canonicalize(info.sender.as_str())?,
+        creator: deps.api.addr_validate(info.sender.as_str())?,
         max_deposit_amt: msg.max_deposit_amt,
         min_withdraw_amt: msg.min_withdraw_amt,
         max_ext_amt: msg.max_ext_amt,
@@ -145,7 +145,7 @@ fn update_vanchor_config(
 
     let mut vanchor = VANCHOR.load(deps.storage)?;
     // Validation 2. Check if the msg sender is "creator".
-    if vanchor.creator != deps.api.addr_canonicalize(info.sender.as_str())? {
+    if vanchor.creator != deps.api.addr_validate(info.sender.as_str())? {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -178,7 +178,7 @@ fn transact(
 ) -> Result<Response, ContractError> {
     // Only Cw20 token contract can execute this message.
     let vanchor: VAnchor = VANCHOR.load(deps.storage)?;
-    if vanchor.cw20_address != deps.api.addr_canonicalize(info.sender.as_str())? {
+    if vanchor.cw20_address != deps.api.addr_validate(info.sender.as_str())? {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -237,12 +237,8 @@ fn transact(
             // Compute hash of abi encoded ext_data, reduced into field from config
             // Ensure that the passed external data hash matches the computed one
             let mut ext_data_args = Vec::new();
-            let recipient_bytes = element_encoder(
-                &hex::decode(&ext_data.recipient).map_err(|_| ContractError::DecodeError)?,
-            );
-            let relayer_bytes = element_encoder(
-                &hex::decode(&ext_data.relayer).map_err(|_| ContractError::DecodeError)?,
-            );
+            let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+            let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
             let fee_bytes = element_encoder(&ext_data_fee.to_le_bytes());
             let ext_amt_bytes = element_encoder(&ext_amt.to_le_bytes());
             ext_data_args.extend_from_slice(&recipient_bytes);
@@ -262,13 +258,13 @@ fn transact(
 
             let abs_ext_amt = ext_amt.unsigned_abs();
             // Making sure that public amount and fee are correct
-            if Uint256::from(ext_data_fee) > vanchor.max_fee {
+            if Uint128::from(ext_data_fee) > vanchor.max_fee {
                 return Err(ContractError::Std(StdError::GenericErr {
                     msg: "Invalid fee amount".to_string(),
                 }));
             }
 
-            if Uint256::from(abs_ext_amt) > vanchor.max_ext_amt {
+            if Uint128::from(abs_ext_amt) > vanchor.max_ext_amt {
                 return Err(ContractError::Std(StdError::GenericErr {
                     msg: "Invalid ext amount".to_string(),
                 }));
@@ -333,7 +329,7 @@ fn transact(
 
             let is_deposit = ext_amt.is_positive();
             if is_deposit {
-                if Uint256::from(abs_ext_amt) > vanchor.max_deposit_amt {
+                if Uint128::from(abs_ext_amt) > vanchor.max_deposit_amt {
                     return Err(ContractError::Std(StdError::GenericErr {
                         msg: "Invalid deposit amount".to_string(),
                     }));
@@ -346,7 +342,7 @@ fn transact(
                 // No need to call "transfer from transactor to this contract"
                 // since this message is the result of sending.
             } else {
-                if Uint256::from(abs_ext_amt) < vanchor.min_withdraw_amt {
+                if Uint128::from(abs_ext_amt) < vanchor.min_withdraw_amt {
                     return Err(ContractError::Std(StdError::GenericErr {
                         msg: "Invalid withdraw amount".to_string(),
                     }));

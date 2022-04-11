@@ -1,4 +1,4 @@
-use cosmwasm_std::{CanonicalAddr, StdResult, Storage, Uint256};
+use cosmwasm_std::{Addr, StdResult, Storage, Uint128};
 use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -189,14 +189,14 @@ impl LinkableMerkleTree {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct VAnchor {
     pub chain_id: u64,
-    pub creator: CanonicalAddr,
+    pub creator: Addr,
     pub merkle_tree: MerkleTree,
     pub linkable_tree: LinkableMerkleTree,
-    pub cw20_address: CanonicalAddr,
-    pub max_deposit_amt: Uint256,
-    pub min_withdraw_amt: Uint256,
-    pub max_ext_amt: Uint256,
-    pub max_fee: Uint256,
+    pub cw20_address: Addr,
+    pub max_deposit_amt: Uint128,
+    pub min_withdraw_amt: Uint128,
+    pub max_ext_amt: Uint128,
+    pub max_fee: Uint128,
 }
 
 pub const VANCHOR: Item<VAnchor> = Item::new("vanchor");
