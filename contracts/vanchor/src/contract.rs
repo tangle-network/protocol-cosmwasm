@@ -12,7 +12,7 @@ use protocol_cosmwasm::field_ops::{ArkworksIntoFieldBn254, IntoPrimeField};
 use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::vanchor::{
-    Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg, UpdateConfigMsg,
+    Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, QueryMsg, UpdateConfigMsg,
 };
 use protocol_cosmwasm::vanchor_verifier::VAnchorVerifier;
 use protocol_cosmwasm::zeroes::zeroes;
@@ -119,7 +119,11 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::UpdateConfig(msg) => update_vanchor_config(deps, info, msg),
-        ExecuteMsg::Receive(msg) => transact(deps, info, msg),
+        ExecuteMsg::Receive(msg) => transact_deposit(deps, info, msg),
+        ExecuteMsg::TransactWithdraw {
+            proof_data,
+            ext_data,
+        } => transact_withdraw(deps, proof_data, ext_data),
         ExecuteMsg::AddEdge {
             src_chain_id,
             root,
@@ -171,8 +175,8 @@ fn update_vanchor_config(
     Ok(Response::new().add_attributes(vec![attr("method", "update_vanchor_config")]))
 }
 
-fn transact(
-    deps: DepsMut,
+fn transact_deposit(
+    mut deps: DepsMut,
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
@@ -187,148 +191,25 @@ fn transact(
     let cw20_address = info.sender.to_string();
 
     match from_binary(&cw20_msg.msg) {
-        Ok(Cw20HookMsg::Transact {
+        Ok(Cw20HookMsg::TransactDeposit {
             proof_data,
             ext_data,
         }) => {
+            validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
+
             let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
             let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
-
-            // Validation 1. Double check the number of roots.
-            if vanchor.linkable_tree.max_edges != proof_data.roots.len() as u32 {
-                return Err(ContractError::Std(StdError::GenericErr {
-                    msg: "Max edges not matched".to_string(),
-                }));
-            }
-
-            // Validation 2. Check if the root is known to merkle tree
-            if !vanchor
-                .merkle_tree
-                .is_known_root(proof_data.roots[0], deps.storage)
-            {
-                return Err(ContractError::Std(StdError::GenericErr {
-                    msg: "Root is not known".to_string(),
-                }));
-            }
-
-            // Validation 3. Check if the roots are valid in linkable tree.
-            let linkable_tree = vanchor.linkable_tree;
-            if !linkable_tree.is_valid_neighbor_roots(&proof_data.roots[1..], deps.storage) {
-                return Err(ContractError::Std(StdError::GenericErr {
-                    msg: "Neighbor roots are not valid".to_string(),
-                }));
-            }
-
-            // Check nullifier and add or return `InvalidNullifier`
-            for nullifier in &proof_data.input_nullifiers {
-                if is_known_nullifier(deps.storage, *nullifier) {
-                    return Err(ContractError::Std(StdError::GenericErr {
-                        msg: "Nullifier is known".to_string(),
-                    }));
-                }
-            }
-
-            let element_encoder = |v: &[u8]| {
-                let mut output = [0u8; 32];
-                output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
-                output
-            };
-
-            // Compute hash of abi encoded ext_data, reduced into field from config
-            // Ensure that the passed external data hash matches the computed one
-            let mut ext_data_args = Vec::new();
-            let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
-            let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-            let fee_bytes = element_encoder(&ext_data_fee.to_le_bytes());
-            let ext_amt_bytes = element_encoder(&ext_amt.to_le_bytes());
-            ext_data_args.extend_from_slice(&recipient_bytes);
-            ext_data_args.extend_from_slice(&relayer_bytes);
-            ext_data_args.extend_from_slice(&ext_amt_bytes);
-            ext_data_args.extend_from_slice(&fee_bytes);
-            ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
-            ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
-
-            let computed_ext_data_hash =
-                Keccak256::hash(&ext_data_args).map_err(|_| ContractError::HashError)?;
-            if computed_ext_data_hash != proof_data.ext_data_hash {
-                return Err(ContractError::Std(StdError::GenericErr {
-                    msg: "Invalid ext data".to_string(),
-                }));
-            }
-
             let abs_ext_amt = ext_amt.unsigned_abs();
-            // Making sure that public amount and fee are correct
-            if Uint128::from(ext_data_fee) > vanchor.max_fee {
-                return Err(ContractError::Std(StdError::GenericErr {
-                    msg: "Invalid fee amount".to_string(),
-                }));
-            }
 
-            if Uint128::from(abs_ext_amt) > vanchor.max_ext_amt {
-                return Err(ContractError::Std(StdError::GenericErr {
-                    msg: "Invalid ext amount".to_string(),
-                }));
-            }
-
-            // Public amounnt can also be negative, in which
-            // case it would wrap around the field, so we should check if FIELD_SIZE -
-            // public_amount == proof_data.public_amount, in case of a negative ext_amount
-            let calc_public_amt = ext_amt - ext_data_fee as i128;
-            let calc_public_amt_bytes =
-                element_encoder(&ArkworksIntoFieldBn254::into_field(calc_public_amt));
-            if calc_public_amt_bytes != proof_data.public_amount {
-                return Err(ContractError::Std(StdError::GenericErr {
-                    msg: "Invalid public amount".to_string(),
-                }));
-            }
-
-            // Construct public inputs
-            let chain_id_type_bytes = element_encoder(
-                &compute_chain_id_type(vanchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes(),
-            );
-
-            let mut bytes = Vec::new();
-            bytes.extend_from_slice(&proof_data.public_amount);
-            bytes.extend_from_slice(&proof_data.ext_data_hash);
-            for null in &proof_data.input_nullifiers {
-                bytes.extend_from_slice(null);
-            }
-            for comm in &proof_data.output_commitments {
-                bytes.extend_from_slice(comm);
-            }
-            bytes.extend_from_slice(&element_encoder(&chain_id_type_bytes));
-            for root in &proof_data.roots {
-                bytes.extend_from_slice(root);
-            }
-
-            let verifier_2_2 = VERIFIER_2_2.load(deps.storage)?;
-            let verifier_16_2 = VERIFIER_16_2.load(deps.storage)?;
-
-            let result = match (
-                proof_data.input_nullifiers.len(),
-                proof_data.output_commitments.len(),
-            ) {
-                (2, 2) => verify(verifier_2_2, bytes, proof_data.proof)?,
-                (16, 2) => verify(verifier_16_2, bytes, proof_data.proof)?,
-                _ => false,
-            };
-
-            if !result {
-                return Err(ContractError::Std(StdError::GenericErr {
-                    msg: "Invalid transaction proof".to_string(),
-                }));
-            }
-
-            // Flag nullifiers as used
-            for nullifier in &proof_data.input_nullifiers {
-                NULLIFIERS.save(deps.storage, nullifier.to_vec(), &true)?;
-            }
-
-            // Deposit or Withdraw
+            // Deposit
             let mut msgs: Vec<CosmosMsg> = vec![];
 
-            let is_deposit = ext_amt.is_positive();
-            if is_deposit {
+            let is_withdraw = ext_amt.is_negative();
+            if is_withdraw {
+                return Err(ContractError::Std(StdError::GenericErr {
+                    msg: "Invalid execute entry".to_string(),
+                }));
+            } else {
                 if Uint128::from(abs_ext_amt) > vanchor.max_deposit_amt {
                     return Err(ContractError::Std(StdError::GenericErr {
                         msg: "Invalid deposit amount".to_string(),
@@ -341,25 +222,6 @@ fn transact(
                 };
                 // No need to call "transfer from transactor to this contract"
                 // since this message is the result of sending.
-            } else {
-                if Uint128::from(abs_ext_amt) < vanchor.min_withdraw_amt {
-                    return Err(ContractError::Std(StdError::GenericErr {
-                        msg: "Invalid withdraw amount".to_string(),
-                    }));
-                }
-                if cw20_token_amt != Uint128::zero() {
-                    return Err(ContractError::Std(StdError::GenericErr {
-                        msg: "Sent unnecessary funds".to_string(),
-                    }));
-                }
-                msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: cw20_address.clone(),
-                    funds: [].to_vec(),
-                    msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                        recipient: ext_data.recipient.clone(),
-                        amount: Uint128::try_from(abs_ext_amt).unwrap(),
-                    })?,
-                }));
             }
 
             // If fee exists, handle it
@@ -389,7 +251,7 @@ fn transact(
                     creator: vanchor.creator,
                     chain_id: vanchor.chain_id,
                     merkle_tree,
-                    linkable_tree,
+                    linkable_tree: vanchor.linkable_tree,
                     cw20_address: vanchor.cw20_address,
                     max_deposit_amt: vanchor.max_deposit_amt,
                     min_withdraw_amt: vanchor.min_withdraw_amt,
@@ -399,9 +261,7 @@ fn transact(
             )?;
 
             Ok(Response::new().add_messages(msgs).add_attributes(vec![
-                attr("method", "transact"),
-                attr("deposit", is_deposit.to_string()),
-                attr("withdraw", (!is_deposit).to_string()),
+                attr("method", "transact_deposit"),
                 attr("ext_amt", ext_amt.to_string()),
             ]))
         }
@@ -409,6 +269,225 @@ fn transact(
             "invalid cw20 hook msg",
         ))),
     }
+}
+
+fn transact_withdraw(
+    mut deps: DepsMut,
+    proof_data: ProofData,
+    ext_data: ExtData,
+) -> Result<Response, ContractError> {
+    validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
+
+    let vanchor = VANCHOR.load(deps.storage)?;
+    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
+    let abs_ext_amt = ext_amt.unsigned_abs();
+
+    // Withdraw
+    let mut msgs: Vec<CosmosMsg> = vec![];
+
+    if ext_amt.is_positive() {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid execute entry".to_string(),
+        }));
+    } else {
+        if Uint128::from(abs_ext_amt) < vanchor.min_withdraw_amt {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Invalid withdraw amount".to_string(),
+            }));
+        }
+        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: vanchor.cw20_address.to_string(),
+            funds: [].to_vec(),
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: ext_data.recipient.clone(),
+                amount: Uint128::try_from(abs_ext_amt).unwrap(),
+            })?,
+        }));
+    }
+
+    // If fee exists, handle it
+    let fee_exists = ext_data_fee != 0;
+
+    if fee_exists {
+        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: vanchor.cw20_address.to_string(),
+            funds: [].to_vec(),
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: ext_data.relayer.clone(),
+                amount: Uint128::try_from(ext_data_fee).unwrap(),
+            })?,
+        }));
+    }
+
+    // Insert output commitments into the tree
+    let mut merkle_tree = vanchor.merkle_tree;
+    for comm in &proof_data.output_commitments {
+        let poseidon: Poseidon = POSEIDON.load(deps.storage)?;
+        merkle_tree.insert(poseidon, *comm, deps.storage)?;
+    }
+
+    VANCHOR.save(
+        deps.storage,
+        &VAnchor {
+            creator: vanchor.creator,
+            chain_id: vanchor.chain_id,
+            merkle_tree,
+            linkable_tree: vanchor.linkable_tree,
+            cw20_address: vanchor.cw20_address,
+            max_deposit_amt: vanchor.max_deposit_amt,
+            min_withdraw_amt: vanchor.min_withdraw_amt,
+            max_fee: vanchor.max_fee,
+            max_ext_amt: vanchor.max_ext_amt,
+        },
+    )?;
+
+    Ok(Response::new().add_messages(msgs).add_attributes(vec![
+        attr("method", "transact_withdraw"),
+        attr("ext_amt", ext_amt.to_string()),
+    ]))
+}
+
+fn validate_proof(
+    deps: DepsMut,
+    proof_data: ProofData,
+    ext_data: ExtData,
+) -> Result<(), ContractError> {
+    let vanchor = VANCHOR.load(deps.storage)?;
+
+    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
+
+    // Validation 1. Double check the number of roots.
+    if vanchor.linkable_tree.max_edges != proof_data.roots.len() as u32 {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Max edges not matched".to_string(),
+        }));
+    }
+
+    // Validation 2. Check if the root is known to merkle tree
+    if !vanchor
+        .merkle_tree
+        .is_known_root(proof_data.roots[0], deps.storage)
+    {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Root is not known".to_string(),
+        }));
+    }
+
+    // Validation 3. Check if the roots are valid in linkable tree.
+    let linkable_tree = vanchor.linkable_tree;
+    if !linkable_tree.is_valid_neighbor_roots(&proof_data.roots[1..], deps.storage) {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Neighbor roots are not valid".to_string(),
+        }));
+    }
+
+    // Check nullifier and add or return `InvalidNullifier`
+    for nullifier in &proof_data.input_nullifiers {
+        if is_known_nullifier(deps.storage, *nullifier) {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Nullifier is known".to_string(),
+            }));
+        }
+    }
+
+    let element_encoder = |v: &[u8]| {
+        let mut output = [0u8; 32];
+        output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
+        output
+    };
+
+    // Compute hash of abi encoded ext_data, reduced into field from config
+    // Ensure that the passed external data hash matches the computed one
+    let mut ext_data_args = Vec::new();
+    let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
+    let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
+    let fee_bytes = element_encoder(&ext_data_fee.to_le_bytes());
+    let ext_amt_bytes = element_encoder(&ext_amt.to_le_bytes());
+    ext_data_args.extend_from_slice(&recipient_bytes);
+    ext_data_args.extend_from_slice(&relayer_bytes);
+    ext_data_args.extend_from_slice(&ext_amt_bytes);
+    ext_data_args.extend_from_slice(&fee_bytes);
+    ext_data_args.extend_from_slice(&ext_data.encrypted_output1);
+    ext_data_args.extend_from_slice(&ext_data.encrypted_output2);
+
+    let computed_ext_data_hash =
+        Keccak256::hash(&ext_data_args).map_err(|_| ContractError::HashError)?;
+    if computed_ext_data_hash != proof_data.ext_data_hash {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid ext data".to_string(),
+        }));
+    }
+
+    let abs_ext_amt = ext_amt.unsigned_abs();
+    // Making sure that public amount and fee are correct
+    if Uint128::from(ext_data_fee) > vanchor.max_fee {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid fee amount".to_string(),
+        }));
+    }
+
+    if Uint128::from(abs_ext_amt) > vanchor.max_ext_amt {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid ext amount".to_string(),
+        }));
+    }
+
+    // Public amounnt can also be negative, in which
+    // case it would wrap around the field, so we should check if FIELD_SIZE -
+    // public_amount == proof_data.public_amount, in case of a negative ext_amount
+    let calc_public_amt = ext_amt - ext_data_fee as i128;
+    let calc_public_amt_bytes =
+        element_encoder(&ArkworksIntoFieldBn254::into_field(calc_public_amt));
+    if calc_public_amt_bytes != proof_data.public_amount {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid public amount".to_string(),
+        }));
+    }
+
+    // Construct public inputs
+    let chain_id_type_bytes =
+        element_encoder(&compute_chain_id_type(vanchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
+
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(&proof_data.public_amount);
+    bytes.extend_from_slice(&proof_data.ext_data_hash);
+    for null in &proof_data.input_nullifiers {
+        bytes.extend_from_slice(null);
+    }
+    for comm in &proof_data.output_commitments {
+        bytes.extend_from_slice(comm);
+    }
+    bytes.extend_from_slice(&element_encoder(&chain_id_type_bytes));
+    for root in &proof_data.roots {
+        bytes.extend_from_slice(root);
+    }
+
+    let verifier_2_2 = VERIFIER_2_2.load(deps.storage)?;
+    let verifier_16_2 = VERIFIER_16_2.load(deps.storage)?;
+
+    let result = match (
+        proof_data.input_nullifiers.len(),
+        proof_data.output_commitments.len(),
+    ) {
+        (2, 2) => verify(verifier_2_2, bytes, proof_data.proof)?,
+        (16, 2) => verify(verifier_16_2, bytes, proof_data.proof)?,
+        _ => false,
+    };
+
+    if !result {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid transaction proof".to_string(),
+        }));
+    }
+
+    // Flag nullifiers as used
+    for nullifier in &proof_data.input_nullifiers {
+        NULLIFIERS.save(deps.storage, nullifier.to_vec(), &true)?;
+    }
+
+    Ok(())
 }
 
 fn add_edge(

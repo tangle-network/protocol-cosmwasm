@@ -20,6 +20,10 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     UpdateConfig(UpdateConfigMsg),
     Receive(Cw20ReceiveMsg),
+    TransactWithdraw {
+        proof_data: ProofData,
+        ext_data: ExtData,
+    },
     AddEdge {
         src_chain_id: u64,
         root: [u8; 32],
@@ -43,7 +47,7 @@ pub struct UpdateConfigMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
-    Transact {
+    TransactDeposit {
         proof_data: ProofData,
         ext_data: ExtData,
     },

@@ -10,7 +10,9 @@ use cw20::Cw20ReceiveMsg;
 use sp_core::hashing::keccak_256;
 
 use crate::contract::{compute_chain_id_type, execute, instantiate};
-use protocol_cosmwasm::vanchor::{Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, UpdateConfigMsg};
+use protocol_cosmwasm::vanchor::{
+    Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, UpdateConfigMsg,
+};
 use protocol_cosmwasm::zeroes::zeroes;
 
 const CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
@@ -70,7 +72,6 @@ fn hash_ext_data(ext_data: ExtData, ext_amount: i128, fee: u128) -> [u8; 32] {
 
     keccak_256(&ext_data_args)
 }
-
 
 #[test]
 fn test_vanchor_proper_initialization() {
@@ -205,7 +206,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_deposit_cw20() {
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: TRANSACTOR.to_string(),
         amount: Uint128::from(10_u128),
-        msg: to_binary(&Cw20HookMsg::Transact {
+        msg: to_binary(&Cw20HookMsg::TransactDeposit {
             proof_data: proof_data,
             ext_data: ext_data,
         })
@@ -215,12 +216,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_deposit_cw20() {
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
     assert_eq!(
         response.attributes,
-        vec![
-            attr("method", "transact"),
-            attr("deposit", "true"),
-            attr("withdraw", "false"),
-            attr("ext_amt", "10"),
-        ]
+        vec![attr("method", "transact_deposit"), attr("ext_amt", "10"),]
     );
 }
 
@@ -291,17 +287,20 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
         ext_data_hash.0,
     );
 
+    println!("Proof-data:{:?}", proof_data);
+    println!("ext-data:{:?}", ext_data);
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: TRANSACTOR.to_string(),
         amount: Uint128::from(10_u128),
-        msg: to_binary(&Cw20HookMsg::Transact {
+        msg: to_binary(&Cw20HookMsg::TransactDeposit {
             proof_data: proof_data,
             ext_data: ext_data,
         })
         .unwrap(),
     });
+    println!("Proof_data{:?}", deposit_cw20_msg);
 
     // Deposit "10" cw20 tokens.
     let _ = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
@@ -364,28 +363,21 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
         ext_data_hash.0,
     );
 
+    println!("Proof-data:{:?}", proof_data);
+    println!("ext-data:{:?}", ext_data);
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
-    let withdraw_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: TRANSACTOR.to_string(),
-        amount: Uint128::zero(),
-        msg: to_binary(&Cw20HookMsg::Transact {
-            proof_data: proof_data,
-            ext_data: ext_data,
-        })
-        .unwrap(),
-    });
+    let withdraw_cw20_msg = ExecuteMsg::TransactWithdraw {
+        proof_data: proof_data,
+        ext_data: ext_data,
+    };
+    println!("Withdraw msg::{:?}", withdraw_cw20_msg);
 
     // Withdraw "7" cw20 tokens.
     let response = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap();
     assert_eq!(
         response.attributes,
-        vec![
-            attr("method", "transact"),
-            attr("deposit", "false"),
-            attr("withdraw", "true"),
-            attr("ext_amt", "-5"),
-        ]
+        vec![attr("method", "transact_withdraw"), attr("ext_amt", "-5"),]
     );
 }
 
@@ -461,7 +453,7 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: TRANSACTOR.to_string(),
         amount: Uint128::from(10_u128),
-        msg: to_binary(&Cw20HookMsg::Transact {
+        msg: to_binary(&Cw20HookMsg::TransactDeposit {
             proof_data: proof_data,
             ext_data: ext_data,
         })
@@ -541,15 +533,10 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
 
     // Should fail with "invalid ext data".
     let info = mock_info(CW20_ADDRESS, &[]);
-    let withdraw_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: TRANSACTOR.to_string(),
-        amount: Uint128::zero(),
-        msg: to_binary(&Cw20HookMsg::Transact {
-            proof_data: proof_data,
-            ext_data: ext_data,
-        })
-        .unwrap(),
-    });
+    let withdraw_cw20_msg = ExecuteMsg::TransactWithdraw {
+        proof_data: proof_data,
+        ext_data: ext_data,
+    };
 
     let err = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap_err();
     assert_eq!(
@@ -630,7 +617,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: TRANSACTOR.to_string(),
         amount: Uint128::from(10_u128),
-        msg: to_binary(&Cw20HookMsg::Transact {
+        msg: to_binary(&Cw20HookMsg::TransactDeposit {
             proof_data: proof_data,
             ext_data: ext_data,
         })
@@ -700,15 +687,10 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
 
     // Should fail with "Invalid ext amount".
     let info = mock_info(CW20_ADDRESS, &[]);
-    let withdraw_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: TRANSACTOR.to_string(),
-        amount: Uint128::zero(),
-        msg: to_binary(&Cw20HookMsg::Transact {
-            proof_data: proof_data,
-            ext_data: ext_data,
-        })
-        .unwrap(),
-    });
+    let withdraw_cw20_msg = ExecuteMsg::TransactWithdraw {
+        proof_data: proof_data,
+        ext_data: ext_data,
+    };
 
     let err = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap_err();
     assert_eq!(
@@ -789,7 +771,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: TRANSACTOR.to_string(),
         amount: Uint128::from(10_u128),
-        msg: to_binary(&Cw20HookMsg::Transact {
+        msg: to_binary(&Cw20HookMsg::TransactDeposit {
             proof_data: proof_data,
             ext_data: ext_data,
         })
@@ -859,15 +841,10 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
 
     // Should fail with "Invalid ext amount".
     let info = mock_info(CW20_ADDRESS, &[]);
-    let withdraw_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: TRANSACTOR.to_string(),
-        amount: Uint128::zero(),
-        msg: to_binary(&Cw20HookMsg::Transact {
-            proof_data: proof_data,
-            ext_data: ext_data,
-        })
-        .unwrap(),
-    });
+    let withdraw_cw20_msg = ExecuteMsg::TransactWithdraw {
+        proof_data: proof_data,
+        ext_data: ext_data,
+    };
 
     let err = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap_err();
     assert_eq!(
@@ -948,7 +925,7 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: TRANSACTOR.to_string(),
         amount: Uint128::from(10_u128),
-        msg: to_binary(&Cw20HookMsg::Transact {
+        msg: to_binary(&Cw20HookMsg::TransactDeposit {
             proof_data: proof_data,
             ext_data: ext_data,
         })
@@ -1018,15 +995,10 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
 
     // Should succeed first, & fail second attempt.
     let info = mock_info(CW20_ADDRESS, &[]);
-    let withdraw_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: TRANSACTOR.to_string(),
-        amount: Uint128::zero(),
-        msg: to_binary(&Cw20HookMsg::Transact {
-            proof_data: proof_data,
-            ext_data: ext_data,
-        })
-        .unwrap(),
-    });
+    let withdraw_cw20_msg = ExecuteMsg::TransactWithdraw {
+        proof_data: proof_data,
+        ext_data: ext_data,
+    };
 
     // Should success since first attempt.
     let _ = execute(
@@ -1117,7 +1089,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_deposit_cw20() {
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: TRANSACTOR.to_string(),
         amount: Uint128::from(160_u128),
-        msg: to_binary(&Cw20HookMsg::Transact {
+        msg: to_binary(&Cw20HookMsg::TransactDeposit {
             proof_data: proof_data,
             ext_data: ext_data,
         })
@@ -1127,12 +1099,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_deposit_cw20() {
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
     assert_eq!(
         response.attributes,
-        vec![
-            attr("method", "transact"),
-            attr("deposit", "true"),
-            attr("withdraw", "false"),
-            attr("ext_amt", "160"),
-        ]
+        vec![attr("method", "transact_deposit"), attr("ext_amt", "160"),]
     );
 }
 
@@ -1208,7 +1175,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: TRANSACTOR.to_string(),
         amount: Uint128::from(160_u128),
-        msg: to_binary(&Cw20HookMsg::Transact {
+        msg: to_binary(&Cw20HookMsg::TransactDeposit {
             proof_data: proof_data,
             ext_data: ext_data,
         })
@@ -1278,25 +1245,15 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
 
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
-    let withdraw_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
-        sender: TRANSACTOR.to_string(),
-        amount: Uint128::zero(),
-        msg: to_binary(&Cw20HookMsg::Transact {
-            proof_data: proof_data,
-            ext_data: ext_data,
-        })
-        .unwrap(),
-    });
+    let withdraw_cw20_msg = ExecuteMsg::TransactWithdraw {
+        proof_data: proof_data,
+        ext_data: ext_data,
+    };
 
     // Withdraw "7" cw20 tokens.
     let response = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap();
     assert_eq!(
         response.attributes,
-        vec![
-            attr("method", "transact"),
-            attr("deposit", "false"),
-            attr("withdraw", "true"),
-            attr("ext_amt", "-50"),
-        ]
+        vec![attr("method", "transact_withdraw"), attr("ext_amt", "-50"),]
     );
 }
