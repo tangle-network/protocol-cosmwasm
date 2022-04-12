@@ -67,8 +67,8 @@ pub fn instantiate(
         chain_id_list: Vec::new(),
     };
 
-    // Get the "cw20_address"
-    let cw20_address = deps.api.addr_validate(msg.cw20_address.as_str())?;
+    // Get the "TokenWrapper" token address.
+    let tokenwrapper_addr = deps.api.addr_validate(msg.tokenwrapper_addr.as_str())?;
 
     // Initialize the Anchor
     let deposit_size = match parse_string_to_uint128(msg.deposit_size) {
@@ -80,7 +80,7 @@ pub fn instantiate(
         linkable_tree: linkable_merkle_tree,
         deposit_size,
         merkle_tree,
-        cw20_address,
+        tokenwrapper_addr,
     };
     ANCHOR.save(deps.storage, &anchor)?;
 
@@ -121,7 +121,7 @@ pub fn receive_cw20(
 
     // Validations
     let cw20_address = deps.api.addr_validate(info.sender.as_str())?;
-    if anchor.cw20_address != cw20_address {
+    if anchor.tokenwrapper_addr != cw20_address {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -145,7 +145,7 @@ pub fn receive_cw20(
                         chain_id: anchor.chain_id,
                         deposit_size: anchor.deposit_size,
                         linkable_tree: anchor.linkable_tree,
-                        cw20_address: anchor.cw20_address,
+                        tokenwrapper_addr: anchor.tokenwrapper_addr,
                         merkle_tree,
                     },
                 )?;
@@ -259,7 +259,7 @@ pub fn withdraw(
 
     // Validate the "cw20_address".
     let cw20_address = msg.cw20_address;
-    if anchor.cw20_address != deps.api.addr_validate(cw20_address.as_str())? {
+    if anchor.tokenwrapper_addr != deps.api.addr_validate(cw20_address.as_str())? {
         return Err(ContractError::Std(StdError::generic_err(
             "Invalid cw20 address",
         )));
@@ -331,7 +331,7 @@ pub fn get_config(deps: Deps) -> StdResult<ConfigResponse> {
     let anchor = ANCHOR.load(deps.storage)?;
     Ok(ConfigResponse {
         chain_id: anchor.chain_id,
-        cw20_address: anchor.cw20_address.to_string(),
+        tokenwrapper_addr: anchor.tokenwrapper_addr.to_string(),
         deposit_size: anchor.deposit_size.to_string(),
     })
 }

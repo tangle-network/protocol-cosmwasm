@@ -44,7 +44,7 @@ fn create_anchor() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
         chain_id: CHAIN_ID,
         levels: LEVELS,
         deposit_size: DEPOSIT_SIZE.to_string(),
-        cw20_address: CW20_ADDRESS.to_string(),
+        tokenwrapper_addr: CW20_ADDRESS.to_string(),
     };
 
     // Should pass this "unwrap" if success.
@@ -63,7 +63,7 @@ fn test_anchor_proper_initialization() {
         chain_id: CHAIN_ID,
         levels: LEVELS,
         deposit_size: DEPOSIT_SIZE.to_string(),
-        cw20_address: CW20_ADDRESS.to_string(),
+        tokenwrapper_addr: CW20_ADDRESS.to_string(),
     };
 
     // Should pass this "unwrap" if success.

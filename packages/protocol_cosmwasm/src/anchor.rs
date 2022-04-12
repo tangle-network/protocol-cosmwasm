@@ -8,7 +8,7 @@ pub struct InstantiateMsg {
     pub chain_id: u64,
     pub levels: u32,
     pub deposit_size: String,
-    pub cw20_address: String,
+    pub tokenwrapper_addr: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -50,7 +50,7 @@ pub enum QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
-    pub cw20_address: String,
+    pub tokenwrapper_addr: String,
     pub chain_id: u64,
     pub deposit_size: String,
 }

@@ -189,7 +189,7 @@ pub struct Anchor {
     pub deposit_size: Uint128,
     pub merkle_tree: MerkleTree,
     pub linkable_tree: LinkableMerkleTree,
-    pub cw20_address: Addr,
+    pub tokenwrapper_addr: Addr, // Cw20 token address used for wrapping native & any cw20 token
 }
 
 // MerkleTree

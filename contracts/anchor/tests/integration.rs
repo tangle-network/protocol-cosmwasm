@@ -42,7 +42,7 @@ fn integration_test_instantiate_anchor() {
         chain_id: CHAIN_ID,
         levels: LEVELS,
         deposit_size: DEPOSIT_SIZE.to_string(),
-        cw20_address: CW20_ADDRESS.to_string(),
+        tokenwrapper_addr: CW20_ADDRESS.to_string(),
     };
 
     let info = mock_info("anyone", &[]);
@@ -66,7 +66,7 @@ fn test_deposit_cw20() {
         chain_id: CHAIN_ID,
         levels: LEVELS,
         deposit_size: DEPOSIT_SIZE.to_string(),
-        cw20_address: CW20_ADDRESS.to_string(),
+        tokenwrapper_addr: CW20_ADDRESS.to_string(),
     };
 
     let _res: Response = instantiate(&mut deps, env, info, instantiate_msg).unwrap();

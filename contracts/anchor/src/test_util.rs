@@ -12,8 +12,6 @@ use wasm_utils::{
     types::{Backend, Curve as WasmCurve},
 };
 
-use crate::state::ANCHOR;
-
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub struct Element(pub [u8; 32]);
 
