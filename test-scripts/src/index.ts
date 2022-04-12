@@ -14,7 +14,7 @@ import * as testContracts from './scripts/testContracts';
             await setupContracts.setupAnchor();
             break;
         case "testnet_test_anchor":
-            await testContracts.testanchor();
+            await testContracts.testAnchor();
             break;
         default:
             console.log("Invalid command");

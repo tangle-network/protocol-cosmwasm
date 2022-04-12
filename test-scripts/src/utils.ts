@@ -6,15 +6,13 @@ import {
 	MsgInstantiateContract, 
 	MsgStoreCode, 
 } from "@terra-money/terra.js";
-
-import axios from "axios";
 import chalk from "chalk";
 import * as fs from "fs";
 
 /**
  * @notice Upload contract code to LocalTerra. Return code ID.
  */
- export async function storeCode(
+export async function storeCode(
     terra: LCDClient,
     deployer: Wallet,
     filepath: string
@@ -36,17 +34,17 @@ export async function instantiateContract(
     admin: Wallet, // leave this emtpy then contract is not migratable
     codeId: number,
     instantiateMsg: Record<string, unknown>
-  ) {
+) {
     const result = await sendTransaction(terra, deployer, [
-      new MsgInstantiateContract(
-        deployer.key.accAddress,
-        admin.key.accAddress,
-        codeId,
-        instantiateMsg
-      ),
+        new MsgInstantiateContract(
+            deployer.key.accAddress,
+            admin.key.accAddress,
+            codeId,
+            instantiateMsg
+        ),
     ]);
     return result;
-  }
+}
 
 
 /**
@@ -58,35 +56,36 @@ export async function sendTransaction(
     sender: Wallet,
     msgs: Msg[],
     verbose = false
-  ): Promise<any> {
+): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
     const tx = await sender.createAndSignTx({ msgs });
     const result = await terra.tx.broadcast(tx);
-  
+
     // Print the log info
     if (verbose) {
-      console.log(chalk.magenta("\nTxHash:"), result.txhash);
-      try {
+        console.log(chalk.magenta("\nTxHash:"), result.txhash);
+        try {
         console.log(
-          chalk.magenta("Raw log:"),
-          JSON.stringify(JSON.parse(result.raw_log), null, 2)
+            chalk.magenta("Raw log:"),
+            JSON.stringify(JSON.parse(result.raw_log), null, 2)
         );
-      } catch {
+        } catch {
         console.log(chalk.magenta("Failed to parse log! Raw log:"), result.raw_log);
-      }
+        }
     }
-  
+
     if (isTxError(result)) {
-      throw new Error(
+        throw new Error(
         chalk.red("Transaction failed!") +
-          `\n${chalk.yellow("code")}: ${result.code}` +
-          `\n${chalk.yellow("codespace")}: ${result.codespace}` +
-          `\n${chalk.yellow("raw_log")}: ${result.raw_log}`
-      );
+            `\n${chalk.yellow("code")}: ${result.code}` +
+            `\n${chalk.yellow("codespace")}: ${result.codespace}` +
+            `\n${chalk.yellow("raw_log")}: ${result.raw_log}`
+        );
     }
-  
+
     return result;
-  }
-  
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function encodeObjBinary(obj: any) {
     return Buffer.from(JSON.stringify(obj)).toString("base64");
-} 
+}
