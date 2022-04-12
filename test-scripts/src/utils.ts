@@ -85,6 +85,44 @@ export async function sendTransaction(
     return result;
 }
 
+export async function queryNativeBalance(
+    terra: LCDClient,
+    denom: string,
+    wallet: string,
+): Promise<any> {
+    try {
+        const res = await terra.bank.balance(wallet);
+        const amount = res[0].get(denom)?.amount;
+        if (!amount) {
+            console.error("Invalid amount");
+        } else {
+            return parseInt(amount.toString());
+        }
+    } catch {
+        console.error("Unable to query the native balance!");
+    }
+}
+
+export async function queryCw20Balance(
+    terra: LCDClient, 
+    cw20Contract: string, 
+    wallet: string,
+): Promise<any> {
+    try {
+        const result: { balance: string } = await terra.wasm.contractQuery(
+            cw20Contract,
+            {
+                "balance": {
+                    "address": wallet,
+                },
+            }
+        );
+        return parseInt(result.balance);
+    } catch {
+        console.error("Unable to query the Cw20 balance!");
+    }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function encodeObjBinary(obj: any) {
     return Buffer.from(JSON.stringify(obj)).toString("base64");

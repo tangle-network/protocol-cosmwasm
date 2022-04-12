@@ -17,5 +17,7 @@ export default {
         mixer: "",
         anchor: "",
         vanchor: "",
+        recipient: "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4",
+        relayer: "terra1jrj2vh6cstqwk3pg8nkmdf0r9z0n3q3f3jk5xn"
     },
 };
