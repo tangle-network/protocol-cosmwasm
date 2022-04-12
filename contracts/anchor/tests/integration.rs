@@ -1,15 +1,15 @@
 //! This integration test tries to run and call the generated wasm.
 
-use cosmwasm_std::{attr, from_binary, to_binary, Response, Uint128};
+use cosmwasm_std::{attr, to_binary, Response, Uint128};
 use cosmwasm_vm::testing::{
     execute, instantiate, mock_env, mock_info, mock_instance_with_gas_limit, query,
 };
 use cw20::Cw20ReceiveMsg;
-use protocol_cosmwasm::anchor::{Cw20HookMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg};
+use protocol_cosmwasm::anchor::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, QueryMsg};
 
 use ark_bn254::Fr;
+use ark_ff::BigInteger;
 use ark_ff::PrimeField;
-use ark_ff::{BigInteger, Field};
 use ark_std::One;
 use arkworks_native_gadgets::poseidon::{FieldHasher, Poseidon};
 use arkworks_setups::common::setup_params;
@@ -41,8 +41,8 @@ fn integration_test_instantiate_anchor() {
         max_edges: MAX_EDGES,
         chain_id: CHAIN_ID,
         levels: LEVELS,
-        deposit_size: Uint128::from(DEPOSIT_SIZE),
-        cw20_address: CW20_ADDRESS.to_string(),
+        deposit_size: DEPOSIT_SIZE.to_string(),
+        tokenwrapper_addr: CW20_ADDRESS.to_string(),
     };
 
     let info = mock_info("anyone", &[]);
@@ -52,10 +52,6 @@ fn integration_test_instantiate_anchor() {
         response.attributes,
         vec![attr("method", "instantiate"), attr("owner", "anyone"),]
     );
-
-    let query = query(&mut deps, mock_env(), QueryMsg::GetCw20Address {}).unwrap();
-    let info: InfoResponse = from_binary(&query).unwrap();
-    assert_eq!(info.cw20_address, CW20_ADDRESS.to_string());
 }
 
 #[test]
@@ -69,8 +65,8 @@ fn test_deposit_cw20() {
         max_edges: MAX_EDGES,
         chain_id: CHAIN_ID,
         levels: LEVELS,
-        deposit_size: Uint128::from(DEPOSIT_SIZE),
-        cw20_address: CW20_ADDRESS.to_string(),
+        deposit_size: DEPOSIT_SIZE.to_string(),
+        tokenwrapper_addr: CW20_ADDRESS.to_string(),
     };
 
     let _res: Response = instantiate(&mut deps, env, info, instantiate_msg).unwrap();

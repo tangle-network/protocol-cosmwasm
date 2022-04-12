@@ -1,4 +1,3 @@
-use cosmwasm_std::{Uint128, Uint256};
 use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -8,8 +7,8 @@ pub struct InstantiateMsg {
     pub max_edges: u32,
     pub chain_id: u64,
     pub levels: u32,
-    pub deposit_size: Uint128,
-    pub cw20_address: String,
+    pub deposit_size: String,
+    pub tokenwrapper_addr: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -33,8 +32,8 @@ pub struct WithdrawMsg {
     pub nullifier_hash: [u8; 32],
     pub recipient: String,
     pub relayer: String,
-    pub fee: Uint256,
-    pub refund: Uint256,
+    pub fee: String,
+    pub refund: String,
     pub commitment: [u8; 32],
     pub cw20_address: String,
 }
@@ -42,11 +41,40 @@ pub struct WithdrawMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    GetCw20Address {},
+    Config {},
+    EdgeInfo { id: u64 },
+    NeighborRootInfo { chain_id: u64, id: u32 },
+    MerkleTreeInfo {},
+    MerkleRootInfo { id: u32 },
 }
 
-// We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InfoResponse {
-    pub cw20_address: String,
+pub struct ConfigResponse {
+    pub tokenwrapper_addr: String,
+    pub chain_id: u64,
+    pub deposit_size: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct EdgeInfoResponse {
+    pub chain_id: u64,
+    pub root: [u8; 32],
+    pub latest_leaf_index: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct NeighborRootInfoResponse {
+    pub neighbor_root: [u8; 32],
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MerkleTreeInfoResponse {
+    pub levels: u32,
+    pub curr_root_index: u32,
+    pub next_index: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MerkleRootInfoResponse {
+    pub root: [u8; 32],
 }

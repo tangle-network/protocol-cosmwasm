@@ -1,4 +1,4 @@
-use cosmwasm_std::{CanonicalAddr, StdResult, Storage, Uint256};
+use cosmwasm_std::{Addr, StdResult, Storage, Uint128};
 use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -20,8 +20,6 @@ pub struct Edge {
     pub latest_leaf_index: u32,
 }
 
-pub const EDGES: Map<String, Edge> = Map::new("edges");
-
 pub fn read_edge(store: &dyn Storage, k: ChainId) -> StdResult<Edge> {
     EDGES.load(store, k.to_string())
 }
@@ -34,8 +32,6 @@ pub fn has_edge(store: &dyn Storage, k: ChainId) -> bool {
     EDGES.has(store, k.to_string())
 }
 
-pub const CURR_NEIGHBOR_ROOT_INDEX: Map<String, u32> = Map::new("curr_neighbor_root_index");
-
 pub fn read_curr_neighbor_root_index(store: &dyn Storage, k: ChainId) -> StdResult<u32> {
     CURR_NEIGHBOR_ROOT_INDEX.load(store, k.to_string())
 }
@@ -47,8 +43,6 @@ pub fn save_curr_neighbor_root_index(
 ) -> StdResult<()> {
     CURR_NEIGHBOR_ROOT_INDEX.save(store, k.to_string(), &data)
 }
-
-pub const NEIGHBOR_ROOTS: Map<(String, String), [u8; 32]> = Map::new("neighbor_roots");
 
 pub fn read_neighbor_roots(store: &dyn Storage, k: (ChainId, u32)) -> StdResult<[u8; 32]> {
     let (id, num) = k;
@@ -192,22 +186,11 @@ impl LinkableMerkleTree {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Anchor {
     pub chain_id: u64,
-    pub deposit_size: Uint256,
+    pub deposit_size: Uint128,
     pub merkle_tree: MerkleTree,
     pub linkable_tree: LinkableMerkleTree,
-    pub cw20_address: CanonicalAddr,
+    pub tokenwrapper_addr: Addr, // Cw20 token address used for wrapping native & any cw20 token
 }
-
-pub const ANCHOR: Item<Anchor> = Item::new("anchor");
-
-// Struct to save the use of "nullifiers"
-pub const NULLIFIERS: Map<Vec<u8>, bool> = Map::new("used_nullifers");
-
-// "Poseidon hasher"
-pub const POSEIDON: Item<Poseidon> = Item::new("poseidon");
-
-// "AnchorVerifier"
-pub const ANCHORVERIFIER: Item<AnchorVerifier> = Item::new("anchor_verifier");
 
 // MerkleTree
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -217,9 +200,6 @@ pub struct MerkleTree {
     pub next_index: u32,
 }
 
-// MerkleTree "filled_subtrees"
-pub const FILLED_SUBTREES: Map<String, [u8; 32]> = Map::new("filled_subtrees");
-
 pub fn save_subtree(store: &mut dyn Storage, k: u32, data: &[u8; 32]) -> StdResult<()> {
     FILLED_SUBTREES.save(store, k.to_string(), data)
 }
@@ -227,9 +207,6 @@ pub fn save_subtree(store: &mut dyn Storage, k: u32, data: &[u8; 32]) -> StdResu
 pub fn read_subtree(store: &dyn Storage, k: u32) -> StdResult<[u8; 32]> {
     FILLED_SUBTREES.load(store, k.to_string())
 }
-
-// MerkleTree Roots
-pub const MERKLEROOTS: Map<String, [u8; 32]> = Map::new("merkle_roots");
 
 pub fn save_root(store: &mut dyn Storage, k: u32, data: &[u8; 32]) -> StdResult<()> {
     MERKLEROOTS.save(store, k.to_string(), data)
@@ -310,3 +287,14 @@ impl MerkleTree {
         false
     }
 }
+
+pub const EDGES: Map<String, Edge> = Map::new("edges");
+pub const CURR_NEIGHBOR_ROOT_INDEX: Map<String, u32> = Map::new("curr_neighbor_root_index");
+pub const NEIGHBOR_ROOTS: Map<(String, String), [u8; 32]> = Map::new("neighbor_roots");
+pub const MERKLEROOTS: Map<String, [u8; 32]> = Map::new("merkle_roots");
+pub const FILLED_SUBTREES: Map<String, [u8; 32]> = Map::new("filled_subtrees");
+pub const NULLIFIERS: Map<Vec<u8>, bool> = Map::new("used_nullifers");
+
+pub const ANCHOR: Item<Anchor> = Item::new("anchor");
+pub const POSEIDON: Item<Poseidon> = Item::new("poseidon");
+pub const ANCHORVERIFIER: Item<AnchorVerifier> = Item::new("anchor_verifier");

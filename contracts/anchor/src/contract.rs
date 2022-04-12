@@ -1,19 +1,21 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult, Storage, Uint128, Uint256, WasmMsg,
+    attr, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
+    Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 
 use crate::state::{
-    save_root, save_subtree, Anchor, LinkableMerkleTree, MerkleTree, ANCHOR, ANCHORVERIFIER,
-    NULLIFIERS, POSEIDON,
+    read_edge, read_neighbor_roots, read_root, save_root, save_subtree, Anchor, LinkableMerkleTree,
+    MerkleTree, ANCHOR, ANCHORVERIFIER, NULLIFIERS, POSEIDON,
 };
 use codec::Encode;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use protocol_cosmwasm::anchor::{
-    Cw20HookMsg, ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg, WithdrawMsg,
+    ConfigResponse, Cw20HookMsg, EdgeInfoResponse, ExecuteMsg, InstantiateMsg,
+    MerkleRootInfoResponse, MerkleTreeInfoResponse, NeighborRootInfoResponse, QueryMsg,
+    WithdrawMsg,
 };
 use protocol_cosmwasm::anchor_verifier::AnchorVerifier;
 use protocol_cosmwasm::error::ContractError;
@@ -65,16 +67,20 @@ pub fn instantiate(
         chain_id_list: Vec::new(),
     };
 
-    // Get the "cw20_address"
-    let cw20_address = deps.api.addr_canonicalize(&msg.cw20_address)?;
+    // Get the "TokenWrapper" token address.
+    let tokenwrapper_addr = deps.api.addr_validate(msg.tokenwrapper_addr.as_str())?;
 
     // Initialize the Anchor
+    let deposit_size = match parse_string_to_uint128(msg.deposit_size) {
+        Ok(v) => v,
+        Err(e) => return Err(ContractError::Std(e)),
+    };
     let anchor = Anchor {
         chain_id: msg.chain_id,
-        deposit_size: Uint256::from(msg.deposit_size.u128()),
         linkable_tree: linkable_merkle_tree,
+        deposit_size,
         merkle_tree,
-        cw20_address,
+        tokenwrapper_addr,
     };
     ANCHOR.save(deps.storage, &anchor)?;
 
@@ -99,35 +105,33 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
+        // Withdraw the cw20 token with proof
         ExecuteMsg::Withdraw(msg) => withdraw(deps, info, msg),
+        // Deposit the cw20 token with commitment
         ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
     }
 }
 
-/// User deposits the Cw20 tokens with its commitments.
-/// The deposit starts from executing the hook message
-/// coming from the Cw20 token contract.
-/// It checks the validity of the Cw20 tokens sent.
-/// It also checks the merkle tree availiability.
-/// It saves the commitment in "merkle tree".
 pub fn receive_cw20(
     deps: DepsMut,
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
-    // Only Cw20 token contract can execute this message.
     let anchor: Anchor = ANCHOR.load(deps.storage)?;
-    if anchor.cw20_address != deps.api.addr_canonicalize(info.sender.as_str())? {
+
+    // Validations
+    let cw20_address = deps.api.addr_validate(info.sender.as_str())?;
+    if anchor.tokenwrapper_addr != cw20_address {
         return Err(ContractError::Unauthorized {});
     }
 
-    let tokens_sent = cw20_msg.amount;
+    let sent_cw20_token_amt = cw20_msg.amount;
+    if sent_cw20_token_amt < anchor.deposit_size {
+        return Err(ContractError::InsufficientFunds {});
+    }
     match from_binary(&cw20_msg.msg) {
         Ok(Cw20HookMsg::DepositCw20 { commitment }) => {
-            if Uint256::from(tokens_sent) < anchor.deposit_size {
-                return Err(ContractError::InsufficientFunds {});
-            }
-            // Checks the validity of
+            // Handle the "deposit" cw20 tokens
             if let Some(commitment) = commitment {
                 let mut merkle_tree = anchor.merkle_tree;
                 let poseidon = POSEIDON.load(deps.storage)?;
@@ -141,7 +145,7 @@ pub fn receive_cw20(
                         chain_id: anchor.chain_id,
                         deposit_size: anchor.deposit_size,
                         linkable_tree: anchor.linkable_tree,
-                        cw20_address: anchor.cw20_address,
+                        tokenwrapper_addr: anchor.tokenwrapper_addr,
                         merkle_tree,
                     },
                 )?;
@@ -162,25 +166,31 @@ pub fn receive_cw20(
     }
 }
 
-/// User withdraws the CW20 tokens to "recipient" address
-/// by providing the "proof" for the "commitment".
-/// It verifies the "withdraw" by verifying the "proof"
-/// with "commitment" saved in prior.
-/// If success on verify, then it performs "withdraw" action
-/// which sends the CW20 tokens to "recipient" & "relayer" address.
 pub fn withdraw(
     deps: DepsMut,
     info: MessageInfo,
     msg: WithdrawMsg,
 ) -> Result<Response, ContractError> {
-    // Validation 1. Check if the funds are sent.
-    if !info.funds.is_empty() {
-        return Err(ContractError::UnnecessaryFunds {});
+    let recipient = msg.recipient;
+    let relayer = msg.relayer;
+    let fee = match parse_string_to_uint128(msg.fee) {
+        Ok(v) => v,
+        Err(e) => return Err(ContractError::Std(e)),
+    };
+    let refund = match parse_string_to_uint128(msg.refund) {
+        Ok(v) => v,
+        Err(e) => return Err(ContractError::Std(e)),
+    };
+    let sent_funds = info.funds;
+    if !refund.is_zero() && (sent_funds.len() != 1 || sent_funds[0].amount != refund) {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Sent insufficent refund".to_string(),
+        }));
     }
 
-    // Validation 2. Check if the root is known to merkle tree
     let anchor = ANCHOR.load(deps.storage)?;
 
+    // Validation 1. Check if the root is known to merkle tree.
     let merkle_tree = anchor.merkle_tree;
     if !merkle_tree.is_known_root(msg.roots[0], deps.storage) {
         return Err(ContractError::Std(StdError::GenericErr {
@@ -188,7 +198,7 @@ pub fn withdraw(
         }));
     }
 
-    // Validation 3. Check if the roots are valid in linkable tree.
+    // Validation 2. Check if the roots are valid in linkable tree.
     let linkable_tree = anchor.linkable_tree;
     if !linkable_tree.is_valid_neighbor_roots(&msg.roots[1..], deps.storage) {
         return Err(ContractError::Std(StdError::GenericErr {
@@ -196,13 +206,14 @@ pub fn withdraw(
         }));
     }
 
-    // Checks if the nullifier already used.
+    // Validation 3. Check if the nullifier already used.
     if is_known_nullifier(deps.storage, msg.nullifier_hash) {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Nullifier is known".to_string(),
         }));
     }
 
+    //
     let element_encoder = |v: &[u8]| {
         let mut output = [0u8; 32];
         output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
@@ -212,32 +223,14 @@ pub fn withdraw(
     // Format the public input bytes
     let chain_id_type_bytes =
         element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
-    let recipient_bytes =
-        truncate_and_pad(&hex::decode(&msg.recipient).map_err(|_| ContractError::DecodeError)?);
-    let relayer_bytes =
-        truncate_and_pad(&hex::decode(&msg.relayer).map_err(|_| ContractError::DecodeError)?);
-    let fee_u128 = match Uint128::try_from(msg.fee) {
-        Ok(v) => v,
-        Err(_) => {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Cannot convert fee".to_string(),
-            }))
-        }
-    };
-    let refund_u128 = match Uint128::try_from(msg.refund) {
-        Ok(v) => v,
-        Err(_) => {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Cannot convert refund".to_string(),
-            }))
-        }
-    };
+    let recipient_bytes = truncate_and_pad(recipient.as_bytes());
+    let relayer_bytes = truncate_and_pad(relayer.as_bytes());
 
     let mut arbitrary_data_bytes = Vec::new();
     arbitrary_data_bytes.extend_from_slice(&recipient_bytes);
     arbitrary_data_bytes.extend_from_slice(&relayer_bytes);
-    arbitrary_data_bytes.extend_from_slice(&fee_u128.u128().encode());
-    arbitrary_data_bytes.extend_from_slice(&refund_u128.u128().encode());
+    arbitrary_data_bytes.extend_from_slice(&fee.u128().encode());
+    arbitrary_data_bytes.extend_from_slice(&refund.u128().encode());
     arbitrary_data_bytes.extend_from_slice(&msg.commitment);
     let arbitrary_input =
         Keccak256::hash(&arbitrary_data_bytes).map_err(|_| ContractError::HashError)?;
@@ -266,7 +259,7 @@ pub fn withdraw(
 
     // Validate the "cw20_address".
     let cw20_address = msg.cw20_address;
-    if anchor.cw20_address != deps.api.addr_canonicalize(cw20_address.as_str())? {
+    if anchor.tokenwrapper_addr != deps.api.addr_validate(cw20_address.as_str())? {
         return Err(ContractError::Std(StdError::generic_err(
             "Invalid cw20 address",
         )));
@@ -276,58 +269,43 @@ pub fn withdraw(
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     // Send the funds to "recipient"
-    let amt_to_recipient = match Uint128::try_from(anchor.deposit_size - msg.fee) {
+    let amt_to_recipient = match anchor.deposit_size.checked_sub(fee) {
         Ok(v) => v,
-        Err(_) => {
+        Err(e) => {
             return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Cannot compute amount".to_string(),
+                msg: e.to_string(),
             }))
         }
     };
-    msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: cw20_address.clone(),
-        funds: [].to_vec(),
-        msg: to_binary(&Cw20ExecuteMsg::Transfer {
-            recipient: msg.recipient.clone(),
-            amount: amt_to_recipient,
-        })?,
-    }));
+
+    if !amt_to_recipient.is_zero() {
+        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: cw20_address.clone(),
+            funds: [].to_vec(),
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: recipient.clone(),
+                amount: amt_to_recipient,
+            })?,
+        }));
+    }
 
     // Send the funds to "relayer"
-    let amt_to_relayer = match Uint128::try_from(msg.fee) {
-        Ok(v) => v,
-        Err(_) => {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Cannot compute amount".to_string(),
-            }))
-        }
-    };
-    msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: cw20_address.clone(),
-        funds: [].to_vec(),
-        msg: to_binary(&Cw20ExecuteMsg::Transfer {
-            recipient: msg.relayer.clone(),
-            amount: amt_to_relayer,
-        })?,
-    }));
-
-    // If "refund" field is non-zero, send the funds to "recipient"
-    if msg.refund > Uint256::zero() {
-        let amt_refund = match Uint128::try_from(msg.refund) {
-            Ok(v) => v,
-            Err(_) => {
-                return Err(ContractError::Std(StdError::GenericErr {
-                    msg: "Cannot compute amount".to_string(),
-                }))
-            }
-        };
+    if !fee.is_zero() {
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: cw20_address,
             funds: [].to_vec(),
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: msg.recipient.clone(),
-                amount: amt_refund,
+                recipient: relayer,
+                amount: fee,
             })?,
+        }));
+    }
+
+    // If "refund" field is non-zero, send the funds to "recipient"
+    if !refund.is_zero() {
+        msgs.push(CosmosMsg::Bank(BankMsg::Send {
+            to_address: recipient,
+            amount: sent_funds,
         }));
     }
 
@@ -339,15 +317,55 @@ pub fn withdraw(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCw20Address {} => to_binary(&get_cw20_address(deps)?),
+        QueryMsg::Config {} => to_binary(&get_config(deps)?),
+        QueryMsg::EdgeInfo { id } => to_binary(&get_edge_info(deps, id)?),
+        QueryMsg::NeighborRootInfo { chain_id, id } => {
+            to_binary(&get_neighbor_root_info(deps, chain_id, id)?)
+        }
+        QueryMsg::MerkleTreeInfo {} => to_binary(&get_merkle_tree_info(deps)?),
+        QueryMsg::MerkleRootInfo { id } => to_binary(&get_merkle_root(deps, id)?),
     }
 }
 
-pub fn get_cw20_address(deps: Deps) -> StdResult<InfoResponse> {
+pub fn get_config(deps: Deps) -> StdResult<ConfigResponse> {
     let anchor = ANCHOR.load(deps.storage)?;
-    Ok(InfoResponse {
-        cw20_address: deps.api.addr_humanize(&anchor.cw20_address)?.to_string(),
+    Ok(ConfigResponse {
+        chain_id: anchor.chain_id,
+        tokenwrapper_addr: anchor.tokenwrapper_addr.to_string(),
+        deposit_size: anchor.deposit_size.to_string(),
     })
+}
+
+pub fn get_edge_info(deps: Deps, id: u64) -> StdResult<EdgeInfoResponse> {
+    let edge = read_edge(deps.storage, id)?;
+    Ok(EdgeInfoResponse {
+        chain_id: edge.chain_id,
+        root: edge.root,
+        latest_leaf_index: edge.latest_leaf_index,
+    })
+}
+
+pub fn get_neighbor_root_info(
+    deps: Deps,
+    chain_id: u64,
+    id: u32,
+) -> StdResult<NeighborRootInfoResponse> {
+    let neighbor_root = read_neighbor_roots(deps.storage, (chain_id, id))?;
+    Ok(NeighborRootInfoResponse { neighbor_root })
+}
+
+pub fn get_merkle_tree_info(deps: Deps) -> StdResult<MerkleTreeInfoResponse> {
+    let anchor = ANCHOR.load(deps.storage)?;
+    Ok(MerkleTreeInfoResponse {
+        levels: anchor.merkle_tree.levels,
+        curr_root_index: anchor.merkle_tree.current_root_index,
+        next_index: anchor.merkle_tree.next_index,
+    })
+}
+
+pub fn get_merkle_root(deps: Deps, id: u32) -> StdResult<MerkleRootInfoResponse> {
+    let root = read_root(deps.storage, id)?;
+    Ok(MerkleRootInfoResponse { root })
 }
 
 // Check if the "nullifier" is already used or not.
@@ -385,4 +403,12 @@ pub fn compute_chain_id_type(chain_id: u64, chain_type: &[u8]) -> u64 {
     buf[2..4].copy_from_slice(&chain_type);
     buf[4..8].copy_from_slice(&chain_id_value.to_be_bytes());
     u64::from_be_bytes(buf)
+}
+
+pub fn parse_string_to_uint128(v: String) -> Result<Uint128, StdError> {
+    let res = match v.parse::<u128>() {
+        Ok(v) => Uint128::from(v),
+        Err(e) => return Err(StdError::GenericErr { msg: e.to_string() }),
+    };
+    Ok(res)
 }
