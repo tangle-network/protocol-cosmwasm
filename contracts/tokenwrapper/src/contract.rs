@@ -99,7 +99,12 @@ pub fn execute(
         ExecuteMsg::Wrap { sender, recipient } => wrap_native(deps, env, info, sender, recipient),
 
         // Used to unwrap native/cw20 tokens on behalf of a sender.
-        ExecuteMsg::Unwrap { sender, token, amount, recipient } => match token {
+        ExecuteMsg::Unwrap {
+            sender,
+            token,
+            amount,
+            recipient,
+        } => match token {
             // Unwrap the cw20 tokens.
             Some(token) => unwrap_cw20(deps, env, info, sender, token, amount, recipient),
             // Unwrap the native token.
@@ -167,10 +172,10 @@ pub fn execute(
 }
 
 fn wrap_native(
-    mut deps: DepsMut, 
-    env: Env, 
-    info: MessageInfo, 
-    sender: Option<String>, 
+    mut deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    sender: Option<String>,
     recipient: Option<String>,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
@@ -211,8 +216,14 @@ fn wrap_native(
     };
 
     // Mint the wrapped tokens to "sender" address.
-    let sender = sender.unwrap_or(info.sender.to_string());
-    execute_mint(deps.branch(), env.clone(), sub_info, sender.clone(), left_over)?;
+    let sender = sender.unwrap_or_else(|| info.sender.to_string());
+    execute_mint(
+        deps.branch(),
+        env.clone(),
+        sub_info,
+        sender.clone(),
+        left_over,
+    )?;
 
     // Send the wrapped tokens to "recipient" address if any.
     if recipient.is_some() {
@@ -268,7 +279,7 @@ fn unwrap_native(
     TOTAL_SUPPLY.save(deps.storage, &Supply { issued: remainder })?;
 
     // burn from the "sender"
-    let sender = sender.unwrap_or(info.sender.to_string());
+    let sender = sender.unwrap_or_else(|| info.sender.to_string());
     let sub_info = MessageInfo {
         sender: deps.api.addr_validate(sender.as_str())?,
         funds: vec![],
@@ -276,7 +287,7 @@ fn unwrap_native(
     execute_burn(deps.branch(), env, sub_info, amount)?;
 
     // Send the native token to "recipient"
-    let recipient = recipient.unwrap_or(sender.clone());
+    let recipient = recipient.unwrap_or_else(|| sender.clone());
     let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Bank(BankMsg::Send {
         to_address: recipient.clone(),
         amount: coins(amount.u128(), config.native_token_denom),
@@ -321,16 +332,16 @@ fn unwrap_cw20(
     let remainder = total_supply.issued - amount;
     TOTAL_SUPPLY.save(deps.storage, &Supply { issued: remainder })?;
 
-     // burn from the "sender"
-     let sender = sender.unwrap_or(info.sender.to_string());
-     let sub_info = MessageInfo {
+    // burn from the "sender"
+    let sender = sender.unwrap_or_else(|| info.sender.to_string());
+    let sub_info = MessageInfo {
         sender: deps.api.addr_validate(sender.as_str())?,
         funds: vec![],
-     };
-     execute_burn(deps.branch(), env, sub_info, amount)?;
+    };
+    execute_burn(deps.branch(), env, sub_info, amount)?;
 
     // Send the Cw20 token to "recipient"
-    let recipient = recipient.unwrap_or(sender.clone());
+    let recipient = recipient.unwrap_or_else(|| sender.clone());
     let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: token.to_string(),
         funds: vec![],
@@ -380,7 +391,6 @@ fn wrap_cw20(
 
     match from_binary(&cw20_msg.msg) {
         Ok(Cw20HookMsg::Wrap { sender, recipient }) => {
-            
             // Save the wrapping number
             let mut supply = TOTAL_SUPPLY.load(deps.storage)?;
             supply.issued += left_over;
@@ -391,8 +401,14 @@ fn wrap_cw20(
                 sender: env.contract.address.clone(),
                 funds: vec![],
             };
-            let sender = sender.unwrap_or(cw20_msg.sender.clone());
-            execute_mint(deps.branch(), env.clone(), sub_info, sender.clone(), left_over)?;
+            let sender = sender.unwrap_or_else(|| cw20_msg.sender.clone());
+            execute_mint(
+                deps.branch(),
+                env.clone(),
+                sub_info,
+                sender.clone(),
+                left_over,
+            )?;
 
             // Send the wrapped tokens to "recipient" address if any.
             if recipient.is_some() {

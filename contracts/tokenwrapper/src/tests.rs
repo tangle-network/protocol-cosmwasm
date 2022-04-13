@@ -90,7 +90,10 @@ fn test_wrap_native() {
 
     // Try the wrapping the native token
     let info = mock_info("anyone", &coins(100, "uusd"));
-    let wrap_msg = ExecuteMsg::Wrap { sender: Some("owner".to_string()), recipient: Some("recipient".to_string()) };
+    let wrap_msg = ExecuteMsg::Wrap {
+        sender: Some("owner".to_string()),
+        recipient: Some("recipient".to_string()),
+    };
     let res = execute(deps.as_mut(), mock_env(), info, wrap_msg).unwrap();
 
     assert_eq!(
@@ -127,7 +130,10 @@ fn test_unwrap_native() {
 
     // Try the wrapping the native token
     let info = mock_info("anyone", &coins(100, "uusd"));
-    let wrap_msg = ExecuteMsg::Wrap { sender: None, recipient: None };
+    let wrap_msg = ExecuteMsg::Wrap {
+        sender: None,
+        recipient: None,
+    };
     let _res = execute(deps.as_mut(), mock_env(), info, wrap_msg).unwrap();
 
     // Try unwrapping the native token
@@ -182,7 +188,11 @@ fn test_wrap_cw20() {
     let wrap_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "anyone".to_string(),
         amount: Uint128::from(100_u128),
-        msg: to_binary(&Cw20HookMsg::Wrap { sender: None, recipient: None }).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Wrap {
+            sender: None,
+            recipient: None,
+        })
+        .unwrap(),
     });
     let res = execute(deps.as_mut(), mock_env(), info, wrap_msg).unwrap();
 
@@ -228,7 +238,11 @@ fn test_unwrap_cw20() {
     let wrap_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "anyone".to_string(),
         amount: Uint128::from(100_u128),
-        msg: to_binary(&Cw20HookMsg::Wrap { sender: None, recipient: None }).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Wrap {
+            sender: None,
+            recipient: None,
+        })
+        .unwrap(),
     });
     let _res = execute(deps.as_mut(), mock_env(), info, wrap_msg).unwrap();
 

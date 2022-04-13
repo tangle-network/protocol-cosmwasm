@@ -68,7 +68,10 @@ fn integration_test_tokenwrapper_wrap_native() {
 
     // Wrap the native token
     let info = mock_info("anyone", &[Coin::new(100_u128, "uusd")]);
-    let wrap_msg = ExecuteMsg::Wrap { sender: None, recipient: None };
+    let wrap_msg = ExecuteMsg::Wrap {
+        sender: None,
+        recipient: None,
+    };
     let res: Response = execute(&mut deps, mock_env(), info, wrap_msg).unwrap();
 
     assert_eq!(
@@ -118,7 +121,10 @@ fn integration_test_tokenwrapper_unwrap_native() {
 
     // Wrap the native token
     let info = mock_info("anyone", &[Coin::new(100_u128, "uusd")]);
-    let wrap_msg = ExecuteMsg::Wrap { sender: None, recipient: None };
+    let wrap_msg = ExecuteMsg::Wrap {
+        sender: None,
+        recipient: None,
+    };
     let _res: Response = execute(&mut deps, mock_env(), info, wrap_msg).unwrap();
 
     // Unwrap the native token
