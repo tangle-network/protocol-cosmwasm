@@ -28,13 +28,18 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    /// Wrap the native tokens(UST).
-    Wrap {},
+    /// Wrap the native token for "sender" address/tx sender address.
+    Wrap {
+        sender: Option<String>,
+        recipient: Option<String>,
+    },
 
     /// Unwrap the underlying tokens & re-send the fund(native or Cw20)
     Unwrap {
+        sender: Option<String>,
         token: Option<Addr>,
         amount: Uint128,
+        recipient: Option<String>,
     },
 
     /// Wrap the Cw20 token
@@ -123,7 +128,10 @@ pub enum QueryMsg {
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
     /// Wrap Cw20 tokens
-    Wrap {},
+    Wrap {
+        sender: Option<String>,
+        recipient: Option<String>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
