@@ -90,7 +90,7 @@ fn test_wrap_native() {
 
     // Try the wrapping the native token
     let info = mock_info("anyone", &coins(100, "uusd"));
-    let wrap_msg = ExecuteMsg::Wrap {};
+    let wrap_msg = ExecuteMsg::Wrap { sender: Some("owner".to_string()), recipient: Some("recipient".to_string()) };
     let res = execute(deps.as_mut(), mock_env(), info, wrap_msg).unwrap();
 
     assert_eq!(
@@ -98,6 +98,8 @@ fn test_wrap_native() {
         vec![
             attr("action", "wrap_native"),
             attr("from", "anyone"),
+            attr("owner", "owner"),
+            attr("to", "recipient"),
             attr("minted", "99"),
             attr("fee", "1"),
         ]
@@ -110,7 +112,7 @@ fn test_wrap_native() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::Balance {
-            address: "anyone".to_string(),
+            address: "recipient".to_string(),
         },
     )
     .unwrap();
@@ -125,7 +127,7 @@ fn test_unwrap_native() {
 
     // Try the wrapping the native token
     let info = mock_info("anyone", &coins(100, "uusd"));
-    let wrap_msg = ExecuteMsg::Wrap {};
+    let wrap_msg = ExecuteMsg::Wrap { sender: None, recipient: None };
     let _res = execute(deps.as_mut(), mock_env(), info, wrap_msg).unwrap();
 
     // Try unwrapping the native token
@@ -133,6 +135,8 @@ fn test_unwrap_native() {
     let unwrap_msg = ExecuteMsg::Unwrap {
         token: None,
         amount: Uint128::from(80_u128),
+        sender: None,
+        recipient: None,
     };
     let res = execute(deps.as_mut(), mock_env(), info, unwrap_msg).unwrap();
 
@@ -141,6 +145,8 @@ fn test_unwrap_native() {
         vec![
             attr("action", "unwrap_native"),
             attr("from", "anyone"),
+            attr("owner", "anyone"),
+            attr("to", "anyone"),
             attr("unwrap", "80"),
             attr("refund", "80"),
         ]
@@ -176,7 +182,7 @@ fn test_wrap_cw20() {
     let wrap_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "anyone".to_string(),
         amount: Uint128::from(100_u128),
-        msg: to_binary(&Cw20HookMsg::Wrap {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Wrap { sender: None, recipient: None }).unwrap(),
     });
     let res = execute(deps.as_mut(), mock_env(), info, wrap_msg).unwrap();
 
@@ -185,6 +191,8 @@ fn test_wrap_cw20() {
         vec![
             attr("action", "wrap_cw20"),
             attr("from", "anyone"),
+            attr("owner", "anyone"),
+            attr("to", "anyone"),
             attr("minted", "99"),
             attr("fee", "1")
         ]
@@ -220,7 +228,7 @@ fn test_unwrap_cw20() {
     let wrap_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "anyone".to_string(),
         amount: Uint128::from(100_u128),
-        msg: to_binary(&Cw20HookMsg::Wrap {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::Wrap { sender: None, recipient: None }).unwrap(),
     });
     let _res = execute(deps.as_mut(), mock_env(), info, wrap_msg).unwrap();
 
@@ -229,6 +237,8 @@ fn test_unwrap_cw20() {
     let unwrap_msg = ExecuteMsg::Unwrap {
         token: Some(Addr::unchecked(CW20_TOKEN.to_string())),
         amount: Uint128::from(80_u128),
+        sender: None,
+        recipient: None,
     };
     let res = execute(deps.as_mut(), mock_env(), info, unwrap_msg).unwrap();
 
@@ -237,6 +247,8 @@ fn test_unwrap_cw20() {
         vec![
             attr("action", "unwrap_cw20"),
             attr("from", "anyone"),
+            attr("owner", "anyone"),
+            attr("to", "anyone"),
             attr("unwrap", "80"),
             attr("refund", "80"),
         ]
