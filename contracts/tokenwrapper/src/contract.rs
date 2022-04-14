@@ -96,14 +96,19 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         // Used to wrap native tokens on behalf of a sender.
-        ExecuteMsg::Wrap {} => wrap_native(deps, env, info),
+        ExecuteMsg::Wrap { sender, recipient } => wrap_native(deps, env, info, sender, recipient),
 
         // Used to unwrap native/cw20 tokens on behalf of a sender.
-        ExecuteMsg::Unwrap { token, amount } => match token {
+        ExecuteMsg::Unwrap {
+            sender,
+            token,
+            amount,
+            recipient,
+        } => match token {
             // Unwrap the cw20 tokens.
-            Some(token) => unwrap_cw20(deps, env, info, token, amount),
+            Some(token) => unwrap_cw20(deps, env, info, sender, token, amount, recipient),
             // Unwrap the native token.
-            None => unwrap_native(deps, env, info, amount),
+            None => unwrap_native(deps, env, info, sender, amount, recipient),
         },
 
         // Used to wrap cw20 tokens on behalf of a sender.
@@ -166,8 +171,15 @@ pub fn execute(
     }
 }
 
-fn wrap_native(mut deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+fn wrap_native(
+    mut deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    sender: Option<String>,
+    recipient: Option<String>,
+) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
+
     // Validate the "is_native_allowed"
     if !config.is_native_allowed {
         return Err(ContractError::Std(StdError::GenericErr {
@@ -202,7 +214,25 @@ fn wrap_native(mut deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respons
         sender: env.contract.address.clone(),
         funds: vec![],
     };
-    execute_mint(deps, env, sub_info, info.sender.to_string(), left_over)?;
+
+    // Mint the wrapped tokens to "sender" address.
+    let sender = sender.unwrap_or_else(|| info.sender.to_string());
+    execute_mint(
+        deps.branch(),
+        env.clone(),
+        sub_info,
+        sender.clone(),
+        left_over,
+    )?;
+
+    // Send the wrapped tokens to "recipient" address if any.
+    if recipient.is_some() {
+        let sub_info = MessageInfo {
+            sender: deps.api.addr_validate(sender.as_str())?,
+            funds: vec![],
+        };
+        execute_transfer(deps, env, sub_info, recipient.clone().unwrap(), left_over)?;
+    }
 
     // send "fee" to fee_recipient
     let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Bank(BankMsg::Send {
@@ -213,6 +243,8 @@ fn wrap_native(mut deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respons
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("action", "wrap_native"),
         attr("from", info.sender),
+        attr("owner", sender.clone()),
+        attr("to", recipient.unwrap_or(sender)),
         attr("minted", left_over),
         attr("fee", cost_to_wrap),
     ]))
@@ -222,7 +254,9 @@ fn unwrap_native(
     mut deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    sender: Option<String>,
     amount: Uint128,
+    recipient: Option<String>,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     // Validate the "is_native_allowed"
@@ -244,18 +278,26 @@ fn unwrap_native(
     let remainder = total_supply.issued - amount;
     TOTAL_SUPPLY.save(deps.storage, &Supply { issued: remainder })?;
 
-    // burn from the original caller
-    execute_burn(deps.branch(), env, info.clone(), amount)?;
+    // burn from the "sender"
+    let sender = sender.unwrap_or_else(|| info.sender.to_string());
+    let sub_info = MessageInfo {
+        sender: deps.api.addr_validate(sender.as_str())?,
+        funds: vec![],
+    };
+    execute_burn(deps.branch(), env, sub_info, amount)?;
 
-    // Send the native token to caller
+    // Send the native token to "recipient"
+    let recipient = recipient.unwrap_or_else(|| sender.clone());
     let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Bank(BankMsg::Send {
-        to_address: info.sender.to_string(),
+        to_address: recipient.clone(),
         amount: coins(amount.u128(), config.native_token_denom),
     })];
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("action", "unwrap_native"),
         attr("from", info.sender),
+        attr("owner", sender),
+        attr("to", recipient),
         attr("unwrap", amount),
         attr("refund", amount),
     ]))
@@ -265,8 +307,10 @@ fn unwrap_cw20(
     mut deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    sender: Option<String>,
     token: Addr,
     amount: Uint128,
+    recipient: Option<String>,
 ) -> Result<Response, ContractError> {
     // Validate the "token" address
     let is_valid_unwrap_address = HISTORICAL_TOKENS.has(deps.storage, token.clone());
@@ -288,15 +332,21 @@ fn unwrap_cw20(
     let remainder = total_supply.issued - amount;
     TOTAL_SUPPLY.save(deps.storage, &Supply { issued: remainder })?;
 
-    // burn from the original caller
-    execute_burn(deps.branch(), env, info.clone(), amount)?;
+    // burn from the "sender"
+    let sender = sender.unwrap_or_else(|| info.sender.to_string());
+    let sub_info = MessageInfo {
+        sender: deps.api.addr_validate(sender.as_str())?,
+        funds: vec![],
+    };
+    execute_burn(deps.branch(), env, sub_info, amount)?;
 
-    // Send the Cw20 token to caller
+    // Send the Cw20 token to "recipient"
+    let recipient = recipient.unwrap_or_else(|| sender.clone());
     let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: token.to_string(),
         funds: vec![],
         msg: to_binary(&Cw20ExecuteMsg::Transfer {
-            recipient: info.sender.to_string(),
+            recipient: recipient.clone(),
             amount,
         })?,
     })];
@@ -304,6 +354,8 @@ fn unwrap_cw20(
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("action", "unwrap_cw20"),
         attr("from", info.sender),
+        attr("owner", sender),
+        attr("to", recipient),
         attr("unwrap", amount),
         attr("refund", amount),
     ]))
@@ -315,7 +367,6 @@ fn wrap_cw20(
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
-    let sender = cw20_msg.sender;
     let cw20_address = info.sender;
 
     // Validate the cw20 address
@@ -339,7 +390,7 @@ fn wrap_cw20(
     let left_over = cw20_msg.amount - cost_to_wrap;
 
     match from_binary(&cw20_msg.msg) {
-        Ok(Cw20HookMsg::Wrap {}) => {
+        Ok(Cw20HookMsg::Wrap { sender, recipient }) => {
             // Save the wrapping number
             let mut supply = TOTAL_SUPPLY.load(deps.storage)?;
             supply.issued += left_over;
@@ -350,7 +401,23 @@ fn wrap_cw20(
                 sender: env.contract.address.clone(),
                 funds: vec![],
             };
-            execute_mint(deps, env, sub_info, sender.to_string(), left_over)?;
+            let sender = sender.unwrap_or_else(|| cw20_msg.sender.clone());
+            execute_mint(
+                deps.branch(),
+                env.clone(),
+                sub_info,
+                sender.clone(),
+                left_over,
+            )?;
+
+            // Send the wrapped tokens to "recipient" address if any.
+            if recipient.is_some() {
+                let sub_info = MessageInfo {
+                    sender: deps.api.addr_validate(sender.as_str())?,
+                    funds: vec![],
+                };
+                execute_transfer(deps, env, sub_info, recipient.clone().unwrap(), left_over)?;
+            }
 
             // Send the "fee" to "fee_recipient".
             let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
@@ -364,7 +431,9 @@ fn wrap_cw20(
 
             Ok(Response::new().add_messages(msgs).add_attributes(vec![
                 attr("action", "wrap_cw20"),
-                attr("from", sender),
+                attr("from", cw20_msg.sender),
+                attr("owner", sender.clone()),
+                attr("to", recipient.unwrap_or(sender)),
                 attr("minted", left_over),
                 attr("fee", cost_to_wrap),
             ]))
