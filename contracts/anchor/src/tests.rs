@@ -597,3 +597,54 @@ fn test_anchor_fail_when_fee_submitted_is_changed() {
         "Generic error: Invalid withdraw proof".to_string()
     );
 }
+
+#[test]
+fn test_anchor_wrap_token() {
+    let mut deps = create_anchor();
+
+    let wrap_amt = Uint128::from(100_u128);
+    let wrap_token = "recv_token";
+
+    let info = mock_info(wrap_token, &[]);
+    let wrap_token_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+        sender: "anyone".to_string(),
+        amount: wrap_amt,
+        msg: to_binary(&Cw20HookMsg::WrapToken {}).unwrap(),
+    });
+    let response = execute(deps.as_mut(), mock_env(), info, wrap_token_msg).unwrap();
+
+    assert_eq!(response.messages.len(), 1);
+    assert_eq!(
+        response.attributes,
+        vec![
+            attr("method", "wrap_token"),
+            attr("token", wrap_token.to_string()),
+            attr("amount", wrap_amt.to_string()),
+        ]
+    );
+}
+
+#[test]
+fn test_anchor_unwrap_into_token() {
+    let mut deps = create_anchor();
+
+    let unwrap_amt = "100";
+    let recv_token = "recv_token";
+
+    let info = mock_info("anyone", &[]);
+    let unwrap_into_token_msg = ExecuteMsg::UnwrapIntoToken {
+        token_addr: recv_token.to_string(),
+        amount: unwrap_amt.to_string(),
+    };
+    let response = execute(deps.as_mut(), mock_env(), info, unwrap_into_token_msg).unwrap();
+
+    assert_eq!(response.messages.len(), 1);
+    assert_eq!(
+        response.attributes,
+        vec![
+            attr("method", "unwrap_into_token"),
+            attr("token", recv_token),
+            attr("amount", unwrap_amt),
+        ]
+    );
+}

@@ -14,7 +14,14 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
+    /// Withdraw a deposit from the contract
     Withdraw(WithdrawMsg),
+    /// Unwraps the Anchor's TokenWrapper token for the `sender`
+    /// into one of its wrappable tokens.
+    UnwrapIntoToken { token_addr: String, amount: String },
+    /// Handles the cw20 token receive cases
+    /// 1. DepositCw20
+    /// 2. WrapToken
     Receive(Cw20ReceiveMsg),
 }
 
@@ -23,6 +30,9 @@ pub enum ExecuteMsg {
 pub enum Cw20HookMsg {
     /// Depcosit Cw20 tokens
     DepositCw20 { commitment: Option<[u8; 32]> },
+    /// Wraps a cw20 token for the `sender` using
+    /// the underlying Anchor's TokenWrapper contract
+    WrapToken {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
