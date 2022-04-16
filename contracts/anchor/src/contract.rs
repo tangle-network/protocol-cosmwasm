@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
-    Response, StdError, StdResult, Storage, Uint128, WasmMsg,
+    attr, from_binary, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 
@@ -22,7 +22,8 @@ use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::token_wrapper::{
-    Cw20HookMsg as TokenWrapperHookMsg, ExecuteMsg as TokenWrapperExecuteMsg,
+    ConfigResponse as TokenWrapperConfigResp, Cw20HookMsg as TokenWrapperHookMsg,
+    ExecuteMsg as TokenWrapperExecuteMsg, QueryMsg as TokenWrapperQueryMsg,
 };
 use protocol_cosmwasm::zeroes::zeroes;
 
@@ -118,6 +119,12 @@ pub fn execute(
         // 1. DepositCw20
         // 2. WrapToken
         ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
+        // Wrap the native token
+        ExecuteMsg::WrapNative { amount } => {
+            wrap_native(deps, info.sender.to_string(), amount, info.funds)
+        }
+        // Unwrap the "TokenWrapper" token to native token
+        ExecuteMsg::UnwrapNative { amount } => unwrap_native(deps, info.sender.to_string(), amount),
     }
 }
 
@@ -401,6 +408,70 @@ pub fn withdraw(
     Ok(Response::new()
         .add_attributes(vec![attr("method", "withdraw")])
         .add_messages(msgs))
+}
+
+/// Wrap the native token into "TokenWrapper" token
+fn wrap_native(
+    deps: DepsMut,
+    sender: String,
+    amount: String,
+    sent_funds: Vec<Coin>,
+) -> Result<Response, ContractError> {
+    let amount = parse_string_to_uint128(amount)?;
+    let anchor = ANCHOR.load(deps.storage)?;
+
+    // Validations
+    let wrapper_config: TokenWrapperConfigResp = deps.querier.query_wasm_smart(
+        anchor.tokenwrapper_addr.to_string(),
+        &TokenWrapperQueryMsg::Config {},
+    )?;
+    let token_denom = wrapper_config.native_token_denom;
+
+    let is_sent_enough_token = sent_funds
+        .iter()
+        .any(|c| c.denom == token_denom.clone() && c.amount == amount);
+    if !is_sent_enough_token {
+        return Err(ContractError::InsufficientFunds {});
+    }
+
+    // Handle the "wrap"
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: anchor.tokenwrapper_addr.to_string(),
+        funds: sent_funds,
+        msg: to_binary(&TokenWrapperExecuteMsg::Wrap {
+            sender: Some(sender.clone()),
+            recipient: Some(sender),
+        })?,
+    })];
+
+    Ok(Response::default().add_messages(msgs).add_attributes(vec![
+        attr("method", "wrap_native"),
+        attr("denom", token_denom),
+        attr("amount", amount),
+    ]))
+}
+
+/// Unwrap the "TokenWrapper" token into "token"
+fn unwrap_native(deps: DepsMut, sender: String, amount: String) -> Result<Response, ContractError> {
+    let amount = parse_string_to_uint128(amount)?;
+    let anchor = ANCHOR.load(deps.storage)?;
+
+    // Handle the "Unwrap"
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: anchor.tokenwrapper_addr.to_string(),
+        funds: vec![],
+        msg: to_binary(&TokenWrapperExecuteMsg::Unwrap {
+            sender: Some(sender.clone()),
+            recipient: Some(sender),
+            token: None,
+            amount,
+        })?,
+    })];
+
+    Ok(Response::default().add_messages(msgs).add_attributes(vec![
+        attr("method", "unwrap_native"),
+        attr("amount", amount),
+    ]))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

@@ -19,6 +19,10 @@ pub enum ExecuteMsg {
     /// Unwraps the Anchor's TokenWrapper token for the `sender`
     /// into one of its wrappable tokens.
     UnwrapIntoToken { token_addr: String, amount: String },
+    /// Wraps the native token to "TokenWrapper" token
+    WrapNative { amount: String },
+    /// Unwraps the "TokenWrapper" token to native token
+    UnwrapNative { amount: String },
     /// Handles the cw20 token receive cases
     /// 1. DepositCw20
     /// 2. WrapToken
