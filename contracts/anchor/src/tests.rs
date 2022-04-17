@@ -170,7 +170,7 @@ fn test_anchor_fail_when_any_byte_is_changed_in_proof() {
         fee: FEE.to_string(),
         refund: REFUND.to_string(),
         commitment: commitment_element.0,
-        cw20_address: CW20_ADDRESS.to_string(),
+        cw20_address: Some(CW20_ADDRESS.to_string()),
     };
     let info = mock_info("withdraw", &[]);
     assert!(
@@ -249,7 +249,7 @@ fn test_anchor_fail_when_invalid_merkle_roots() {
         fee: FEE.to_string(),
         refund: REFUND.to_string(),
         commitment: commitment_element.0,
-        cw20_address: CW20_ADDRESS.to_string(),
+        cw20_address: Some(CW20_ADDRESS.to_string()),
     };
     let info = mock_info("withdraw", &[]);
     let err = execute(
@@ -328,7 +328,7 @@ fn test_anchor_works_with_wasm_utils() {
         fee: FEE.to_string(),
         refund: REFUND.to_string(),
         commitment: commitment_element.0,
-        cw20_address: CW20_ADDRESS.to_string(),
+        cw20_address: Some(CW20_ADDRESS.to_string()),
     };
     let info = mock_info("withdraw", &[]);
     let response = execute(
@@ -415,7 +415,7 @@ fn test_anchor_works() {
         fee: FEE.to_string(),
         refund: REFUND.to_string(),
         commitment: commitment_element.0,
-        cw20_address: CW20_ADDRESS.to_string(),
+        cw20_address: Some(CW20_ADDRESS.to_string()),
     };
     let info = mock_info("withdraw", &[]);
     let response = execute(
@@ -503,7 +503,7 @@ fn test_anchor_fail_when_relayer_is_diff_from_that_in_proof_generation() {
         fee: FEE.to_string(),
         refund: REFUND.to_string(),
         commitment: commitment_element.0,
-        cw20_address: CW20_ADDRESS.to_string(),
+        cw20_address: Some(CW20_ADDRESS.to_string()),
     };
     let info = mock_info("withdraw", &[]);
     let err = execute(
@@ -582,7 +582,7 @@ fn test_anchor_fail_when_fee_submitted_is_changed() {
         fee: changed_fee_value.to_string(),
         refund: REFUND.to_string(),
         commitment: commitment_element.0,
-        cw20_address: CW20_ADDRESS.to_string(),
+        cw20_address: Some(CW20_ADDRESS.to_string()),
     };
     let info = mock_info("withdraw", &[]);
     let err = execute(

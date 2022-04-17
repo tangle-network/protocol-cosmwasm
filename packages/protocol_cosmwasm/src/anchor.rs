@@ -16,13 +16,25 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     /// Withdraw a deposit from the contract
     Withdraw(WithdrawMsg),
+
     /// Unwraps the Anchor's TokenWrapper token for the `sender`
     /// into one of its wrappable tokens.
     UnwrapIntoToken { token_addr: String, amount: String },
+
     /// Wraps the native token to "TokenWrapper" token
     WrapNative { amount: String },
     /// Unwraps the "TokenWrapper" token to native token
     UnwrapNative { amount: String },
+
+    /// Wraps the native token & deposit it into the contract
+    WrapAndDeposit {
+        commitment: Option<[u8; 32]>,
+        amount: String,
+    },
+
+    /// Withdraws the deposit & unwraps into valid token for `sender`
+    WithdrawAndUnwrap(WithdrawMsg),
+
     /// Handles the cw20 token receive cases
     /// 1. DepositCw20
     /// 2. WrapToken
@@ -34,9 +46,17 @@ pub enum ExecuteMsg {
 pub enum Cw20HookMsg {
     /// Depcosit Cw20 tokens
     DepositCw20 { commitment: Option<[u8; 32]> },
+
     /// Wraps a cw20 token for the `sender` using
     /// the underlying Anchor's TokenWrapper contract
     WrapToken {},
+
+    /// Wraps a cw20 token for the `sender`
+    /// & deposit it into the contract.
+    WrapAndDeposit {
+        commitment: Option<[u8; 32]>,
+        amount: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -49,7 +69,7 @@ pub struct WithdrawMsg {
     pub fee: String,
     pub refund: String,
     pub commitment: [u8; 32],
-    pub cw20_address: String,
+    pub cw20_address: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
