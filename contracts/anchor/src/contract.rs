@@ -138,7 +138,7 @@ pub fn execute(
         ),
 
         // Withdraws the deposit & unwraps to valid token for `sender`
-        ExecuteMsg::WithdrawAndUnwrap(msg) => withdraw_and_unwrap(deps, env, info, msg),
+        ExecuteMsg::WithdrawAndUnwrap(msg) => withdraw_and_unwrap(deps, info, msg),
     }
 }
 
@@ -171,10 +171,9 @@ pub fn receive_cw20(
     }
 }
 
-/// The deposit function
-/// "commitment": The commitment for the deposit
+/// Deposit CW20 token("TokenWrapper") with the commitment
 fn deposit_cw20(
-    deps: DepsMut,
+    mut deps: DepsMut,
     commitment: Option<[u8; 32]>,
     recv_token_addr: String,
     recv_token_amt: Uint128,
@@ -193,22 +192,11 @@ fn deposit_cw20(
 
     // Handle the "deposit" cw20 tokens
     if let Some(commitment) = commitment {
-        let mut merkle_tree = anchor.merkle_tree;
-        let poseidon = POSEIDON.load(deps.storage)?;
-        let res = merkle_tree
-            .insert(poseidon, commitment, deps.storage)
-            .map_err(|_| ContractError::MerkleTreeIsFull)?;
+        // Handle the "commitment"
+        let res = validate_and_store_commitment(deps.branch(), commitment)?;
 
-        ANCHOR.save(
-            deps.storage,
-            &Anchor {
-                chain_id: anchor.chain_id,
-                deposit_size: anchor.deposit_size,
-                linkable_tree: anchor.linkable_tree,
-                tokenwrapper_addr: anchor.tokenwrapper_addr,
-                merkle_tree,
-            },
-        )?;
+        // No need to handle any cw20 token transfer
+        // since "TokenWrapper" tokens are already sent to this contract
 
         Ok(Response::new().add_attributes(vec![
             attr("method", "deposit_cw20"),
@@ -250,7 +238,7 @@ fn wrap_token(
         })?,
     })];
 
-    Ok(Response::default().add_messages(msgs).add_attributes(vec![
+    Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("method", "wrap_token"),
         attr("token", recv_token_addr),
         attr("amount", recv_token_amt),
@@ -279,13 +267,14 @@ fn unwrap_into_token(
         })?,
     })];
 
-    Ok(Response::default().add_messages(msgs).add_attributes(vec![
+    Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("method", "unwrap_into_token"),
         attr("token", token_addr),
         attr("amount", amount),
     ]))
 }
 
+/// Withdraw a deposit from the contract
 pub fn withdraw(
     deps: DepsMut,
     info: MessageInfo,
@@ -470,7 +459,7 @@ fn wrap_native(
         })?,
     })];
 
-    Ok(Response::default().add_messages(msgs).add_attributes(vec![
+    Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("method", "wrap_native"),
         attr("denom", token_denom),
         attr("amount", amount),
@@ -494,7 +483,7 @@ fn unwrap_native(deps: DepsMut, sender: String, amount: String) -> Result<Respon
         })?,
     })];
 
-    Ok(Response::default().add_messages(msgs).add_attributes(vec![
+    Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("method", "unwrap_native"),
         attr("amount", amount),
     ]))
@@ -502,7 +491,7 @@ fn unwrap_native(deps: DepsMut, sender: String, amount: String) -> Result<Respon
 
 /// Wrap the native token & deposit it into the contract
 fn wrap_and_deposit_native(
-    deps: DepsMut,
+    mut deps: DepsMut,
     sender: String,
     recipient: String,
     commitment: Option<[u8; 32]>,
@@ -510,6 +499,7 @@ fn wrap_and_deposit_native(
     sent_funds: Vec<Coin>,
 ) -> Result<Response, ContractError> {
     let anchor = ANCHOR.load(deps.storage)?;
+    let tokenwrapper = anchor.tokenwrapper_addr.as_str();
 
     // Validations
     let wrapper_config: TokenWrapperConfigResp = deps.querier.query_wasm_smart(
@@ -519,9 +509,9 @@ fn wrap_and_deposit_native(
     let token_denom = wrapper_config.native_token_denom;
 
     let amt_to_wrap_query: GetAmountToWrapResponse = deps.querier.query_wasm_smart(
-        anchor.tokenwrapper_addr.to_string(),
+        tokenwrapper.to_string(),
         &TokenWrapperQueryMsg::GetAmountToWrap {
-            target_amount: amount.clone(),
+            target_amount: amount,
         },
     )?;
     let amt_to_wrap = parse_string_to_uint128(amt_to_wrap_query.amount_to_wrap)?;
@@ -533,33 +523,20 @@ fn wrap_and_deposit_native(
         return Err(ContractError::InsufficientFunds {});
     }
 
-    // Wrap into the token and send directly to this contract
-    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: anchor.tokenwrapper_addr.to_string(),
-        msg: to_binary(&TokenWrapperExecuteMsg::Wrap {
-            sender: Some(sender.clone()),
-            recipient: Some(recipient),
-        })?,
-        funds: sent_funds,
-    })];
-
+    // Handle the "deposit"
     if let Some(commitment) = commitment {
-        let mut merkle_tree = anchor.merkle_tree;
-        let poseidon = POSEIDON.load(deps.storage)?;
-        let res = merkle_tree
-            .insert(poseidon, commitment, deps.storage)
-            .map_err(|_| ContractError::MerkleTreeIsFull)?;
+        // Handle the "commitment"
+        let res = validate_and_store_commitment(deps.branch(), commitment)?;
 
-        ANCHOR.save(
-            deps.storage,
-            &Anchor {
-                chain_id: anchor.chain_id,
-                deposit_size: anchor.deposit_size,
-                linkable_tree: anchor.linkable_tree,
-                tokenwrapper_addr: anchor.tokenwrapper_addr,
-                merkle_tree,
-            },
-        )?;
+        // Wrap into the token and send directly to this contract
+        let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: tokenwrapper.to_string(),
+            msg: to_binary(&TokenWrapperExecuteMsg::Wrap {
+                sender: Some(sender.clone()),
+                recipient: Some(recipient),
+            })?,
+            funds: sent_funds,
+        })];
 
         Ok(Response::new().add_messages(msgs).add_attributes(vec![
             attr("method", "wrap_and_deposit_native"),
@@ -575,7 +552,7 @@ fn wrap_and_deposit_native(
 
 /// Wrap the cw20 token & deposit it into the contract
 fn wrap_and_deposit_cw20(
-    deps: DepsMut,
+    mut deps: DepsMut,
     sender: String,
     recipient: String,
     commitment: Option<[u8; 32]>,
@@ -585,10 +562,11 @@ fn wrap_and_deposit_cw20(
 ) -> Result<Response, ContractError> {
     let amount = parse_string_to_uint128(amount)?;
     let anchor = ANCHOR.load(deps.storage)?;
+    let tokenwrapper = anchor.tokenwrapper_addr.as_str();
 
     // Validations
     let amt_to_wrap_query: GetAmountToWrapResponse = deps.querier.query_wasm_smart(
-        anchor.tokenwrapper_addr.to_string(),
+        tokenwrapper.to_string(),
         &TokenWrapperQueryMsg::GetAmountToWrap {
             target_amount: amount.to_string(),
         },
@@ -599,37 +577,24 @@ fn wrap_and_deposit_cw20(
         return Err(ContractError::InsufficientFunds {});
     }
 
-    // Wrap into the token and send directly to this contract
-    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: recv_token_addr,
-        msg: to_binary(&Cw20ExecuteMsg::Send {
-            contract: anchor.tokenwrapper_addr.to_string(),
-            amount: amt_to_wrap,
-            msg: to_binary(&TokenWrapperHookMsg::Wrap {
-                sender: Some(sender.clone()),
-                recipient: Some(recipient),
-            })?,
-        })?,
-        funds: vec![],
-    })];
-
+    // Handle the "deposit"
     if let Some(commitment) = commitment {
-        let mut merkle_tree = anchor.merkle_tree;
-        let poseidon = POSEIDON.load(deps.storage)?;
-        let res = merkle_tree
-            .insert(poseidon, commitment, deps.storage)
-            .map_err(|_| ContractError::MerkleTreeIsFull)?;
+        // Handle the "commitment"
+        let res = validate_and_store_commitment(deps.branch(), commitment)?;
 
-        ANCHOR.save(
-            deps.storage,
-            &Anchor {
-                chain_id: anchor.chain_id,
-                deposit_size: anchor.deposit_size,
-                linkable_tree: anchor.linkable_tree,
-                tokenwrapper_addr: anchor.tokenwrapper_addr,
-                merkle_tree,
-            },
-        )?;
+        // Wrap into the token and send directly to this contract
+        let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: recv_token_addr,
+            msg: to_binary(&Cw20ExecuteMsg::Send {
+                contract: tokenwrapper.to_string(),
+                amount: amt_to_wrap,
+                msg: to_binary(&TokenWrapperHookMsg::Wrap {
+                    sender: Some(sender.clone()),
+                    recipient: Some(recipient),
+                })?,
+            })?,
+            funds: vec![],
+        })];
 
         Ok(Response::new().add_messages(msgs).add_attributes(vec![
             attr("method", "wrap_and_deposit_cw20"),
@@ -646,7 +611,6 @@ fn wrap_and_deposit_cw20(
 /// Withdraws the deposit & unwraps into valid token for `sender`
 fn withdraw_and_unwrap(
     deps: DepsMut,
-    env: Env,
     info: MessageInfo,
     msg: WithdrawMsg,
 ) -> Result<Response, ContractError> {
@@ -750,14 +714,15 @@ fn withdraw_and_unwrap(
     };
 
     if !amt_to_recipient.is_zero() {
+        let token_address = msg
+            .cw20_address
+            .map(|v| deps.api.addr_validate(v.as_str()).unwrap());
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: anchor.tokenwrapper_addr.to_string(),
             funds: [].to_vec(),
             msg: to_binary(&TokenWrapperExecuteMsg::Unwrap {
                 sender: None,
-                token: msg
-                    .cw20_address
-                    .and_then(|v| Some(deps.api.addr_validate(v.as_str()).unwrap())),
+                token: token_address,
                 amount: amt_to_recipient,
                 recipient: Some(recipient.clone()),
             })?,
@@ -878,6 +843,31 @@ pub fn compute_chain_id_type(chain_id: u64, chain_type: &[u8]) -> u64 {
     buf[2..4].copy_from_slice(&chain_type);
     buf[4..8].copy_from_slice(&chain_id_value.to_be_bytes());
     u64::from_be_bytes(buf)
+}
+
+pub fn validate_and_store_commitment(
+    deps: DepsMut,
+    commitment: [u8; 32],
+) -> Result<u32, ContractError> {
+    let anchor = ANCHOR.load(deps.storage)?;
+    let mut merkle_tree = anchor.merkle_tree;
+    let poseidon = POSEIDON.load(deps.storage)?;
+    let res = merkle_tree
+        .insert(poseidon, commitment, deps.storage)
+        .map_err(|_| ContractError::MerkleTreeIsFull)?;
+
+    ANCHOR.save(
+        deps.storage,
+        &Anchor {
+            chain_id: anchor.chain_id,
+            deposit_size: anchor.deposit_size,
+            linkable_tree: anchor.linkable_tree,
+            tokenwrapper_addr: anchor.tokenwrapper_addr,
+            merkle_tree,
+        },
+    )?;
+
+    Ok(res)
 }
 
 pub fn parse_string_to_uint128(v: String) -> Result<Uint128, StdError> {
