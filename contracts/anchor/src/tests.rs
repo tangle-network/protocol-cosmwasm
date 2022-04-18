@@ -7,11 +7,10 @@ use arkworks_setups::common::setup_params;
 use arkworks_setups::Curve;
 
 use cosmwasm_std::testing::MockApi;
-use cosmwasm_std::testing::MockQuerier;
 use cosmwasm_std::testing::MockStorage;
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::OwnedDeps;
-use cosmwasm_std::{attr, to_binary, CosmosMsg, Uint128, WasmMsg};
+use cosmwasm_std::{attr, coins, to_binary, CosmosMsg, Uint128, WasmMsg};
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use protocol_cosmwasm::anchor::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, WithdrawMsg};
@@ -34,8 +33,8 @@ const RELAYER: &str = "terra17cz29kl6z5wj04ledes9jdmn6pgkelffjxglky";
 const FEE: u128 = 0;
 const REFUND: u128 = 0;
 
-fn create_anchor() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
-    let mut deps = mock_dependencies(&[]);
+fn create_anchor() -> OwnedDeps<MockStorage, MockApi, crate::mock_querier::WasmMockQuerier> {
+    let mut deps = crate::mock_querier::mock_dependencies(&[]);
 
     let env = mock_env();
     let info = mock_info("anyone", &[]);
@@ -646,5 +645,195 @@ fn test_anchor_unwrap_into_token() {
             attr("token", recv_token),
             attr("amount", unwrap_amt),
         ]
+    );
+}
+
+#[test]
+fn test_anchor_wrap_native() {
+    let mut deps = create_anchor();
+
+    let wrap_amt = Uint128::from(100_u128);
+
+    let info = mock_info("anyone", &coins(wrap_amt.u128(), "uusd"));
+    let wrap_native_msg = ExecuteMsg::WrapNative {
+        amount: wrap_amt.to_string(),
+    };
+    let response = execute(deps.as_mut(), mock_env(), info, wrap_native_msg).unwrap();
+
+    assert_eq!(response.messages.len(), 1);
+    assert_eq!(
+        response.attributes,
+        vec![
+            attr("method", "wrap_native"),
+            attr("denom", "uusd"),
+            attr("amount", wrap_amt.to_string()),
+        ]
+    );
+}
+
+#[test]
+fn test_anchor_unwrap_native() {
+    let mut deps = create_anchor();
+
+    let unwrap_amt = Uint128::from(100_u128);
+
+    let info = mock_info("anyone", &[]);
+    let unwrap_native_msg = ExecuteMsg::UnwrapNative {
+        amount: unwrap_amt.to_string(),
+    };
+    let response = execute(deps.as_mut(), mock_env(), info, unwrap_native_msg).unwrap();
+
+    assert_eq!(response.messages.len(), 1);
+    assert_eq!(
+        response.attributes,
+        vec![
+            attr("method", "unwrap_native"),
+            attr("amount", unwrap_amt.to_string()),
+        ]
+    );
+}
+
+#[test]
+fn test_anchor_wrap_and_deposit_native() {
+    let mut deps = create_anchor();
+
+    // Initialize the deposit proof
+    let params = setup_params(Curve::Bn254, 5, 3);
+    let poseidon = Poseidon::new(params);
+    let res = poseidon.hash_two(&Fr::one(), &Fr::one()).unwrap();
+    let mut commitment: [u8; 32] = [0u8; 32];
+    commitment.copy_from_slice(&res.into_repr().to_bytes_le());
+
+    // "Wrap & deposit" native token
+    let info = mock_info(DEPOSITOR, &coins(DEPOSIT_SIZE, "uusd"));
+    let wrap_and_deposit_native_msg = ExecuteMsg::WrapAndDeposit {
+        commitment: Some(commitment),
+        amount: DEPOSIT_SIZE.to_string(),
+    };
+    let res = execute(deps.as_mut(), mock_env(), info, wrap_and_deposit_native_msg).unwrap();
+
+    assert_eq!(res.messages.len(), 1);
+    assert_eq!(
+        res.attributes,
+        vec![
+            attr("method", "wrap_and_deposit_native"),
+            attr("sender", DEPOSITOR),
+            attr("result", "0"),
+        ]
+    )
+}
+
+#[test]
+fn test_anchor_wrap_and_deposit_cw20() {
+    let mut deps = create_anchor();
+
+    // Initialize the deposit proof
+    let params = setup_params(Curve::Bn254, 5, 3);
+    let poseidon = Poseidon::new(params);
+    let res = poseidon.hash_two(&Fr::one(), &Fr::one()).unwrap();
+    let mut commitment: [u8; 32] = [0u8; 32];
+    commitment.copy_from_slice(&res.into_repr().to_bytes_le());
+
+    // "Wrap & deposit" cw20 tokens with success.
+    let any_cw20_address = "any-cw20".to_string();
+    let info = mock_info(any_cw20_address.as_str(), &[]);
+    let wrap_deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+        sender: DEPOSITOR.to_string(),
+        amount: Uint128::from(DEPOSIT_SIZE),
+        msg: to_binary(&Cw20HookMsg::WrapAndDeposit {
+            commitment: Some(commitment),
+            amount: DEPOSIT_SIZE.to_string(),
+        })
+        .unwrap(),
+    });
+    let res = execute(deps.as_mut(), mock_env(), info, wrap_deposit_cw20_msg).unwrap();
+
+    assert_eq!(res.messages.len(), 1);
+    assert_eq!(
+        res.attributes,
+        vec![
+            attr("method", "wrap_and_deposit_cw20"),
+            attr("sender", DEPOSITOR),
+            attr("result", "0"),
+        ]
+    )
+}
+
+#[test]
+fn test_anchor_withdraw_and_unwrap_native() {
+    let curve = Curve::Bn254;
+    let (pk_bytes, _) = crate::test_util::setup_environment(curve);
+    let recipient_bytes = RECIPIENT.as_bytes();
+    let relayer_bytes = RELAYER.as_bytes();
+    let fee_value = 0;
+    let refund_value = 0;
+    let src_chain_id = compute_chain_id_type(1, &COSMOS_CHAIN_TYPE);
+    let commitment_bytes = vec![0u8; 32];
+    let commitment_element = Element::from_bytes(&commitment_bytes);
+
+    // Setup zk circuit for withdraw
+    let (proof_bytes, root_elements, nullifier_hash_element, leaf_element) =
+        crate::test_util::setup_zk_circuit(
+            curve,
+            truncate_and_pad(&recipient_bytes),
+            truncate_and_pad(&relayer_bytes),
+            commitment_bytes.clone(),
+            pk_bytes.clone(),
+            src_chain_id,
+            fee_value,
+            refund_value,
+        );
+
+    let mut deps = create_anchor();
+
+    // "Wrap & deposit" native token
+    let info = mock_info(DEPOSITOR, &coins(DEPOSIT_SIZE, "uusd"));
+    let wrap_and_deposit_native_msg = ExecuteMsg::WrapAndDeposit {
+        commitment: Some(leaf_element.0),
+        amount: DEPOSIT_SIZE.to_string(),
+    };
+    let res = execute(deps.as_mut(), mock_env(), info, wrap_and_deposit_native_msg).unwrap();
+
+    assert_eq!(
+        res.attributes,
+        vec![
+            attr("method", "wrap_and_deposit_native"),
+            attr("sender", DEPOSITOR),
+            attr("result", "0"),
+        ],
+    );
+
+    let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
+    let local_root = root_elements[0].0;
+    assert_eq!(on_chain_root, local_root);
+
+    // Should "withdraw & unwrap" cw20 tokens with success.
+    let mut roots = vec![];
+    for elem in root_elements {
+        roots.push(elem.0);
+    }
+    let any_cw20_address = "any-cw20";
+    let withdraw_msg = WithdrawMsg {
+        proof_bytes: proof_bytes,
+        roots: roots,
+        nullifier_hash: nullifier_hash_element.0,
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
+        fee: FEE.to_string(),
+        refund: REFUND.to_string(),
+        commitment: commitment_element.0,
+        cw20_address: Some(any_cw20_address.to_string()),
+    };
+    let info = mock_info("withdraw", &[]);
+    let response = execute(
+        deps.as_mut(),
+        mock_env(),
+        info,
+        ExecuteMsg::WithdrawAndUnwrap(withdraw_msg),
+    )
+    .unwrap();
+    assert_eq!(
+        response.attributes,
+        vec![attr("method", "withdraw_and_unwrap")]
     );
 }

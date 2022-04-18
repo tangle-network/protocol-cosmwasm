@@ -5,4 +5,7 @@ pub mod state;
 pub mod test_util;
 
 #[cfg(test)]
+pub mod mock_querier;
+
+#[cfg(test)]
 mod tests;
