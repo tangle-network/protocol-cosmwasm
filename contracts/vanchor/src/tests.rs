@@ -5,7 +5,7 @@ use cosmwasm_std::testing::{
     mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
 };
 use cosmwasm_std::OwnedDeps;
-use cosmwasm_std::{attr, to_binary, Uint128};
+use cosmwasm_std::{attr, to_binary, coins, Uint128};
 use cw20::Cw20ReceiveMsg;
 use sp_core::hashing::keccak_256;
 
@@ -36,8 +36,8 @@ fn element_encoder(v: &[u8]) -> [u8; 32] {
     output
 }
 
-fn create_vanchor() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
-    let mut deps = mock_dependencies(&[]);
+fn create_vanchor() -> OwnedDeps<MockStorage, MockApi, crate::mock_querier::WasmMockQuerier> {
+    let mut deps = crate::mock_querier::mock_dependencies(&[]);
 
     let msg = InstantiateMsg {
         chain_id: TEST_CHAIN_ID,
@@ -1255,5 +1255,50 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
     assert_eq!(
         response.attributes,
         vec![attr("method", "transact_withdraw"), attr("ext_amt", "-50"),]
+    );
+}
+
+#[test]
+fn test_vanchor_wrap_native() {
+    let mut deps = create_vanchor();
+
+    let wrap_amt = Uint128::from(100_u128);
+
+    let info = mock_info("anyone", &coins(wrap_amt.u128(), "uusd"));
+    let wrap_native_msg = ExecuteMsg::WrapNative {
+        amount: wrap_amt.to_string(),
+    };
+    let response = execute(deps.as_mut(), mock_env(), info, wrap_native_msg).unwrap();
+
+    assert_eq!(response.messages.len(), 1);
+    assert_eq!(
+        response.attributes,
+        vec![
+            attr("method", "wrap_native"),
+            attr("denom", "uusd"),
+            attr("amount", wrap_amt.to_string()),
+        ]
+    );
+}
+
+#[test]
+fn test_vanchor_unwrap_native() {
+    let mut deps = create_vanchor();
+
+    let unwrap_amt = Uint128::from(100_u128);
+
+    let info = mock_info("anyone", &[]);
+    let unwrap_native_msg = ExecuteMsg::UnwrapNative {
+        amount: unwrap_amt.to_string(),
+    };
+    let response = execute(deps.as_mut(), mock_env(), info, unwrap_native_msg).unwrap();
+
+    assert_eq!(response.messages.len(), 1);
+    assert_eq!(
+        response.attributes,
+        vec![
+            attr("method", "unwrap_native"),
+            attr("amount", unwrap_amt.to_string()),
+        ]
     );
 }

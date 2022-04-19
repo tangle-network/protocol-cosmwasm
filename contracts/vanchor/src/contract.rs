@@ -612,13 +612,60 @@ fn wrap_native(
     amount: String,
     sent_funds: Vec<Coin>,
 ) -> Result<Response, ContractError> {
-    // TODO
-    Ok(Response::new())
+    let amount = parse_string_to_uint128(amount)?;
+    let vanchor = VANCHOR.load(deps.storage)?;
+
+    // Validations
+    let wrapper_config: TokenWrapperConfigResp = deps.querier.query_wasm_smart(
+        vanchor.tokenwrapper_addr.to_string(),
+        &TokenWrapperQueryMsg::Config {},
+    )?;
+    let token_denom = wrapper_config.native_token_denom;
+
+    let is_sent_enough_token = sent_funds
+        .iter()
+        .any(|c| c.denom == token_denom.clone() && c.amount == amount);
+    if !is_sent_enough_token {
+        return Err(ContractError::InsufficientFunds {});
+    }
+
+    // Handle the "wrap"
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: vanchor.tokenwrapper_addr.to_string(),
+        funds: sent_funds,
+        msg: to_binary(&TokenWrapperExecuteMsg::Wrap {
+            sender: Some(sender.clone()),
+            recipient: Some(sender),
+        })?,
+    })];
+
+    Ok(Response::new().add_messages(msgs).add_attributes(vec![
+        attr("method", "wrap_native"),
+        attr("denom", token_denom),
+        attr("amount", amount),
+    ]))
 }
 
 fn unwrap_native(deps: DepsMut, sender: String, amount: String) -> Result<Response, ContractError> {
-    // TODO
-    Ok(Response::new())
+    let amount = parse_string_to_uint128(amount)?;
+    let vanchor = VANCHOR.load(deps.storage)?;
+
+    // Handle the "Unwrap"
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: vanchor.tokenwrapper_addr.to_string(),
+        funds: vec![],
+        msg: to_binary(&TokenWrapperExecuteMsg::Unwrap {
+            sender: Some(sender.clone()),
+            recipient: Some(sender),
+            token: None,
+            amount,
+        })?,
+    })];
+
+    Ok(Response::new().add_messages(msgs).add_attributes(vec![
+        attr("method", "unwrap_native"),
+        attr("amount", amount),
+    ]))
 }
 
 fn unwrap_into_token(
