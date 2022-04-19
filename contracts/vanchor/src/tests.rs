@@ -1,11 +1,9 @@
 use ark_ff::BigInteger;
 use ark_ff::PrimeField;
 use arkworks_setups::Curve;
-use cosmwasm_std::testing::{
-    mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
-};
+use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MockApi, MockStorage};
 use cosmwasm_std::OwnedDeps;
-use cosmwasm_std::{attr, to_binary, coins, Uint128};
+use cosmwasm_std::{attr, coins, to_binary, Uint128};
 use cw20::Cw20ReceiveMsg;
 use sp_core::hashing::keccak_256;
 
@@ -1299,6 +1297,57 @@ fn test_vanchor_unwrap_native() {
         vec![
             attr("method", "unwrap_native"),
             attr("amount", unwrap_amt.to_string()),
+        ]
+    );
+}
+
+#[test]
+fn test_vanchor_wrap_token() {
+    let mut deps = create_vanchor();
+
+    let wrap_amt = Uint128::from(100_u128);
+    let wrap_token = "recv_token";
+
+    let info = mock_info(wrap_token, &[]);
+    let wrap_token_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+        sender: "anyone".to_string(),
+        amount: wrap_amt,
+        msg: to_binary(&Cw20HookMsg::WrapToken {}).unwrap(),
+    });
+    let response = execute(deps.as_mut(), mock_env(), info, wrap_token_msg).unwrap();
+
+    assert_eq!(response.messages.len(), 1);
+    assert_eq!(
+        response.attributes,
+        vec![
+            attr("method", "wrap_token"),
+            attr("token", wrap_token.to_string()),
+            attr("amount", wrap_amt.to_string()),
+        ]
+    );
+}
+
+#[test]
+fn test_vanchor_unwrap_into_token() {
+    let mut deps = create_vanchor();
+
+    let unwrap_amt = "100";
+    let recv_token = "recv_token";
+
+    let info = mock_info("anyone", &[]);
+    let unwrap_into_token_msg = ExecuteMsg::UnwrapIntoToken {
+        token_addr: recv_token.to_string(),
+        amount: unwrap_amt.to_string(),
+    };
+    let response = execute(deps.as_mut(), mock_env(), info, unwrap_into_token_msg).unwrap();
+
+    assert_eq!(response.messages.len(), 1);
+    assert_eq!(
+        response.attributes,
+        vec![
+            attr("method", "unwrap_into_token"),
+            attr("token", recv_token),
+            attr("amount", unwrap_amt),
         ]
     );
 }
