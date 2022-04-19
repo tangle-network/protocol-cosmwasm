@@ -8,7 +8,7 @@ pub struct InstantiateMsg {
     pub chain_id: u64,
     pub levels: u32,
     pub max_edges: u32,
-    pub cw20_address: String,
+    pub tokenwrapper_addr: String,
     pub max_deposit_amt: Uint128,
     pub min_withdraw_amt: Uint128,
     pub max_ext_amt: Uint128,
@@ -18,12 +18,30 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
+    /// Update the config
     UpdateConfig(UpdateConfigMsg),
+
+    /// Handles the cw20 token receive cases
+    /// 1. Executes a deposit or combination join/split transaction
+    /// 2. WrapToken
     Receive(Cw20ReceiveMsg),
+
+    /// Executes a withdrawal or combination join/split transaction
     TransactWithdraw {
         proof_data: ProofData,
         ext_data: ExtData,
     },
+
+    /// Wraps the native token to "TokenWrapper" token
+    WrapNative { amount: String },
+
+    /// Unwraps the "TokenWrapper" token to native token
+    UnwrapNative { amount: String },
+
+    /// Unwraps the VAnchor's TokenWrapper token for the `sender`
+    /// into one of its wrappable tokens.
+    UnwrapIntoToken { token_addr: String, amount: String },
+
     AddEdge {
         src_chain_id: u64,
         root: [u8; 32],
@@ -47,10 +65,15 @@ pub struct UpdateConfigMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw20HookMsg {
+    /// Executes a deposit or combination join/split transaction
     TransactDeposit {
         proof_data: ProofData,
         ext_data: ExtData,
     },
+
+    /// Wraps cw20 token for the `sender` using
+    /// the underlying VAnchor's TokenWrapper contract
+    WrapToken {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

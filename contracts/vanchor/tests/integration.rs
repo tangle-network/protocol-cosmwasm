@@ -37,7 +37,7 @@ fn integration_test_instantiate_mixer() {
         min_withdraw_amt: Uint128::from(MIN_WITHDRAW_AMT),
         max_ext_amt: Uint128::from(MAX_EXT_AMT),
         max_fee: Uint128::from(MAX_FEE),
-        cw20_address: CW20_ADDRESS.to_string(),
+        tokenwrapper_addr: CW20_ADDRESS.to_string(),
     };
     let info = mock_info("creator", &[]);
     let response: Response = instantiate(&mut deps, mock_env(), info, msg).unwrap();

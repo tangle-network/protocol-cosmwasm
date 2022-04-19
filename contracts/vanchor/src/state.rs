@@ -192,7 +192,7 @@ pub struct VAnchor {
     pub creator: Addr,
     pub merkle_tree: MerkleTree,
     pub linkable_tree: LinkableMerkleTree,
-    pub cw20_address: Addr,
+    pub tokenwrapper_addr: Addr,
     pub max_deposit_amt: Uint128,
     pub min_withdraw_amt: Uint128,
     pub max_ext_amt: Uint128,

@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult, Storage, Uint128, WasmMsg,
+    attr, from_binary, to_binary, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
+    Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 
@@ -11,6 +11,10 @@ use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::field_ops::{ArkworksIntoFieldBn254, IntoPrimeField};
 use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::poseidon::Poseidon;
+use protocol_cosmwasm::token_wrapper::{
+    ConfigResponse as TokenWrapperConfigResp, ExecuteMsg as TokenWrapperExecuteMsg,
+    QueryMsg as TokenWrapperQueryMsg,
+};
 use protocol_cosmwasm::vanchor::{
     Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, QueryMsg, UpdateConfigMsg,
 };
@@ -80,8 +84,8 @@ pub fn instantiate(
         max_edges: msg.max_edges,
         chain_id_list: Vec::new(),
     };
-    // Get the "cw20_address"
-    let cw20_address = deps.api.addr_validate(&msg.cw20_address)?;
+    // Get the "TokenWrapper" address
+    let tokenwrapper_addr = deps.api.addr_validate(&msg.tokenwrapper_addr)?;
 
     // Initialize the VAnchor
     let anchor = VAnchor {
@@ -93,7 +97,7 @@ pub fn instantiate(
         max_fee: msg.max_fee,
         linkable_tree: linkable_merkle_tree,
         merkle_tree,
-        cw20_address,
+        tokenwrapper_addr,
     };
     VANCHOR.save(deps.storage, &anchor)?;
 
@@ -118,12 +122,34 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
+        // Update the config params
         ExecuteMsg::UpdateConfig(msg) => update_vanchor_config(deps, info, msg),
-        ExecuteMsg::Receive(msg) => transact_deposit(deps, info, msg),
+
+        // Handle the "receive" cw20 token
+        // 1. Executes a deposit or combination join/split transaction
+        // 2. WrapToken
+        ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
+
+        // Executes a withdrawal or combination join/split transaction
         ExecuteMsg::TransactWithdraw {
             proof_data,
             ext_data,
         } => transact_withdraw(deps, proof_data, ext_data),
+
+        // Wraps the native token to "TokenWrapper" token
+        ExecuteMsg::WrapNative { amount } => {
+            wrap_native(deps, info.sender.to_string(), amount, info.funds)
+        }
+
+        // Unwraps the "TokenWrapper" token to native token
+        ExecuteMsg::UnwrapNative { amount } => unwrap_native(deps, info.sender.to_string(), amount),
+
+        // Unwraps the VAnchor's TokenWrapper token for the `sender`
+        // into one of its wrappable tokens.
+        ExecuteMsg::UnwrapIntoToken { token_addr, amount } => {
+            unwrap_into_token(deps, info.sender.to_string(), token_addr, amount)
+        }
+
         ExecuteMsg::AddEdge {
             src_chain_id,
             root,
@@ -175,14 +201,14 @@ fn update_vanchor_config(
     Ok(Response::new().add_attributes(vec![attr("method", "update_vanchor_config")]))
 }
 
-fn transact_deposit(
+fn receive_cw20(
     mut deps: DepsMut,
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
     // Only Cw20 token contract can execute this message.
     let vanchor: VAnchor = VANCHOR.load(deps.storage)?;
-    if vanchor.cw20_address != deps.api.addr_validate(info.sender.as_str())? {
+    if vanchor.tokenwrapper_addr != deps.api.addr_validate(info.sender.as_str())? {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -195,6 +221,7 @@ fn transact_deposit(
             proof_data,
             ext_data,
         }) => {
+            // TODO: Move the logics here to fn named "transact_deposit"
             validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
 
             let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
@@ -232,7 +259,7 @@ fn transact_deposit(
                     contract_addr: cw20_address,
                     funds: [].to_vec(),
                     msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                        recipient: ext_data.relayer.clone(),
+                        recipient: ext_data.relayer,
                         amount: Uint128::try_from(ext_data_fee).unwrap(),
                     })?,
                 }));
@@ -252,7 +279,7 @@ fn transact_deposit(
                     chain_id: vanchor.chain_id,
                     merkle_tree,
                     linkable_tree: vanchor.linkable_tree,
-                    cw20_address: vanchor.cw20_address,
+                    tokenwrapper_addr: vanchor.tokenwrapper_addr,
                     max_deposit_amt: vanchor.max_deposit_amt,
                     min_withdraw_amt: vanchor.min_withdraw_amt,
                     max_fee: vanchor.max_fee,
@@ -264,6 +291,10 @@ fn transact_deposit(
                 attr("method", "transact_deposit"),
                 attr("ext_amt", ext_amt.to_string()),
             ]))
+        }
+        Ok(Cw20HookMsg::WrapToken {}) => {
+            // TODO
+            Ok(Response::new())
         }
         Err(_) => Err(ContractError::Std(StdError::generic_err(
             "invalid cw20 hook msg",
@@ -297,7 +328,7 @@ fn transact_withdraw(
             }));
         }
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: vanchor.cw20_address.to_string(),
+            contract_addr: vanchor.tokenwrapper_addr.to_string(),
             funds: [].to_vec(),
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: ext_data.recipient.clone(),
@@ -311,10 +342,10 @@ fn transact_withdraw(
 
     if fee_exists {
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: vanchor.cw20_address.to_string(),
+            contract_addr: vanchor.tokenwrapper_addr.to_string(),
             funds: [].to_vec(),
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: ext_data.relayer.clone(),
+                recipient: ext_data.relayer,
                 amount: Uint128::try_from(ext_data_fee).unwrap(),
             })?,
         }));
@@ -334,7 +365,7 @@ fn transact_withdraw(
             chain_id: vanchor.chain_id,
             merkle_tree,
             linkable_tree: vanchor.linkable_tree,
-            cw20_address: vanchor.cw20_address,
+            tokenwrapper_addr: vanchor.tokenwrapper_addr,
             max_deposit_amt: vanchor.max_deposit_amt,
             min_withdraw_amt: vanchor.min_withdraw_amt,
             max_fee: vanchor.max_fee,
@@ -575,6 +606,31 @@ fn update_edge(
     Ok(Response::new().add_attributes(vec![attr("method", "udpate_edge")]))
 }
 
+fn wrap_native(
+    deps: DepsMut,
+    sender: String,
+    amount: String,
+    sent_funds: Vec<Coin>,
+) -> Result<Response, ContractError> {
+    // TODO
+    Ok(Response::new())
+}
+
+fn unwrap_native(deps: DepsMut, sender: String, amount: String) -> Result<Response, ContractError> {
+    // TODO
+    Ok(Response::new())
+}
+
+fn unwrap_into_token(
+    deps: DepsMut,
+    sender: String,
+    token_addr: String,
+    amount: String,
+) -> Result<Response, ContractError> {
+    // TODO
+    Ok(Response::new())
+}
+
 // Check if the "nullifier" is already used or not.
 fn is_known_nullifier(store: &dyn Storage, nullifier: [u8; 32]) -> bool {
     NULLIFIERS.has(store, nullifier.to_vec())
@@ -611,6 +667,14 @@ fn verify(
     verifier
         .verify(public_input, proof_bytes)
         .map_err(|_| ContractError::VerifyError)
+}
+
+pub fn parse_string_to_uint128(v: String) -> Result<Uint128, StdError> {
+    let res = match v.parse::<u128>() {
+        Ok(v) => Uint128::from(v),
+        Err(e) => return Err(StdError::GenericErr { msg: e.to_string() }),
+    };
+    Ok(res)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
