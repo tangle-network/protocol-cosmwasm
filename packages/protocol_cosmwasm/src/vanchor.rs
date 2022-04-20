@@ -33,14 +33,24 @@ pub enum ExecuteMsg {
     },
 
     /// Wraps the native token to "TokenWrapper" token
-    WrapNative { amount: String },
+    /// Send the tokens back to `tx sender` or deposit to `this` contract
+    WrapNative { amount: String, is_deposit: bool },
 
     /// Unwraps the "TokenWrapper" token to native token
-    UnwrapNative { amount: String },
+    /// Send the tokens back to `tx sender` or `recipient`
+    UnwrapNative {
+        amount: String,
+        recipient: Option<String>,
+    },
 
     /// Unwraps the VAnchor's TokenWrapper token for the `sender`
     /// into one of its wrappable tokens.
-    UnwrapIntoToken { token_addr: String, amount: String },
+    /// Send the tokens back to `tx sender` or `recipient`
+    UnwrapIntoToken {
+        token_addr: String,
+        amount: String,
+        recipient: Option<String>,
+    },
 
     AddEdge {
         src_chain_id: u64,
@@ -73,7 +83,8 @@ pub enum Cw20HookMsg {
 
     /// Wraps cw20 token for the `sender` using
     /// the underlying VAnchor's TokenWrapper contract
-    WrapToken {},
+    /// Send the tokens back to `tx sender` or deposit to `this` contract
+    WrapToken { is_deposit: bool },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

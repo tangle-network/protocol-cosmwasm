@@ -1265,6 +1265,7 @@ fn test_vanchor_wrap_native() {
     let info = mock_info("anyone", &coins(wrap_amt.u128(), "uusd"));
     let wrap_native_msg = ExecuteMsg::WrapNative {
         amount: wrap_amt.to_string(),
+        is_deposit: false,
     };
     let response = execute(deps.as_mut(), mock_env(), info, wrap_native_msg).unwrap();
 
@@ -1288,6 +1289,7 @@ fn test_vanchor_unwrap_native() {
     let info = mock_info("anyone", &[]);
     let unwrap_native_msg = ExecuteMsg::UnwrapNative {
         amount: unwrap_amt.to_string(),
+        recipient: None,
     };
     let response = execute(deps.as_mut(), mock_env(), info, unwrap_native_msg).unwrap();
 
@@ -1312,7 +1314,7 @@ fn test_vanchor_wrap_token() {
     let wrap_token_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "anyone".to_string(),
         amount: wrap_amt,
-        msg: to_binary(&Cw20HookMsg::WrapToken {}).unwrap(),
+        msg: to_binary(&Cw20HookMsg::WrapToken { is_deposit: false }).unwrap(),
     });
     let response = execute(deps.as_mut(), mock_env(), info, wrap_token_msg).unwrap();
 
@@ -1338,6 +1340,7 @@ fn test_vanchor_unwrap_into_token() {
     let unwrap_into_token_msg = ExecuteMsg::UnwrapIntoToken {
         token_addr: recv_token.to_string(),
         amount: unwrap_amt.to_string(),
+        recipient: None,
     };
     let response = execute(deps.as_mut(), mock_env(), info, unwrap_into_token_msg).unwrap();
 

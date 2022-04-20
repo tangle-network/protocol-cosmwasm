@@ -117,7 +117,7 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
@@ -128,7 +128,7 @@ pub fn execute(
         // Handle the "receive" cw20 token
         // 1. Executes a deposit or combination join/split transaction
         // 2. WrapToken
-        ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
+        ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
 
         // Executes a withdrawal or combination join/split transaction
         ExecuteMsg::TransactWithdraw {
@@ -137,17 +137,32 @@ pub fn execute(
         } => transact_withdraw(deps, proof_data, ext_data),
 
         // Wraps the native token to "TokenWrapper" token
-        ExecuteMsg::WrapNative { amount } => {
-            wrap_native(deps, info.sender.to_string(), amount, info.funds)
+        // Send the tokens back to `tx sender` or deposit to `this` contract
+        ExecuteMsg::WrapNative { amount, is_deposit } => {
+            let recipient = if is_deposit {
+                env.contract.address.to_string()
+            } else {
+                info.sender.to_string()
+            };
+            wrap_native(deps, info.sender.to_string(), recipient, amount, info.funds)
         }
 
         // Unwraps the "TokenWrapper" token to native token
-        ExecuteMsg::UnwrapNative { amount } => unwrap_native(deps, info.sender.to_string(), amount),
+        // Send the tokens back to `tx sender` or `recipient`
+        ExecuteMsg::UnwrapNative { amount, recipient } => {
+            let recipient = recipient.unwrap_or_else(|| env.contract.address.to_string());
+            unwrap_native(deps, info.sender.to_string(), recipient, amount)
+        }
 
         // Unwraps the VAnchor's TokenWrapper token for the `sender`
         // into one of its wrappable tokens.
-        ExecuteMsg::UnwrapIntoToken { token_addr, amount } => {
-            unwrap_into_token(deps, info.sender.to_string(), token_addr, amount)
+        ExecuteMsg::UnwrapIntoToken {
+            token_addr,
+            amount,
+            recipient,
+        } => {
+            let recipient = recipient.unwrap_or_else(|| env.contract.address.to_string());
+            unwrap_into_token(deps, info.sender.to_string(), recipient, token_addr, amount)
         }
 
         ExecuteMsg::AddEdge {
@@ -203,6 +218,7 @@ fn update_vanchor_config(
 
 fn receive_cw20(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
@@ -215,7 +231,14 @@ fn receive_cw20(
             proof_data,
             ext_data,
         }) => transact_deposit(deps, proof_data, ext_data, recv_token_addr, recv_token_amt),
-        Ok(Cw20HookMsg::WrapToken {}) => wrap_token(deps, sender, recv_token_addr, recv_token_amt),
+        Ok(Cw20HookMsg::WrapToken { is_deposit }) => {
+            let recipient = if is_deposit {
+                env.contract.address.to_string()
+            } else {
+                info.sender.to_string()
+            };
+            wrap_token(deps, sender, recipient, recv_token_addr, recv_token_amt)
+        }
         Err(_) => Err(ContractError::Std(StdError::generic_err(
             "invalid cw20 hook msg",
         ))),
@@ -613,6 +636,7 @@ fn update_edge(
 fn wrap_native(
     deps: DepsMut,
     sender: String,
+    recipient: String,
     amount: String,
     sent_funds: Vec<Coin>,
 ) -> Result<Response, ContractError> {
@@ -638,8 +662,8 @@ fn wrap_native(
         contract_addr: vanchor.tokenwrapper_addr.to_string(),
         funds: sent_funds,
         msg: to_binary(&TokenWrapperExecuteMsg::Wrap {
-            sender: Some(sender.clone()),
-            recipient: Some(sender),
+            sender: Some(sender),
+            recipient: Some(recipient),
         })?,
     })];
 
@@ -650,7 +674,12 @@ fn wrap_native(
     ]))
 }
 
-fn unwrap_native(deps: DepsMut, sender: String, amount: String) -> Result<Response, ContractError> {
+fn unwrap_native(
+    deps: DepsMut,
+    sender: String,
+    recipient: String,
+    amount: String,
+) -> Result<Response, ContractError> {
     let amount = parse_string_to_uint128(amount)?;
     let vanchor = VANCHOR.load(deps.storage)?;
 
@@ -659,8 +688,8 @@ fn unwrap_native(deps: DepsMut, sender: String, amount: String) -> Result<Respon
         contract_addr: vanchor.tokenwrapper_addr.to_string(),
         funds: vec![],
         msg: to_binary(&TokenWrapperExecuteMsg::Unwrap {
-            sender: Some(sender.clone()),
-            recipient: Some(sender),
+            sender: Some(sender),
+            recipient: Some(recipient),
             token: None,
             amount,
         })?,
@@ -675,6 +704,7 @@ fn unwrap_native(deps: DepsMut, sender: String, amount: String) -> Result<Respon
 fn wrap_token(
     deps: DepsMut,
     sender: String,
+    recipient: String,
     recv_token_addr: String,
     recv_token_amt: Uint128,
 ) -> Result<Response, ContractError> {
@@ -694,8 +724,8 @@ fn wrap_token(
             contract: vanchor.tokenwrapper_addr.to_string(),
             amount: recv_token_amt,
             msg: to_binary(&TokenWrapperHookMsg::Wrap {
-                sender: Some(sender.clone()),
-                recipient: Some(sender),
+                sender: Some(sender),
+                recipient: Some(recipient),
             })?,
         })?,
     })];
@@ -710,6 +740,7 @@ fn wrap_token(
 fn unwrap_into_token(
     deps: DepsMut,
     sender: String,
+    recipient: String,
     token_addr: String,
     amount: String,
 ) -> Result<Response, ContractError> {
@@ -721,8 +752,8 @@ fn unwrap_into_token(
         contract_addr: vanchor.tokenwrapper_addr.to_string(),
         funds: vec![],
         msg: to_binary(&TokenWrapperExecuteMsg::Unwrap {
-            sender: Some(sender.clone()),
-            recipient: Some(sender),
+            sender: Some(sender),
+            recipient: Some(recipient),
             token: Some(deps.api.addr_validate(token_addr.as_str())?),
             amount,
         })?,
