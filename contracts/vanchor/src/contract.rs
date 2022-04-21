@@ -165,6 +165,22 @@ pub fn execute(
             unwrap_into_token(deps, info.sender.to_string(), recipient, token_addr, amount)
         }
 
+        //
+        ExecuteMsg::TransactDepositWrap {
+            proof_data,
+            ext_data,
+        } => transact_deposit_wrap_native(deps, info, proof_data, ext_data),
+
+        //  Executes a withdrawal or combination join/split transaction
+        // including wrapping or unwrapping
+        // If `token_addr` is None, it means need to withdraw the "native token"
+        // Otherwise, the "cw20" token address to be unwrapped is given.
+        ExecuteMsg::TransactWithdrawUnwrap {
+            proof_data,
+            ext_data,
+            token_addr,
+        } => transact_withdraw_unwrap(deps, proof_data, ext_data, token_addr),
+
         ExecuteMsg::AddEdge {
             src_chain_id,
             root,
@@ -238,6 +254,12 @@ fn receive_cw20(
                 info.sender.to_string()
             };
             wrap_token(deps, sender, recipient, recv_token_addr, recv_token_amt)
+        }
+        Ok(Cw20HookMsg::TransactDepositWrap {
+            proof_data,
+            ext_data,
+        }) => {
+            transact_deposit_wrap_cw20(deps, proof_data, ext_data, recv_token_addr, recv_token_amt)
         }
         Err(_) => Err(ContractError::Std(StdError::generic_err(
             "invalid cw20 hook msg",
@@ -329,6 +351,196 @@ fn transact_deposit(
     ]))
 }
 
+fn transact_deposit_wrap_native(
+    mut deps: DepsMut,
+    info: MessageInfo,
+    proof_data: ProofData,
+    ext_data: ExtData,
+) -> Result<Response, ContractError> {
+    let vanchor: VAnchor = VANCHOR.load(deps.storage)?;
+
+    // Validations
+    let wrapper_config: TokenWrapperConfigResp = deps.querier.query_wasm_smart(
+        vanchor.tokenwrapper_addr.to_string(),
+        &TokenWrapperQueryMsg::Config {},
+    )?;
+    let token_denom = wrapper_config.native_token_denom;
+
+    let recv_token_amt = match info.funds.iter().find(|c| c.denom == token_denom.clone()) {
+        Some(v) => v.amount,
+        None => return Err(ContractError::InsufficientFunds {}),
+    };
+
+    validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
+
+    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
+    let abs_ext_amt = ext_amt.unsigned_abs();
+
+    // Deposit
+    let mut msgs: Vec<CosmosMsg> = vec![];
+
+    let is_withdraw = ext_amt.is_negative();
+    if is_withdraw {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid execute entry".to_string(),
+        }));
+    } else {
+        if Uint128::from(abs_ext_amt) > vanchor.max_deposit_amt {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Invalid deposit amount".to_string(),
+            }));
+        };
+        if abs_ext_amt != recv_token_amt.u128() {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Did not send enough tokens".to_string(),
+            }));
+        };
+        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: vanchor.tokenwrapper_addr.to_string(),
+            funds: info.funds,
+            msg: to_binary(&TokenWrapperExecuteMsg::Wrap {
+                sender: None,
+                recipient: None,
+            })?,
+        }));
+    }
+
+    // If fee exists, handle it
+    let fee_exists = ext_data_fee != 0;
+
+    if fee_exists {
+        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: vanchor.tokenwrapper_addr.to_string(),
+            funds: [].to_vec(),
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: ext_data.relayer,
+                amount: Uint128::try_from(ext_data_fee).unwrap(),
+            })?,
+        }));
+    }
+
+    // Insert output commitments into the tree
+    let mut merkle_tree = vanchor.merkle_tree;
+    for comm in &proof_data.output_commitments {
+        let poseidon: Poseidon = POSEIDON.load(deps.storage)?;
+        merkle_tree.insert(poseidon, *comm, deps.storage)?;
+    }
+
+    VANCHOR.save(
+        deps.storage,
+        &VAnchor {
+            creator: vanchor.creator,
+            chain_id: vanchor.chain_id,
+            merkle_tree,
+            linkable_tree: vanchor.linkable_tree,
+            tokenwrapper_addr: vanchor.tokenwrapper_addr,
+            max_deposit_amt: vanchor.max_deposit_amt,
+            min_withdraw_amt: vanchor.min_withdraw_amt,
+            max_fee: vanchor.max_fee,
+            max_ext_amt: vanchor.max_ext_amt,
+        },
+    )?;
+
+    Ok(Response::new().add_messages(msgs).add_attributes(vec![
+        attr("method", "transact_deposit_wrap_native"),
+        attr("ext_amt", ext_amt.to_string()),
+    ]))
+}
+
+fn transact_deposit_wrap_cw20(
+    mut deps: DepsMut,
+    proof_data: ProofData,
+    ext_data: ExtData,
+    recv_token_addr: String,
+    recv_token_amt: Uint128,
+) -> Result<Response, ContractError> {
+    // Only non-"TokenWrapper" Cw20 token contract can execute this message.
+    let vanchor: VAnchor = VANCHOR.load(deps.storage)?;
+    if vanchor.tokenwrapper_addr == deps.api.addr_validate(recv_token_addr.as_str())? {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
+
+    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
+    let abs_ext_amt = ext_amt.unsigned_abs();
+
+    // Deposit
+    let mut msgs: Vec<CosmosMsg> = vec![];
+
+    if ext_amt.is_negative() {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid execute entry".to_string(),
+        }));
+    } else {
+        if Uint128::from(abs_ext_amt) > vanchor.max_deposit_amt {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Invalid deposit amount".to_string(),
+            }));
+        };
+        if abs_ext_amt != recv_token_amt.u128() {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Did not send enough tokens".to_string(),
+            }));
+        };
+        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: recv_token_addr,
+            funds: vec![],
+            msg: to_binary(&Cw20ExecuteMsg::Send {
+                contract: vanchor.tokenwrapper_addr.to_string(),
+                amount: recv_token_amt,
+                msg: to_binary(&TokenWrapperHookMsg::Wrap {
+                    sender: None,
+                    recipient: None,
+                })?,
+            })?,
+        }));
+    }
+
+    // If fee exists, handle it
+    let fee_exists = ext_data_fee != 0;
+
+    if fee_exists {
+        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: vanchor.tokenwrapper_addr.to_string(),
+            funds: [].to_vec(),
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: ext_data.relayer,
+                amount: Uint128::try_from(ext_data_fee).unwrap(),
+            })?,
+        }));
+    }
+
+    // Insert output commitments into the tree
+    let mut merkle_tree = vanchor.merkle_tree;
+    for comm in &proof_data.output_commitments {
+        let poseidon: Poseidon = POSEIDON.load(deps.storage)?;
+        merkle_tree.insert(poseidon, *comm, deps.storage)?;
+    }
+
+    VANCHOR.save(
+        deps.storage,
+        &VAnchor {
+            creator: vanchor.creator,
+            chain_id: vanchor.chain_id,
+            merkle_tree,
+            linkable_tree: vanchor.linkable_tree,
+            tokenwrapper_addr: vanchor.tokenwrapper_addr,
+            max_deposit_amt: vanchor.max_deposit_amt,
+            min_withdraw_amt: vanchor.min_withdraw_amt,
+            max_fee: vanchor.max_fee,
+            max_ext_amt: vanchor.max_ext_amt,
+        },
+    )?;
+
+    Ok(Response::new().add_messages(msgs).add_attributes(vec![
+        attr("method", "transact_deposit_wrap_cw20"),
+        attr("ext_amt", ext_amt.to_string()),
+    ]))
+}
+
 fn transact_withdraw(
     mut deps: DepsMut,
     proof_data: ProofData,
@@ -402,6 +614,86 @@ fn transact_withdraw(
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("method", "transact_withdraw"),
+        attr("ext_amt", ext_amt.to_string()),
+    ]))
+}
+
+fn transact_withdraw_unwrap(
+    mut deps: DepsMut,
+    proof_data: ProofData,
+    ext_data: ExtData,
+    token_addr: Option<String>,
+) -> Result<Response, ContractError> {
+    validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
+
+    let vanchor = VANCHOR.load(deps.storage)?;
+    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
+    let abs_ext_amt = ext_amt.unsigned_abs();
+
+    // Withdraw
+    let mut msgs: Vec<CosmosMsg> = vec![];
+
+    if ext_amt.is_positive() {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid execute entry".to_string(),
+        }));
+    } else {
+        if Uint128::from(abs_ext_amt) < vanchor.min_withdraw_amt {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Invalid withdraw amount".to_string(),
+            }));
+        }
+        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: vanchor.tokenwrapper_addr.to_string(),
+            funds: [].to_vec(),
+            msg: to_binary(&TokenWrapperExecuteMsg::Unwrap {
+                sender: None,
+                recipient: Some(ext_data.recipient),
+                token: token_addr.map(|a| deps.api.addr_validate(a.as_str()).unwrap()),
+                amount: Uint128::try_from(abs_ext_amt).unwrap(),
+            })?,
+        }));
+    }
+
+    // If fee exists, handle it
+    let fee_exists = ext_data_fee != 0;
+
+    if fee_exists {
+        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: vanchor.tokenwrapper_addr.to_string(),
+            funds: [].to_vec(),
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: ext_data.relayer,
+                amount: Uint128::try_from(ext_data_fee).unwrap(),
+            })?,
+        }));
+    }
+
+    // Insert output commitments into the tree
+    let mut merkle_tree = vanchor.merkle_tree;
+    for comm in &proof_data.output_commitments {
+        let poseidon: Poseidon = POSEIDON.load(deps.storage)?;
+        merkle_tree.insert(poseidon, *comm, deps.storage)?;
+    }
+
+    VANCHOR.save(
+        deps.storage,
+        &VAnchor {
+            creator: vanchor.creator,
+            chain_id: vanchor.chain_id,
+            merkle_tree,
+            linkable_tree: vanchor.linkable_tree,
+            tokenwrapper_addr: vanchor.tokenwrapper_addr,
+            max_deposit_amt: vanchor.max_deposit_amt,
+            min_withdraw_amt: vanchor.min_withdraw_amt,
+            max_fee: vanchor.max_fee,
+            max_ext_amt: vanchor.max_ext_amt,
+        },
+    )?;
+
+    Ok(Response::new().add_messages(msgs).add_attributes(vec![
+        attr("method", "transact_withdraw_unwrap"),
         attr("ext_amt", ext_amt.to_string()),
     ]))
 }

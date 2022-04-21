@@ -52,6 +52,23 @@ pub enum ExecuteMsg {
         recipient: Option<String>,
     },
 
+    ///  Executes a withdrawal or combination join/split transaction
+    /// including wrapping or unwrapping
+    /// If `token_addr` is None, it means need to withdraw the "native token"
+    /// Otherwise, the "cw20" token address to be unwrapped is given.
+    TransactWithdrawUnwrap {
+        proof_data: ProofData,
+        ext_data: ExtData,
+        token_addr: Option<String>,
+    },
+
+    ///  Executes a deposit(native) or combination join/split transaction
+    /// including wrapping or unwrapping
+    TransactDepositWrap {
+        proof_data: ProofData,
+        ext_data: ExtData,
+    },
+
     AddEdge {
         src_chain_id: u64,
         root: [u8; 32],
@@ -85,6 +102,13 @@ pub enum Cw20HookMsg {
     /// the underlying VAnchor's TokenWrapper contract
     /// Send the tokens back to `tx sender` or deposit to `this` contract
     WrapToken { is_deposit: bool },
+
+    ///  Executes a deposit(cw20) or combination join/split transaction
+    /// including wrapping or unwrapping
+    TransactDepositWrap {
+        proof_data: ProofData,
+        ext_data: ExtData,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
