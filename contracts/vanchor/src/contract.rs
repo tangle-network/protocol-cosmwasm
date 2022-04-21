@@ -128,6 +128,7 @@ pub fn execute(
         // Handle the "receive" cw20 token
         // 1. Executes a deposit or combination join/split transaction
         // 2. WrapToken
+        // 3. TransactDepositWrap
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
 
         // Executes a withdrawal or combination join/split transaction
@@ -165,7 +166,8 @@ pub fn execute(
             unwrap_into_token(deps, info.sender.to_string(), recipient, token_addr, amount)
         }
 
-        //
+        //  Executes a deposit(native token) or combination join/split transaction
+        // including wrapping or unwrapping
         ExecuteMsg::TransactDepositWrap {
             proof_data,
             ext_data,
@@ -267,6 +269,7 @@ fn receive_cw20(
     }
 }
 
+// Executes a deposit or combination join/split transactions
 fn transact_deposit(
     mut deps: DepsMut,
     proof_data: ProofData,
@@ -323,27 +326,7 @@ fn transact_deposit(
         }));
     }
 
-    // Insert output commitments into the tree
-    let mut merkle_tree = vanchor.merkle_tree;
-    for comm in &proof_data.output_commitments {
-        let poseidon: Poseidon = POSEIDON.load(deps.storage)?;
-        merkle_tree.insert(poseidon, *comm, deps.storage)?;
-    }
-
-    VANCHOR.save(
-        deps.storage,
-        &VAnchor {
-            creator: vanchor.creator,
-            chain_id: vanchor.chain_id,
-            merkle_tree,
-            linkable_tree: vanchor.linkable_tree,
-            tokenwrapper_addr: vanchor.tokenwrapper_addr,
-            max_deposit_amt: vanchor.max_deposit_amt,
-            min_withdraw_amt: vanchor.min_withdraw_amt,
-            max_fee: vanchor.max_fee,
-            max_ext_amt: vanchor.max_ext_amt,
-        },
-    )?;
+    execute_insertions(deps, proof_data)?;
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("method", "transact_deposit"),
@@ -351,6 +334,8 @@ fn transact_deposit(
     ]))
 }
 
+// Executes a deposit(native token) or combination join/split transaction
+// including wrapping
 fn transact_deposit_wrap_native(
     mut deps: DepsMut,
     info: MessageInfo,
@@ -420,27 +405,7 @@ fn transact_deposit_wrap_native(
         }));
     }
 
-    // Insert output commitments into the tree
-    let mut merkle_tree = vanchor.merkle_tree;
-    for comm in &proof_data.output_commitments {
-        let poseidon: Poseidon = POSEIDON.load(deps.storage)?;
-        merkle_tree.insert(poseidon, *comm, deps.storage)?;
-    }
-
-    VANCHOR.save(
-        deps.storage,
-        &VAnchor {
-            creator: vanchor.creator,
-            chain_id: vanchor.chain_id,
-            merkle_tree,
-            linkable_tree: vanchor.linkable_tree,
-            tokenwrapper_addr: vanchor.tokenwrapper_addr,
-            max_deposit_amt: vanchor.max_deposit_amt,
-            min_withdraw_amt: vanchor.min_withdraw_amt,
-            max_fee: vanchor.max_fee,
-            max_ext_amt: vanchor.max_ext_amt,
-        },
-    )?;
+    execute_insertions(deps, proof_data)?;
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("method", "transact_deposit_wrap_native"),
@@ -448,6 +413,8 @@ fn transact_deposit_wrap_native(
     ]))
 }
 
+// Executes a deposit(cw20) or combination join/split transaction
+// including wrapping
 fn transact_deposit_wrap_cw20(
     mut deps: DepsMut,
     proof_data: ProofData,
@@ -513,27 +480,7 @@ fn transact_deposit_wrap_cw20(
         }));
     }
 
-    // Insert output commitments into the tree
-    let mut merkle_tree = vanchor.merkle_tree;
-    for comm in &proof_data.output_commitments {
-        let poseidon: Poseidon = POSEIDON.load(deps.storage)?;
-        merkle_tree.insert(poseidon, *comm, deps.storage)?;
-    }
-
-    VANCHOR.save(
-        deps.storage,
-        &VAnchor {
-            creator: vanchor.creator,
-            chain_id: vanchor.chain_id,
-            merkle_tree,
-            linkable_tree: vanchor.linkable_tree,
-            tokenwrapper_addr: vanchor.tokenwrapper_addr,
-            max_deposit_amt: vanchor.max_deposit_amt,
-            min_withdraw_amt: vanchor.min_withdraw_amt,
-            max_fee: vanchor.max_fee,
-            max_ext_amt: vanchor.max_ext_amt,
-        },
-    )?;
+    execute_insertions(deps.branch(), proof_data)?;
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("method", "transact_deposit_wrap_cw20"),
@@ -541,6 +488,7 @@ fn transact_deposit_wrap_cw20(
     ]))
 }
 
+// Executes a deposit/withdrawal or combination join/split transaction
 fn transact_withdraw(
     mut deps: DepsMut,
     proof_data: ProofData,
@@ -590,27 +538,7 @@ fn transact_withdraw(
         }));
     }
 
-    // Insert output commitments into the tree
-    let mut merkle_tree = vanchor.merkle_tree;
-    for comm in &proof_data.output_commitments {
-        let poseidon: Poseidon = POSEIDON.load(deps.storage)?;
-        merkle_tree.insert(poseidon, *comm, deps.storage)?;
-    }
-
-    VANCHOR.save(
-        deps.storage,
-        &VAnchor {
-            creator: vanchor.creator,
-            chain_id: vanchor.chain_id,
-            merkle_tree,
-            linkable_tree: vanchor.linkable_tree,
-            tokenwrapper_addr: vanchor.tokenwrapper_addr,
-            max_deposit_amt: vanchor.max_deposit_amt,
-            min_withdraw_amt: vanchor.min_withdraw_amt,
-            max_fee: vanchor.max_fee,
-            max_ext_amt: vanchor.max_ext_amt,
-        },
-    )?;
+    execute_insertions(deps, proof_data)?;
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("method", "transact_withdraw"),
@@ -618,6 +546,8 @@ fn transact_withdraw(
     ]))
 }
 
+// Executes a withdrawal(native + cw20) or combination join/split transaction
+// including unwrapping
 fn transact_withdraw_unwrap(
     mut deps: DepsMut,
     proof_data: ProofData,
@@ -670,27 +600,7 @@ fn transact_withdraw_unwrap(
         }));
     }
 
-    // Insert output commitments into the tree
-    let mut merkle_tree = vanchor.merkle_tree;
-    for comm in &proof_data.output_commitments {
-        let poseidon: Poseidon = POSEIDON.load(deps.storage)?;
-        merkle_tree.insert(poseidon, *comm, deps.storage)?;
-    }
-
-    VANCHOR.save(
-        deps.storage,
-        &VAnchor {
-            creator: vanchor.creator,
-            chain_id: vanchor.chain_id,
-            merkle_tree,
-            linkable_tree: vanchor.linkable_tree,
-            tokenwrapper_addr: vanchor.tokenwrapper_addr,
-            max_deposit_amt: vanchor.max_deposit_amt,
-            min_withdraw_amt: vanchor.min_withdraw_amt,
-            max_fee: vanchor.max_fee,
-            max_ext_amt: vanchor.max_ext_amt,
-        },
-    )?;
+    execute_insertions(deps, proof_data)?;
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("method", "transact_withdraw_unwrap"),
@@ -698,6 +608,7 @@ fn transact_withdraw_unwrap(
     ]))
 }
 
+// Check whether if the zkSNARK proof is valid
 fn validate_proof(
     deps: DepsMut,
     proof_data: ProofData,
@@ -840,6 +751,170 @@ fn validate_proof(
     Ok(())
 }
 
+// Inserts the output commitments into the underlying merkle tree
+fn execute_insertions(deps: DepsMut, proof_data: ProofData) -> Result<(), ContractError> {
+    let vanchor = VANCHOR.load(deps.storage)?;
+    // Insert output commitments into the tree
+    let mut merkle_tree = vanchor.merkle_tree;
+    for comm in &proof_data.output_commitments {
+        let poseidon: Poseidon = POSEIDON.load(deps.storage)?;
+        merkle_tree.insert(poseidon, *comm, deps.storage)?;
+    }
+
+    VANCHOR.save(
+        deps.storage,
+        &VAnchor {
+            creator: vanchor.creator,
+            chain_id: vanchor.chain_id,
+            merkle_tree,
+            linkable_tree: vanchor.linkable_tree,
+            tokenwrapper_addr: vanchor.tokenwrapper_addr,
+            max_deposit_amt: vanchor.max_deposit_amt,
+            min_withdraw_amt: vanchor.min_withdraw_amt,
+            max_fee: vanchor.max_fee,
+            max_ext_amt: vanchor.max_ext_amt,
+        },
+    )?;
+    Ok(())
+}
+
+// Wrap the native token for the `info.sender` into the TokenWrapper token
+fn wrap_native(
+    deps: DepsMut,
+    sender: String,
+    recipient: String,
+    amount: String,
+    sent_funds: Vec<Coin>,
+) -> Result<Response, ContractError> {
+    let amount = parse_string_to_uint128(amount)?;
+    let vanchor = VANCHOR.load(deps.storage)?;
+
+    // Validations
+    let wrapper_config: TokenWrapperConfigResp = deps.querier.query_wasm_smart(
+        vanchor.tokenwrapper_addr.to_string(),
+        &TokenWrapperQueryMsg::Config {},
+    )?;
+    let token_denom = wrapper_config.native_token_denom;
+
+    let is_sent_enough_token = sent_funds
+        .iter()
+        .any(|c| c.denom == token_denom.clone() && c.amount == amount);
+    if !is_sent_enough_token {
+        return Err(ContractError::InsufficientFunds {});
+    }
+
+    // Handle the "wrap"
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: vanchor.tokenwrapper_addr.to_string(),
+        funds: sent_funds,
+        msg: to_binary(&TokenWrapperExecuteMsg::Wrap {
+            sender: Some(sender),
+            recipient: Some(recipient),
+        })?,
+    })];
+
+    Ok(Response::new().add_messages(msgs).add_attributes(vec![
+        attr("method", "wrap_native"),
+        attr("denom", token_denom),
+        attr("amount", amount),
+    ]))
+}
+
+// Unwrap the Tokenwrapper token for the `info.sender` into the native token
+fn unwrap_native(
+    deps: DepsMut,
+    sender: String,
+    recipient: String,
+    amount: String,
+) -> Result<Response, ContractError> {
+    let amount = parse_string_to_uint128(amount)?;
+    let vanchor = VANCHOR.load(deps.storage)?;
+
+    // Handle the "Unwrap"
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: vanchor.tokenwrapper_addr.to_string(),
+        funds: vec![],
+        msg: to_binary(&TokenWrapperExecuteMsg::Unwrap {
+            sender: Some(sender),
+            recipient: Some(recipient),
+            token: None,
+            amount,
+        })?,
+    })];
+
+    Ok(Response::new().add_messages(msgs).add_attributes(vec![
+        attr("method", "unwrap_native"),
+        attr("amount", amount),
+    ]))
+}
+
+// Wrap the cw20 token for the `info.sender` into the TokenWrapper token
+fn wrap_token(
+    deps: DepsMut,
+    sender: String,
+    recipient: String,
+    recv_token_addr: String,
+    recv_token_amt: Uint128,
+) -> Result<Response, ContractError> {
+    let vanchor = VANCHOR.load(deps.storage)?;
+
+    // Validations
+    let cw20_addr = deps.api.addr_validate(recv_token_addr.as_str())?;
+    if vanchor.tokenwrapper_addr == cw20_addr {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // Handle the "Wrap" function
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: recv_token_addr.clone(),
+        funds: vec![],
+        msg: to_binary(&Cw20ExecuteMsg::Send {
+            contract: vanchor.tokenwrapper_addr.to_string(),
+            amount: recv_token_amt,
+            msg: to_binary(&TokenWrapperHookMsg::Wrap {
+                sender: Some(sender),
+                recipient: Some(recipient),
+            })?,
+        })?,
+    })];
+
+    Ok(Response::new().add_messages(msgs).add_attributes(vec![
+        attr("method", "wrap_token"),
+        attr("token", recv_token_addr),
+        attr("amount", recv_token_amt),
+    ]))
+}
+
+// Unwrap the Tokenwrapper token for the `info.sender` into the target cw20 token
+fn unwrap_into_token(
+    deps: DepsMut,
+    sender: String,
+    recipient: String,
+    token_addr: String,
+    amount: String,
+) -> Result<Response, ContractError> {
+    let amount = parse_string_to_uint128(amount)?;
+    let vanchor = VANCHOR.load(deps.storage)?;
+
+    // Handle the "Unwrap"
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: vanchor.tokenwrapper_addr.to_string(),
+        funds: vec![],
+        msg: to_binary(&TokenWrapperExecuteMsg::Unwrap {
+            sender: Some(sender),
+            recipient: Some(recipient),
+            token: Some(deps.api.addr_validate(token_addr.as_str())?),
+            amount,
+        })?,
+    })];
+
+    Ok(Response::new().add_messages(msgs).add_attributes(vec![
+        attr("method", "unwrap_into_token"),
+        attr("token", token_addr),
+        attr("amount", amount),
+    ]))
+}
+
 fn add_edge(
     deps: DepsMut,
     info: MessageInfo,
@@ -923,139 +998,6 @@ fn update_edge(
     save_edge(deps.storage, src_chain_id, edge)?;
 
     Ok(Response::new().add_attributes(vec![attr("method", "udpate_edge")]))
-}
-
-fn wrap_native(
-    deps: DepsMut,
-    sender: String,
-    recipient: String,
-    amount: String,
-    sent_funds: Vec<Coin>,
-) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
-    let vanchor = VANCHOR.load(deps.storage)?;
-
-    // Validations
-    let wrapper_config: TokenWrapperConfigResp = deps.querier.query_wasm_smart(
-        vanchor.tokenwrapper_addr.to_string(),
-        &TokenWrapperQueryMsg::Config {},
-    )?;
-    let token_denom = wrapper_config.native_token_denom;
-
-    let is_sent_enough_token = sent_funds
-        .iter()
-        .any(|c| c.denom == token_denom.clone() && c.amount == amount);
-    if !is_sent_enough_token {
-        return Err(ContractError::InsufficientFunds {});
-    }
-
-    // Handle the "wrap"
-    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: vanchor.tokenwrapper_addr.to_string(),
-        funds: sent_funds,
-        msg: to_binary(&TokenWrapperExecuteMsg::Wrap {
-            sender: Some(sender),
-            recipient: Some(recipient),
-        })?,
-    })];
-
-    Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "wrap_native"),
-        attr("denom", token_denom),
-        attr("amount", amount),
-    ]))
-}
-
-fn unwrap_native(
-    deps: DepsMut,
-    sender: String,
-    recipient: String,
-    amount: String,
-) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
-    let vanchor = VANCHOR.load(deps.storage)?;
-
-    // Handle the "Unwrap"
-    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: vanchor.tokenwrapper_addr.to_string(),
-        funds: vec![],
-        msg: to_binary(&TokenWrapperExecuteMsg::Unwrap {
-            sender: Some(sender),
-            recipient: Some(recipient),
-            token: None,
-            amount,
-        })?,
-    })];
-
-    Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "unwrap_native"),
-        attr("amount", amount),
-    ]))
-}
-
-fn wrap_token(
-    deps: DepsMut,
-    sender: String,
-    recipient: String,
-    recv_token_addr: String,
-    recv_token_amt: Uint128,
-) -> Result<Response, ContractError> {
-    let vanchor = VANCHOR.load(deps.storage)?;
-
-    // Validations
-    let cw20_addr = deps.api.addr_validate(recv_token_addr.as_str())?;
-    if vanchor.tokenwrapper_addr == cw20_addr {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    // Handle the "Wrap" function
-    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: recv_token_addr.clone(),
-        funds: vec![],
-        msg: to_binary(&Cw20ExecuteMsg::Send {
-            contract: vanchor.tokenwrapper_addr.to_string(),
-            amount: recv_token_amt,
-            msg: to_binary(&TokenWrapperHookMsg::Wrap {
-                sender: Some(sender),
-                recipient: Some(recipient),
-            })?,
-        })?,
-    })];
-
-    Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "wrap_token"),
-        attr("token", recv_token_addr),
-        attr("amount", recv_token_amt),
-    ]))
-}
-
-fn unwrap_into_token(
-    deps: DepsMut,
-    sender: String,
-    recipient: String,
-    token_addr: String,
-    amount: String,
-) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
-    let vanchor = VANCHOR.load(deps.storage)?;
-
-    // Handle the "Unwrap"
-    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: vanchor.tokenwrapper_addr.to_string(),
-        funds: vec![],
-        msg: to_binary(&TokenWrapperExecuteMsg::Unwrap {
-            sender: Some(sender),
-            recipient: Some(recipient),
-            token: Some(deps.api.addr_validate(token_addr.as_str())?),
-            amount,
-        })?,
-    })];
-
-    Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "unwrap_into_token"),
-        attr("token", token_addr),
-        attr("amount", amount),
-    ]))
 }
 
 // Check if the "nullifier" is already used or not.

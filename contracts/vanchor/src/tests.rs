@@ -1431,7 +1431,10 @@ fn test_vanchor_wrap_and_deposit_cw20() {
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
     assert_eq!(
         response.attributes,
-        vec![attr("method", "transact_deposit_wrap_cw20"), attr("ext_amt", "10"),]
+        vec![
+            attr("method", "transact_deposit_wrap_cw20"),
+            attr("ext_amt", "10"),
+        ]
     );
     assert_eq!(response.messages.len(), 1);
 }
@@ -1588,6 +1591,9 @@ fn test_vanchor_withdraw_and_unwrap_native() {
     let response = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap();
     assert_eq!(
         response.attributes,
-        vec![attr("method", "transact_withdraw_unwrap"), attr("ext_amt", "-5"),]
+        vec![
+            attr("method", "transact_withdraw_unwrap"),
+            attr("ext_amt", "-5"),
+        ]
     );
 }
