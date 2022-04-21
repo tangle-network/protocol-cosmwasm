@@ -285,8 +285,6 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
         ext_data_hash.0,
     );
 
-    println!("Proof-data:{:?}", proof_data);
-    println!("ext-data:{:?}", ext_data);
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
@@ -298,7 +296,6 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
         })
         .unwrap(),
     });
-    println!("Proof_data{:?}", deposit_cw20_msg);
 
     // Deposit "10" cw20 tokens.
     let _ = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
@@ -361,15 +358,12 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
         ext_data_hash.0,
     );
 
-    println!("Proof-data:{:?}", proof_data);
-    println!("ext-data:{:?}", ext_data);
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
     let withdraw_cw20_msg = ExecuteMsg::TransactWithdraw {
         proof_data: proof_data,
         ext_data: ext_data,
     };
-    println!("Withdraw msg::{:?}", withdraw_cw20_msg);
 
     // Withdraw "7" cw20 tokens.
     let response = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap();
@@ -1352,5 +1346,248 @@ fn test_vanchor_unwrap_into_token() {
             attr("token", recv_token),
             attr("amount", unwrap_amt),
         ]
+    );
+}
+
+#[test]
+fn test_vanchor_wrap_and_deposit_cw20() {
+    // Instantiate the "vanchor" contract.
+    let mut deps = create_vanchor();
+
+    // Initialize the vanchor
+    let (pk_bytes, _) = crate::test_util::setup_environment_2_2_2(Curve::Bn254);
+    let ext_amount = 10_i128;
+    let fee = 0_u128;
+
+    let public_amount = 10_i128;
+
+    let chain_type = [4, 0];
+    let chain_id = compute_chain_id_type(1, &chain_type);
+    let in_chain_ids = [chain_id; 2];
+    let in_amounts = [0, 0];
+    let in_indices = [0, 1];
+    let out_chain_ids = [chain_id; 2];
+    let out_amounts = [10, 0];
+
+    let in_utxos = crate::test_util::setup_utxos_2_2_2(in_chain_ids, in_amounts, Some(in_indices));
+    // We are adding indices to out utxos, since they will be used as an input utxos in next transaction
+    let out_utxos =
+        crate::test_util::setup_utxos_2_2_2(out_chain_ids, out_amounts, Some(in_indices));
+
+    let output1 = out_utxos[0].commitment.into_repr().to_bytes_le();
+    let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
+
+    let ext_data = ExtData {
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
+        ext_amount: ext_amount.to_string(),
+        fee: fee.to_string(),
+        encrypted_output1: element_encoder(&output1),
+        encrypted_output2: element_encoder(&output2),
+    };
+
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
+
+    let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
+    let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_2_2(
+        public_amount,
+        chain_id,
+        ext_data_hash.to_vec(),
+        in_utxos,
+        out_utxos,
+        custom_roots,
+        pk_bytes,
+    );
+
+    // Deconstructing public inputs
+    let (_chain_id, public_amount, root_set, nullifiers, commitments, ext_data_hash) =
+        crate::test_util::deconstruct_public_inputs_el_2_2_2(&public_inputs);
+
+    // Constructing proof data
+    let root_set = root_set.into_iter().map(|v| v.0).collect();
+    let nullifiers = nullifiers.into_iter().map(|v| v.0).collect();
+    let commitments = commitments.into_iter().map(|v| v.0).collect();
+    let proof_data = ProofData::new(
+        proof,
+        public_amount.0,
+        root_set,
+        nullifiers,
+        commitments,
+        ext_data_hash.0,
+    );
+
+    // Should "transact" with success.
+    let info = mock_info("any-cw20", &[]);
+    let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+        sender: TRANSACTOR.to_string(),
+        amount: Uint128::from(10_u128),
+        msg: to_binary(&Cw20HookMsg::TransactDepositWrap {
+            proof_data: proof_data,
+            ext_data: ext_data,
+        })
+        .unwrap(),
+    });
+
+    let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
+    assert_eq!(
+        response.attributes,
+        vec![attr("method", "transact_deposit_wrap_cw20"), attr("ext_amt", "10"),]
+    );
+    assert_eq!(response.messages.len(), 1);
+}
+
+#[test]
+fn test_vanchor_withdraw_and_unwrap_native() {
+    // Instantiate the "vanchor" contract.
+    let mut deps = create_vanchor();
+
+    // Initialize the vanchor
+    let (pk_bytes, _) = crate::test_util::setup_environment_2_2_2(Curve::Bn254);
+    let ext_amount = 10_i128;
+    let fee = 0_u128;
+
+    let public_amount = 10_i128;
+
+    let chain_type = [4, 0];
+    let chain_id = compute_chain_id_type(1, &chain_type);
+    let in_chain_ids = [chain_id; 2];
+    let in_amounts = [0, 0];
+    let in_indices = [0, 1];
+    let out_chain_ids = [chain_id; 2];
+    let out_amounts = [10, 0];
+
+    let in_utxos = crate::test_util::setup_utxos_2_2_2(in_chain_ids, in_amounts, Some(in_indices));
+    // We are adding indices to out utxos, since they will be used as an input utxos in next transaction
+    let out_utxos =
+        crate::test_util::setup_utxos_2_2_2(out_chain_ids, out_amounts, Some(in_indices));
+
+    let output1 = out_utxos[0].commitment.into_repr().to_bytes_le();
+    let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
+
+    let ext_data = ExtData {
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
+        ext_amount: ext_amount.to_string(),
+        fee: fee.to_string(),
+        encrypted_output1: element_encoder(&output1),
+        encrypted_output2: element_encoder(&output2),
+    };
+
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
+
+    let custom_roots = Some([zeroes(LEVELS), zeroes(LEVELS)].map(|x| x.to_vec()));
+    let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_2_2(
+        public_amount,
+        chain_id,
+        ext_data_hash.to_vec(),
+        in_utxos,
+        out_utxos.clone(),
+        custom_roots,
+        pk_bytes,
+    );
+
+    // Deconstructing public inputs
+    let (_chain_id, public_amount, root_set, nullifiers, commitments, ext_data_hash) =
+        crate::test_util::deconstruct_public_inputs_el_2_2_2(&public_inputs);
+
+    // Constructing proof data
+    let root_set = root_set.into_iter().map(|v| v.0).collect();
+    let nullifiers = nullifiers.into_iter().map(|v| v.0).collect();
+    let commitments = commitments.into_iter().map(|v| v.0).collect();
+    let proof_data = ProofData::new(
+        proof,
+        public_amount.0,
+        root_set,
+        nullifiers,
+        commitments,
+        ext_data_hash.0,
+    );
+
+    // Should "transact" with success.
+    let info = mock_info(CW20_ADDRESS, &[]);
+    let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+        sender: TRANSACTOR.to_string(),
+        amount: Uint128::from(10_u128),
+        msg: to_binary(&Cw20HookMsg::TransactDeposit {
+            proof_data: proof_data,
+            ext_data: ext_data,
+        })
+        .unwrap(),
+    });
+
+    // Deposit "10" cw20 tokens.
+    let _ = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
+
+    // Prepare the "withdraw" data.
+    let (pk_bytes, _) = crate::test_util::setup_environment_2_2_2(Curve::Bn254);
+
+    let ext_amount = -5_i128;
+    let fee = 2_u128;
+
+    let public_amount = -7_i128;
+
+    let chain_id = compute_chain_id_type(TEST_CHAIN_ID, &CHAIN_TYPE);
+    let out_chain_ids = [TEST_CHAIN_ID; 2];
+    // After withdrawing -7
+    let out_amounts = [1, 2];
+
+    // "in_utxos" become the "out_utxos" of last transact.
+    let in_utxos = out_utxos;
+    let out_utxos = crate::test_util::setup_utxos_2_2_2(out_chain_ids, out_amounts, None);
+
+    let output1 = out_utxos[0].commitment.into_repr().to_bytes_le();
+    let output2 = out_utxos[1].commitment.into_repr().to_bytes_le();
+    let ext_data = ExtData {
+        recipient: RECIPIENT.to_string(),
+        relayer: RELAYER.to_string(),
+        ext_amount: ext_amount.to_string(),
+        fee: fee.to_string(),
+        encrypted_output1: element_encoder(&output1),
+        encrypted_output2: element_encoder(&output2),
+    };
+
+    let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
+
+    let (proof, public_inputs) = crate::test_util::setup_zk_circuit_2_2_2(
+        public_amount,
+        chain_id,
+        ext_data_hash.to_vec(),
+        in_utxos,
+        out_utxos,
+        None,
+        pk_bytes,
+    );
+
+    // Deconstructing public inputs
+    let (_chain_id, public_amount, root_set, nullifiers, commitments, ext_data_hash) =
+        crate::test_util::deconstruct_public_inputs_el_2_2_2(&public_inputs);
+
+    // Constructing proof data
+    let root_set = root_set.into_iter().map(|v| v.0).collect();
+    let nullifiers = nullifiers.into_iter().map(|v| v.0).collect();
+    let commitments = commitments.into_iter().map(|v| v.0).collect();
+
+    let proof_data = ProofData::new(
+        proof,
+        public_amount.0,
+        root_set,
+        nullifiers,
+        commitments,
+        ext_data_hash.0,
+    );
+
+    // Should "transact" with success.
+    let info = mock_info(CW20_ADDRESS, &[]);
+    let withdraw_cw20_msg = ExecuteMsg::TransactWithdrawUnwrap {
+        proof_data: proof_data,
+        ext_data: ext_data,
+        token_addr: None,
+    };
+
+    // Withdraw "7" cw20 tokens.
+    let response = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap();
+    assert_eq!(
+        response.attributes,
+        vec![attr("method", "transact_withdraw_unwrap"), attr("ext_amt", "-5"),]
     );
 }
