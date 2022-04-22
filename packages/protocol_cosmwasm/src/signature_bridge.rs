@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    pub inital_governer: String,
+    pub initial_governor: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -22,4 +22,10 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
     // Get the state
     GetState {},
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct StateResponse {
+    pub governor: String,
+    pub proposal_nonce: u32,
 }
