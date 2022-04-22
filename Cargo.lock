@@ -804,6 +804,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cosmwasm-signature-bridge"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std 0.16.6",
+ "cosmwasm-storage",
+ "cw-storage-plus",
+ "cw2",
+ "protocol-cosmwasm",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cosmwasm-std"
 version = "0.16.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
