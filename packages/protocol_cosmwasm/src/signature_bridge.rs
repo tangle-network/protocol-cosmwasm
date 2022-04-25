@@ -11,10 +11,27 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     // Sets a new resource for handler contracts that use the IExecutor interface,
     // and maps the {handlerAddress} to {newResourceID} in {_resourceIDToHandlerAddress}.
-    AdminSetResWithSig,
+    AdminSetResWithSig(SetResWithSigMsg),
 
     // Executes a proposal signed by the governor.
-    ExecProposalWithSig,
+    ExecProposalWithSig(ExecProposalWithSigMsg),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct SetResWithSigMsg {
+    pub resource_id: [u8; 32],
+    pub function_sig: [u8; 4],
+    pub nonce: u32,
+    pub new_resource_id: [u8; 32],
+    pub handler_addr: String,
+    pub execution_context_addr: String,
+    pub sig: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct ExecProposalWithSigMsg {
+    pub data: Vec<u8>,
+    pub sig: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

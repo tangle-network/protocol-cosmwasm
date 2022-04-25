@@ -1,15 +1,28 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{attr, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    attr, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, WasmMsg,
+};
 use cw2::set_contract_version;
+use libsecp256k1::{Message, PublicKey, RecoveryId, Signature};
 
-use crate::state::{State, STATE};
+use crate::state::{State, RESID2HANDLERADDR, STATE};
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::signature_bridge::{ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse};
+use protocol_cosmwasm::executor::ExecuteMsg as ExecutorExecMsg;
+use protocol_cosmwasm::keccak::Keccak256;
+use protocol_cosmwasm::signature_bridge::{
+    ExecProposalWithSigMsg, ExecuteMsg, InstantiateMsg, QueryMsg, SetResWithSigMsg, StateResponse,
+};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-signature-bridge";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+// ChainType info
+pub const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
+
+pub const FAKE_CHAIN_ID: u64 = 1;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -49,25 +62,119 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::AdminSetResWithSig => admin_set_res_with_signature(deps, info),
-        ExecuteMsg::ExecProposalWithSig => exec_proposal_with_signature(deps, info),
+        ExecuteMsg::AdminSetResWithSig(msg) => admin_set_res_with_signature(deps, info, msg),
+        ExecuteMsg::ExecProposalWithSig(msg) => exec_proposal_with_signature(deps, info, msg),
     }
 }
 
 fn admin_set_res_with_signature(
     deps: DepsMut,
-    info: MessageInfo,
+    _info: MessageInfo,
+    msg: SetResWithSigMsg,
 ) -> Result<Response, ContractError> {
-    // TODO
-    Ok(Response::new())
+    let mut state = STATE.load(deps.storage)?;
+
+    // Validations
+    let mut data: Vec<u8> = Vec::new();
+    data.extend_from_slice(&msg.resource_id);
+    data.extend_from_slice(&msg.function_sig);
+    data.extend_from_slice(&element_encoder(&msg.nonce.to_le_bytes()));
+    data.extend_from_slice(&msg.new_resource_id);
+    data.extend_from_slice(msg.handler_addr.as_bytes());
+    data.extend_from_slice(msg.execution_context_addr.as_bytes());
+
+    if !signed_by_governor(&data, &msg.sig, state.governor.as_str())? {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid sig from governor".to_string(),
+        }));
+    }
+
+    if msg.nonce != state.proposal_nonce + 1 {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid nonce".to_string(),
+        }));
+    }
+
+    let func_sig = Keccak256::hash(
+        b"adminSetResourceWithSignature(bytes32,bytes4,uint32,bytes32,address,address,bytes)",
+    )
+    .map_err(|_| ContractError::HashError)?;
+    if msg.function_sig != func_sig[0..4] {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid function signature".to_string(),
+        }));
+    }
+
+    // Handle the main business
+    RESID2HANDLERADDR.save(
+        deps.storage,
+        &msg.new_resource_id,
+        &deps.api.addr_validate(&msg.handler_addr)?,
+    )?;
+
+    state.proposal_nonce = msg.nonce;
+    STATE.save(deps.storage, &state)?;
+
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: msg.handler_addr,
+        funds: vec![],
+        msg: to_binary(&ExecutorExecMsg::SetResource {
+            resource_id: msg.resource_id,
+            contract_addr: msg.execution_context_addr,
+        })
+        .unwrap(),
+    })];
+
+    Ok(Response::new()
+        .add_messages(msgs)
+        .add_attributes(vec![attr("method", "admin_set_resource_with_sig")]))
 }
 
 fn exec_proposal_with_signature(
     deps: DepsMut,
-    info: MessageInfo,
+    _info: MessageInfo,
+    msg: ExecProposalWithSigMsg,
 ) -> Result<Response, ContractError> {
-    // TODO
-    Ok(Response::new())
+    let state = STATE.load(deps.storage)?;
+
+    // Validations
+    if !signed_by_governor(&msg.data, &msg.sig, state.governor.as_str())? {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid sig from governor".to_string(),
+        }));
+    }
+
+    // Parse resourceID from the data
+    let resource_id_bytes = &msg.data[0..32];
+    let resource_id = element_encoder(resource_id_bytes);
+
+    // Parse chain ID + chain type from the resource ID
+    let execution_chain_id_type: u64 = get_chain_id_type(&resource_id_bytes[26..32]);
+
+    // Verify current chain matches chain ID from resource ID
+    if compute_chain_id_type(FAKE_CHAIN_ID, &COSMOS_CHAIN_TYPE) != execution_chain_id_type {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "executing on wrong chain".to_string(),
+        }));
+    }
+
+    // Handle the main business
+    let handler_addr = RESID2HANDLERADDR
+        .load(deps.storage, &resource_id)?
+        .to_string();
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: handler_addr,
+        funds: vec![],
+        msg: to_binary(&ExecutorExecMsg::ExecuteProposal {
+            resource_id,
+            data: msg.data,
+        })
+        .unwrap(),
+    })];
+
+    Ok(Response::new()
+        .add_messages(msgs)
+        .add_attributes(vec![attr("method", "execute_proposal_with_sig")]))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -83,6 +190,49 @@ fn get_state(deps: Deps) -> StdResult<StateResponse> {
         governor: state.governor.to_string(),
         proposal_nonce: state.proposal_nonce,
     })
+}
+
+fn signed_by_governor(data: &[u8], sig: &[u8], governor: &str) -> Result<bool, ContractError> {
+    let hashed_data = Keccak256::hash(data).map_err(|_| ContractError::HashError)?;
+    let message = Message::parse(&hashed_data);
+    let sig = Signature::parse_standard_slice(sig).map_err(|_| ContractError::HashError)?;
+    let recv_id = RecoveryId::parse(0_u8).map_err(|_| ContractError::HashError)?;
+
+    let signer = libsecp256k1::recover(&message, &sig, &recv_id)
+        .map_err(|_| ContractError::DecodeError)
+        .map_err(|_| ContractError::HashError)?;
+
+    let governor =
+        PublicKey::parse_slice(governor.as_bytes(), None).map_err(|_| ContractError::HashError)?;
+
+    Ok(signer.eq(&governor))
+}
+
+fn element_encoder(v: &[u8]) -> [u8; 32] {
+    let mut output = [0u8; 32];
+    output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
+    output
+}
+
+pub fn get_chain_id_type(chain_id_type: &[u8]) -> u64 {
+    let mut buf = [0u8; 8];
+    #[allow(clippy::needless_borrow)]
+    buf[2..8].copy_from_slice(&chain_id_type);
+    u64::from_be_bytes(buf)
+}
+
+// Computes the combination bytes of "chain_type" and "chain_id".
+// Combination rule: 8 bytes array(00 * 2 bytes + [chain_type] 2 bytes + [chain_id] 4 bytes)
+// Example:
+//  chain_type - 0x0401, chain_id - 0x00000001 (big endian)
+//  Result - [00, 00, 04, 01, 00, 00, 00, 01]
+pub fn compute_chain_id_type(chain_id: u64, chain_type: &[u8]) -> u64 {
+    let chain_id_value: u32 = chain_id.try_into().unwrap_or_default();
+    let mut buf = [0u8; 8];
+    #[allow(clippy::needless_borrow)]
+    buf[2..4].copy_from_slice(&chain_type);
+    buf[4..8].copy_from_slice(&chain_id_value.to_be_bytes());
+    u64::from_be_bytes(buf)
 }
 
 #[cfg(test)]

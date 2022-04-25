@@ -1,6 +1,7 @@
 pub mod anchor;
 pub mod anchor_verifier;
 pub mod error;
+pub mod executor;
 pub mod field_ops;
 pub mod keccak;
 pub mod mixer;
