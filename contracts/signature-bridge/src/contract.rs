@@ -22,7 +22,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 // ChainType info
 pub const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
 
-pub const FAKE_CHAIN_ID: u64 = 1;
+pub const MOCK_CHAIN_ID: u64 = 1;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -152,7 +152,7 @@ fn exec_proposal_with_signature(
     let execution_chain_id_type: u64 = get_chain_id_type(&resource_id_bytes[26..32]);
 
     // Verify current chain matches chain ID from resource ID
-    if compute_chain_id_type(FAKE_CHAIN_ID, &COSMOS_CHAIN_TYPE) != execution_chain_id_type {
+    if compute_chain_id_type(MOCK_CHAIN_ID, &COSMOS_CHAIN_TYPE) != execution_chain_id_type {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "executing on wrong chain".to_string(),
         }));
@@ -192,6 +192,7 @@ fn get_state(deps: Deps) -> StdResult<StateResponse> {
     })
 }
 
+// Verifying signature of governor over some datahash
 fn signed_by_governor(data: &[u8], sig: &[u8], governor: &str) -> Result<bool, ContractError> {
     let hashed_data = Keccak256::hash(data).map_err(|_| ContractError::HashError)?;
     let message = Message::parse(&hashed_data);
@@ -208,12 +209,14 @@ fn signed_by_governor(data: &[u8], sig: &[u8], governor: &str) -> Result<bool, C
     Ok(signer.eq(&governor))
 }
 
+// Slice the length of the bytes array into 32bytes
 fn element_encoder(v: &[u8]) -> [u8; 32] {
     let mut output = [0u8; 32];
     output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
     output
 }
 
+// Get the `chain_id_type` from bytes array.
 pub fn get_chain_id_type(chain_id_type: &[u8]) -> u64 {
     let mut buf = [0u8; 8];
     #[allow(clippy::needless_borrow)]
