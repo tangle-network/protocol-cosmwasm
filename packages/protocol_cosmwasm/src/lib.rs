@@ -1,11 +1,13 @@
 pub mod anchor;
 pub mod anchor_verifier;
 pub mod error;
+pub mod executor;
 pub mod field_ops;
 pub mod keccak;
 pub mod mixer;
 pub mod mixer_verifier;
 pub mod poseidon;
+pub mod signature_bridge;
 pub mod token_wrapper;
 pub mod vanchor;
 pub mod vanchor_verifier;
