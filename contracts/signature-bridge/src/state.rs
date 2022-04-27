@@ -16,4 +16,4 @@ pub const STATE: Item<State> = Item::new("state");
 pub const COUNTS: Map<&[u8], [u8; 32]> = Map::new("counts");
 
 // resourceID => handler address
-pub const RESID2HANDLERADDR: Map<&[u8], Addr> = Map::new("resourceIDToHandlerAddress");
+pub const RESOURCEID2HANDLERADDR: Map<&[u8], Addr> = Map::new("resourceIDToHandlerAddress");

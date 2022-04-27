@@ -5,14 +5,14 @@ use cosmwasm_std::{
     StdResult, WasmMsg,
 };
 use cw2::set_contract_version;
-use libsecp256k1::{Message, PublicKey, RecoveryId, Signature};
 
-use crate::state::{State, RESID2HANDLERADDR, STATE};
+use crate::state::{State, RESOURCEID2HANDLERADDR, STATE};
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::executor::ExecuteMsg as ExecutorExecMsg;
 use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::signature_bridge::{
-    ExecProposalWithSigMsg, ExecuteMsg, InstantiateMsg, QueryMsg, SetResWithSigMsg, StateResponse,
+    ExecProposalWithSigMsg, ExecuteMsg, InstantiateMsg, QueryMsg, SetResourceWithSigMsg,
+    StateResponse,
 };
 
 // version info for migration info
@@ -62,15 +62,17 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::AdminSetResWithSig(msg) => admin_set_res_with_signature(deps, info, msg),
+        ExecuteMsg::AdminSetResourceWithSig(msg) => {
+            admin_set_resource_with_signature(deps, info, msg)
+        }
         ExecuteMsg::ExecProposalWithSig(msg) => exec_proposal_with_signature(deps, info, msg),
     }
 }
 
-fn admin_set_res_with_signature(
-    deps: DepsMut,
+fn admin_set_resource_with_signature(
+    mut deps: DepsMut,
     _info: MessageInfo,
-    msg: SetResWithSigMsg,
+    msg: SetResourceWithSigMsg,
 ) -> Result<Response, ContractError> {
     let mut state = STATE.load(deps.storage)?;
 
@@ -83,7 +85,7 @@ fn admin_set_res_with_signature(
     data.extend_from_slice(msg.handler_addr.as_bytes());
     data.extend_from_slice(msg.execution_context_addr.as_bytes());
 
-    if !signed_by_governor(&data, &msg.sig, state.governor.as_str())? {
+    if !signed_by_governor(deps.branch(), &data, &msg.sig, state.governor.as_str())? {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Invalid sig from governor".to_string(),
         }));
@@ -105,8 +107,8 @@ fn admin_set_res_with_signature(
         }));
     }
 
-    // Handle the main business
-    RESID2HANDLERADDR.save(
+    // Save the info of "resource_id -> handler(contract)" in this contract.
+    RESOURCEID2HANDLERADDR.save(
         deps.storage,
         &msg.new_resource_id,
         &deps.api.addr_validate(&msg.handler_addr)?,
@@ -115,6 +117,7 @@ fn admin_set_res_with_signature(
     state.proposal_nonce = msg.nonce;
     STATE.save(deps.storage, &state)?;
 
+    // Save the "resource" info in "handler" contract.
     let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: msg.handler_addr,
         funds: vec![],
@@ -131,14 +134,14 @@ fn admin_set_res_with_signature(
 }
 
 fn exec_proposal_with_signature(
-    deps: DepsMut,
+    mut deps: DepsMut,
     _info: MessageInfo,
     msg: ExecProposalWithSigMsg,
 ) -> Result<Response, ContractError> {
     let state = STATE.load(deps.storage)?;
 
     // Validations
-    if !signed_by_governor(&msg.data, &msg.sig, state.governor.as_str())? {
+    if !signed_by_governor(deps.branch(), &msg.data, &msg.sig, state.governor.as_str())? {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Invalid sig from governor".to_string(),
         }));
@@ -152,14 +155,22 @@ fn exec_proposal_with_signature(
     let execution_chain_id_type: u64 = get_chain_id_type(&resource_id_bytes[26..32]);
 
     // Verify current chain matches chain ID from resource ID
+    //
+    // NOTE:
+    // This part is prone to future changes since the current implementation
+    // is based on assumption that the `chain_id` is number.
+    // In fact, the `chain_id` of Cosmos SDK blockchains is string, not number.
+    // For example, the `chain_id` of Terra blockchain(mainnet) is `columbus-5`.
+    // Eventually, it should replace the `MOCK_CHAIN_ID` with `chain_id` obtained
+    // inside contract(here).
     if compute_chain_id_type(MOCK_CHAIN_ID, &COSMOS_CHAIN_TYPE) != execution_chain_id_type {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "executing on wrong chain".to_string(),
         }));
     }
 
-    // Handle the main business
-    let handler_addr = RESID2HANDLERADDR
+    // Execute the "proposal" in "handler" contract
+    let handler_addr = RESOURCEID2HANDLERADDR
         .load(deps.storage, &resource_id)?
         .to_string();
     let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
@@ -193,20 +204,18 @@ fn get_state(deps: Deps) -> StdResult<StateResponse> {
 }
 
 // Verifying signature of governor over some datahash
-fn signed_by_governor(data: &[u8], sig: &[u8], governor: &str) -> Result<bool, ContractError> {
+fn signed_by_governor(
+    deps: DepsMut,
+    data: &[u8],
+    sig: &[u8],
+    governor: &str,
+) -> Result<bool, ContractError> {
     let hashed_data = Keccak256::hash(data).map_err(|_| ContractError::HashError)?;
-    let message = Message::parse(&hashed_data);
-    let sig = Signature::parse_standard_slice(sig).map_err(|_| ContractError::HashError)?;
-    let recv_id = RecoveryId::parse(0_u8).map_err(|_| ContractError::HashError)?;
+    let verify_result = deps
+        .api
+        .secp256k1_verify(&hashed_data, sig, governor.as_bytes());
 
-    let signer = libsecp256k1::recover(&message, &sig, &recv_id)
-        .map_err(|_| ContractError::DecodeError)
-        .map_err(|_| ContractError::HashError)?;
-
-    let governor =
-        PublicKey::parse_slice(governor.as_bytes(), None).map_err(|_| ContractError::HashError)?;
-
-    Ok(signer.eq(&governor))
+    verify_result.map_err(|e| ContractError::Std(StdError::VerificationErr { source: e }))
 }
 
 // Slice the length of the bytes array into 32bytes
