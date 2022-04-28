@@ -187,12 +187,14 @@ pub fn execute(
             src_chain_id,
             root,
             latest_leaf_index,
-        } => add_edge(deps, info, src_chain_id, root, latest_leaf_index),
+            target,
+        } => add_edge(deps, info, src_chain_id, root, latest_leaf_index, target),
         ExecuteMsg::UpdateEdge {
             src_chain_id,
             root,
             latest_leaf_index,
-        } => update_edge(deps, info, src_chain_id, root, latest_leaf_index),
+            target,
+        } => update_edge(deps, info, src_chain_id, root, latest_leaf_index, target),
     }
 }
 
@@ -915,12 +917,14 @@ fn unwrap_into_token(
     ]))
 }
 
+/// Add an edge to underlying linkable tree
 fn add_edge(
     deps: DepsMut,
     info: MessageInfo,
     src_chain_id: u64,
     root: [u8; 32],
     latest_leaf_index: u32,
+    target: [u8; 32],
 ) -> Result<Response, ContractError> {
     // Validation 1. Check if any funds are sent with this message.
     if !info.funds.is_empty() {
@@ -944,9 +948,10 @@ fn add_edge(
 
     // craft edge
     let edge: Edge = Edge {
-        chain_id: src_chain_id,
+        src_chain_id,
         root,
         latest_leaf_index,
+        target,
     };
 
     // update historical neighbor list for this edge's root
@@ -965,12 +970,14 @@ fn add_edge(
     Ok(Response::new().add_attributes(vec![attr("method", "add_edge")]))
 }
 
+/// Update an edge for underlying linkable tree
 fn update_edge(
     deps: DepsMut,
     info: MessageInfo,
     src_chain_id: u64,
     root: [u8; 32],
     latest_leaf_index: u32,
+    target: [u8; 32],
 ) -> Result<Response, ContractError> {
     // Validation 1. Check if any funds are sent with this message.
     if !info.funds.is_empty() {
@@ -986,9 +993,10 @@ fn update_edge(
     }
 
     let edge: Edge = Edge {
-        chain_id: src_chain_id,
+        src_chain_id,
         root,
         latest_leaf_index,
+        target,
     };
     let neighbor_root_idx =
         (read_curr_neighbor_root_index(deps.storage, src_chain_id)? + 1) % HISTORY_LENGTH;
