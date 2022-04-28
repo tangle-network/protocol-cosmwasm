@@ -60,8 +60,8 @@ fn hash_ext_data(ext_data: ExtData, ext_amount: i128, fee: u128) -> [u8; 32] {
     let mut ext_data_args = Vec::new();
     let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
     let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&fee.to_be_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amount.to_be_bytes());
+    let fee_bytes = element_encoder(&fee.to_le_bytes());
+    let ext_amt_bytes = element_encoder(&ext_amount.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
     ext_data_args.extend_from_slice(&relayer_bytes);
     ext_data_args.extend_from_slice(&ext_amt_bytes);

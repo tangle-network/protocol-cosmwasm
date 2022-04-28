@@ -28,7 +28,9 @@ use protocol_cosmwasm::token_wrapper::{
     ExecuteMsg as TokenWrapperExecuteMsg, GetAmountToWrapResponse,
     QueryMsg as TokenWrapperQueryMsg,
 };
-use protocol_cosmwasm::utils::{compute_chain_id_type, parse_string_to_uint128, truncate_and_pad};
+use protocol_cosmwasm::utils::{
+    compute_chain_id_type, element_encoder, parse_string_to_uint128, truncate_and_pad,
+};
 use protocol_cosmwasm::zeroes::zeroes;
 
 // version info for migration info
@@ -338,16 +340,9 @@ pub fn withdraw(
         }));
     }
 
-    //
-    let element_encoder = |v: &[u8]| {
-        let mut output = [0u8; 32];
-        output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
-        output
-    };
-
     // Format the public input bytes
     let chain_id_type_bytes =
-        element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_be_bytes());
+        element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
     let recipient_bytes = truncate_and_pad(recipient.as_bytes());
     let relayer_bytes = truncate_and_pad(relayer.as_bytes());
 
@@ -681,7 +676,7 @@ fn withdraw_and_unwrap(
 
     // Format the public input bytes
     let chain_id_type_bytes =
-        element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_be_bytes());
+        element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
     let recipient_bytes = truncate_and_pad(recipient.as_bytes());
     let relayer_bytes = truncate_and_pad(relayer.as_bytes());
 

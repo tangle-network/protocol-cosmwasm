@@ -16,7 +16,7 @@ use protocol_cosmwasm::token_wrapper::{
     ConfigResponse as TokenWrapperConfigResp, Cw20HookMsg as TokenWrapperHookMsg,
     ExecuteMsg as TokenWrapperExecuteMsg, QueryMsg as TokenWrapperQueryMsg,
 };
-use protocol_cosmwasm::utils::{compute_chain_id_type, parse_string_to_uint128};
+use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder, parse_string_to_uint128};
 use protocol_cosmwasm::vanchor::{
     Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, QueryMsg, UpdateConfigMsg,
 };
@@ -651,19 +651,13 @@ fn validate_proof(
         }
     }
 
-    let element_encoder = |v: &[u8]| {
-        let mut output = [0u8; 32];
-        output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
-        output
-    };
-
     // Compute hash of abi encoded ext_data, reduced into field from config
     // Ensure that the passed external data hash matches the computed one
     let mut ext_data_args = Vec::new();
     let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
     let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&ext_data_fee.to_be_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amt.to_be_bytes());
+    let fee_bytes = element_encoder(&ext_data_fee.to_le_bytes());
+    let ext_amt_bytes = element_encoder(&ext_amt.to_le_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
     ext_data_args.extend_from_slice(&relayer_bytes);
     ext_data_args.extend_from_slice(&ext_amt_bytes);
@@ -707,7 +701,7 @@ fn validate_proof(
 
     // Construct public inputs
     let chain_id_type_bytes =
-        element_encoder(&compute_chain_id_type(vanchor.chain_id, &COSMOS_CHAIN_TYPE).to_be_bytes());
+        element_encoder(&compute_chain_id_type(vanchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
 
     let mut bytes = Vec::new();
     bytes.extend_from_slice(&proof_data.public_amount);
