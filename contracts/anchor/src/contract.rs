@@ -7,8 +7,9 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 
 use crate::state::{
-    read_edge, read_neighbor_roots, read_root, save_root, save_subtree, Anchor, LinkableMerkleTree,
-    MerkleTree, ANCHOR, ANCHORVERIFIER, NULLIFIERS, POSEIDON,
+    read_curr_neighbor_root_index, read_edge, read_neighbor_roots, read_root,
+    save_curr_neighbor_root_index, save_edge, save_neighbor_roots, save_root, save_subtree, Anchor,
+    Edge, LinkableMerkleTree, MerkleTree, ANCHOR, ANCHORVERIFIER, NULLIFIERS, POSEIDON,
 };
 use codec::Encode;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
@@ -34,6 +35,9 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // ChainType info
 pub const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
+
+// History length for the "Curr_neighbor_root_index".
+const HISTORY_LENGTH: u32 = 30;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -139,6 +143,22 @@ pub fn execute(
 
         // Withdraws the deposit & unwraps to valid token for `sender`
         ExecuteMsg::WithdrawAndUnwrap(msg) => withdraw_and_unwrap(deps, info, msg),
+
+        // Add an edge to underlying tree
+        ExecuteMsg::AddEdge {
+            src_chain_id,
+            root,
+            latest_leaf_index,
+            target,
+        } => add_edge(deps, src_chain_id, root, latest_leaf_index, target),
+
+        // Update an edge for underlying tree
+        ExecuteMsg::UpdateEdge {
+            src_chain_id,
+            root,
+            latest_leaf_index,
+            target,
+        } => update_edge(deps, src_chain_id, root, latest_leaf_index, target),
     }
 }
 
@@ -754,6 +774,83 @@ fn withdraw_and_unwrap(
         .add_messages(msgs))
 }
 
+/// Add an edge to underlying linkable tree
+fn add_edge(
+    deps: DepsMut,
+    src_chain_id: u64,
+    root: [u8; 32],
+    latest_leaf_index: u32,
+    target: [u8; 32],
+) -> Result<Response, ContractError> {
+    let anchor: Anchor = ANCHOR.load(deps.storage)?;
+    let linkable_tree = anchor.linkable_tree;
+    // ensure edge doesn't exist
+    if linkable_tree.has_edge(src_chain_id, deps.storage) {
+        return Err(ContractError::EdgeAlreadyExists {});
+    }
+
+    // ensure anchor isn't at maximum edges
+    let curr_length = linkable_tree.get_latest_neighbor_edges(deps.storage).len();
+    if curr_length > linkable_tree.max_edges as usize {
+        return Err(ContractError::TooManyEdges {});
+    }
+
+    // craft edge
+    let edge: Edge = Edge {
+        src_chain_id,
+        root,
+        latest_leaf_index,
+        target,
+    };
+
+    // update historical neighbor list for this edge's root
+    let curr_neighbor_root_idx = read_curr_neighbor_root_index(deps.storage, src_chain_id)?;
+    save_curr_neighbor_root_index(
+        deps.storage,
+        src_chain_id,
+        (curr_neighbor_root_idx + 1) % HISTORY_LENGTH,
+    )?;
+
+    save_neighbor_roots(deps.storage, (src_chain_id, curr_neighbor_root_idx), root)?;
+
+    // Append new edge to the end of the edge list for the given tree
+    save_edge(deps.storage, src_chain_id, edge)?;
+
+    Ok(Response::new().add_attribute("method", "add_edge"))
+}
+
+/// Update an edge for underlying linkable tree
+fn update_edge(
+    deps: DepsMut,
+    src_chain_id: u64,
+    root: [u8; 32],
+    latest_leaf_index: u32,
+    target: [u8; 32],
+) -> Result<Response, ContractError> {
+    let anchor = ANCHOR.load(deps.storage)?;
+    let linkable_tree = anchor.linkable_tree;
+    if !linkable_tree.has_edge(src_chain_id, deps.storage) {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Edge does not exist".to_string(),
+        }));
+    }
+
+    let edge: Edge = Edge {
+        src_chain_id,
+        root,
+        latest_leaf_index,
+        target,
+    };
+    let neighbor_root_idx =
+        (read_curr_neighbor_root_index(deps.storage, src_chain_id)? + 1) % HISTORY_LENGTH;
+    save_curr_neighbor_root_index(deps.storage, src_chain_id, neighbor_root_idx)?;
+    save_neighbor_roots(deps.storage, (src_chain_id, neighbor_root_idx), root)?;
+
+    save_edge(deps.storage, src_chain_id, edge)?;
+
+    Ok(Response::new().add_attributes(vec![attr("method", "udpate_edge")]))
+}
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
@@ -779,9 +876,10 @@ pub fn get_config(deps: Deps) -> StdResult<ConfigResponse> {
 pub fn get_edge_info(deps: Deps, id: u64) -> StdResult<EdgeInfoResponse> {
     let edge = read_edge(deps.storage, id)?;
     Ok(EdgeInfoResponse {
-        chain_id: edge.chain_id,
+        src_chain_id: edge.src_chain_id,
         root: edge.root,
         latest_leaf_index: edge.latest_leaf_index,
+        target: edge.target,
     })
 }
 

@@ -15,9 +15,14 @@ pub type ChainId = u64;
 // Edge: Directed connection or link between two anchors.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default, Copy)]
 pub struct Edge {
-    pub chain_id: ChainId,
+    /// chain id
+    pub src_chain_id: ChainId,
+    /// root of source chain anchor's native merkle tree
     pub root: [u8; 32],
+    /// height of source chain anchor's native merkle tree
     pub latest_leaf_index: u32,
+    /// Target contract address or tree identifier
+    pub target: [u8; 32],
 }
 
 pub fn read_edge(store: &dyn Storage, k: ChainId) -> StdResult<Edge> {
@@ -66,8 +71,7 @@ pub struct LinkableMerkleTree {
 }
 
 impl LinkableMerkleTree {
-    #[allow(dead_code)]
-    fn has_edge(&self, chain_id: ChainId, store: &dyn Storage) -> bool {
+    pub fn has_edge(&self, chain_id: ChainId, store: &dyn Storage) -> bool {
         has_edge(store, chain_id)
     }
 
@@ -76,8 +80,8 @@ impl LinkableMerkleTree {
         edge: Edge,
         store: &mut dyn Storage,
     ) -> Result<(), ContractError> {
-        if has_edge(store, edge.chain_id) {
-            let leaf_index = read_edge(store, edge.chain_id)
+        if has_edge(store, edge.src_chain_id) {
+            let leaf_index = read_edge(store, edge.src_chain_id)
                 .unwrap_or_default()
                 .latest_leaf_index
                 + 65_536;
@@ -86,21 +90,21 @@ impl LinkableMerkleTree {
                 "latest leaf index should be greater than the previous one"
             );
 
-            save_edge(store, edge.chain_id, edge)?;
+            save_edge(store, edge.src_chain_id, edge)?;
 
             let curr_neighbor_root_index =
-                read_curr_neighbor_root_index(store, edge.chain_id).unwrap_or_default();
+                read_curr_neighbor_root_index(store, edge.src_chain_id).unwrap_or_default();
             let neighbor_root_index = curr_neighbor_root_index + 1 % ROOT_HISTORY_SIZE;
 
-            save_curr_neighbor_root_index(store, edge.chain_id, neighbor_root_index)?;
-            save_neighbor_roots(store, (edge.chain_id, neighbor_root_index), edge.root)?;
+            save_curr_neighbor_root_index(store, edge.src_chain_id, neighbor_root_index)?;
+            save_neighbor_roots(store, (edge.src_chain_id, neighbor_root_index), edge.root)?;
         } else {
             let edge_count = self.chain_id_list.len() as u32;
             assert!(self.max_edges > edge_count as u32, "Edge list is full");
-            save_edge(store, edge.chain_id, edge)?;
-            save_neighbor_roots(store, (edge.chain_id, 1), edge.root)?;
-            save_curr_neighbor_root_index(store, edge.chain_id, 1)?;
-            self.chain_id_list.push(edge.chain_id);
+            save_edge(store, edge.src_chain_id, edge)?;
+            save_neighbor_roots(store, (edge.src_chain_id, 1), edge.root)?;
+            save_curr_neighbor_root_index(store, edge.src_chain_id, 1)?;
+            self.chain_id_list.push(edge.src_chain_id);
         }
 
         Ok(())
@@ -172,7 +176,7 @@ impl LinkableMerkleTree {
             .map(|c_id| read_edge(store, *c_id).unwrap_or_default())
             .enumerate()
         {
-            if !self.is_known_neighbor_root(edge.chain_id, roots[i], store) {
+            if !self.is_known_neighbor_root(edge.src_chain_id, roots[i], store) {
                 return false;
             }
         }
