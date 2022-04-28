@@ -14,6 +14,7 @@ use protocol_cosmwasm::mixer::{
 };
 use protocol_cosmwasm::mixer_verifier::MixerVerifier;
 use protocol_cosmwasm::poseidon::Poseidon;
+use protocol_cosmwasm::utils::truncate_and_pad;
 use protocol_cosmwasm::zeroes::zeroes;
 
 use codec::Encode;
@@ -378,12 +379,6 @@ fn verify(
     verifier
         .verify(public_input, proof_bytes)
         .map_err(|_| ContractError::VerifyError)
-}
-
-pub fn truncate_and_pad(t: &[u8]) -> Vec<u8> {
-    let mut truncated_bytes = t[..20].to_vec();
-    truncated_bytes.extend_from_slice(&[0u8; 12]);
-    truncated_bytes
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

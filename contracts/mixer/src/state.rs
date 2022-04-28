@@ -7,9 +7,8 @@ use cw_storage_plus::{Item, Map};
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::mixer_verifier::MixerVerifier;
 use protocol_cosmwasm::poseidon::Poseidon;
+use protocol_cosmwasm::structs::ROOT_HISTORY_SIZE;
 use protocol_cosmwasm::zeroes;
-
-pub const ROOT_HISTORY_SIZE: u32 = 100;
 
 // Mixer
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

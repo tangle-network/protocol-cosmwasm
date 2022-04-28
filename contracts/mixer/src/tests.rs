@@ -13,9 +13,10 @@ use cosmwasm_std::testing::{
 use cosmwasm_std::{attr, to_binary, Coin, CosmosMsg, OwnedDeps, Uint128, WasmMsg};
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
-use crate::contract::{execute, instantiate, truncate_and_pad};
+use crate::contract::{execute, instantiate};
 use crate::test_util::Element;
 use protocol_cosmwasm::mixer::{Cw20HookMsg, DepositMsg, ExecuteMsg, InstantiateMsg, WithdrawMsg};
+use protocol_cosmwasm::utils::truncate_and_pad;
 
 const MERKLE_TREE_LEVELS: u32 = 30;
 const DEPOSIT_SIZE: &str = "1000000";

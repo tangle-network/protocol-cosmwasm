@@ -11,10 +11,12 @@ use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::field_ops::{ArkworksIntoFieldBn254, IntoPrimeField};
 use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::poseidon::Poseidon;
+use protocol_cosmwasm::structs::{Edge, COSMOS_CHAIN_TYPE, HISTORY_LENGTH};
 use protocol_cosmwasm::token_wrapper::{
     ConfigResponse as TokenWrapperConfigResp, Cw20HookMsg as TokenWrapperHookMsg,
     ExecuteMsg as TokenWrapperExecuteMsg, QueryMsg as TokenWrapperQueryMsg,
 };
+use protocol_cosmwasm::utils::{compute_chain_id_type, parse_string_to_uint128};
 use protocol_cosmwasm::vanchor::{
     Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, QueryMsg, UpdateConfigMsg,
 };
@@ -23,19 +25,13 @@ use protocol_cosmwasm::zeroes::zeroes;
 
 use crate::state::{
     read_curr_neighbor_root_index, save_curr_neighbor_root_index, save_edge, save_neighbor_roots,
-    save_root, save_subtree, Edge, LinkableMerkleTree, MerkleTree, VAnchor, NULLIFIERS, POSEIDON,
+    save_root, save_subtree, LinkableMerkleTree, MerkleTree, VAnchor, NULLIFIERS, POSEIDON,
     VANCHOR, VERIFIER_16_2, VERIFIER_2_2,
 };
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-vanchor";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-// ChainType info
-const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
-
-// History length for the "Curr_neighbor_root_index".
-const HISTORY_LENGTH: u32 = 30;
 
 const NUM_INS_2: u32 = 2;
 const NUM_OUTS_2: u32 = 2;
@@ -666,8 +662,8 @@ fn validate_proof(
     let mut ext_data_args = Vec::new();
     let recipient_bytes = element_encoder(ext_data.recipient.as_bytes());
     let relayer_bytes = element_encoder(ext_data.relayer.as_bytes());
-    let fee_bytes = element_encoder(&ext_data_fee.to_le_bytes());
-    let ext_amt_bytes = element_encoder(&ext_amt.to_le_bytes());
+    let fee_bytes = element_encoder(&ext_data_fee.to_be_bytes());
+    let ext_amt_bytes = element_encoder(&ext_amt.to_be_bytes());
     ext_data_args.extend_from_slice(&recipient_bytes);
     ext_data_args.extend_from_slice(&relayer_bytes);
     ext_data_args.extend_from_slice(&ext_amt_bytes);
@@ -711,7 +707,7 @@ fn validate_proof(
 
     // Construct public inputs
     let chain_id_type_bytes =
-        element_encoder(&compute_chain_id_type(vanchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
+        element_encoder(&compute_chain_id_type(vanchor.chain_id, &COSMOS_CHAIN_TYPE).to_be_bytes());
 
     let mut bytes = Vec::new();
     bytes.extend_from_slice(&proof_data.public_amount);
@@ -1013,28 +1009,6 @@ fn is_known_nullifier(store: &dyn Storage, nullifier: [u8; 32]) -> bool {
     NULLIFIERS.has(store, nullifier.to_vec())
 }
 
-// Truncate and pad 256 bit slice
-// NOTE: remove `pub`
-pub fn truncate_and_pad(t: &[u8]) -> Vec<u8> {
-    let mut truncated_bytes = t[..20].to_vec();
-    truncated_bytes.extend_from_slice(&[0u8; 12]);
-    truncated_bytes
-}
-
-// Computes the combination bytes of "chain_type" and "chain_id".
-// Combination rule: 8 bytes array(00 * 2 bytes + [chain_type] 2 bytes + [chain_id] 4 bytes)
-// Example:
-//  chain_type - 0x0401, chain_id - 0x00000001 (big endian)
-//  Result - [00, 00, 04, 01, 00, 00, 00, 01]
-pub fn compute_chain_id_type(chain_id: u64, chain_type: &[u8]) -> u64 {
-    let chain_id_value: u32 = chain_id.try_into().unwrap_or_default();
-    let mut buf = [0u8; 8];
-    #[allow(clippy::needless_borrow)]
-    buf[2..4].copy_from_slice(&chain_type);
-    buf[4..8].copy_from_slice(&chain_id_value.to_be_bytes());
-    u64::from_be_bytes(buf)
-}
-
 // Using "anchor_verifier", verifies if the "proof" really came from "public_input".
 fn verify(
     verifier: VAnchorVerifier,
@@ -1044,14 +1018,6 @@ fn verify(
     verifier
         .verify(public_input, proof_bytes)
         .map_err(|_| ContractError::VerifyError)
-}
-
-pub fn parse_string_to_uint128(v: String) -> Result<Uint128, StdError> {
-    let res = match v.parse::<u128>() {
-        Ok(v) => Uint128::from(v),
-        Err(e) => return Err(StdError::GenericErr { msg: e.to_string() }),
-    };
-    Ok(res)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

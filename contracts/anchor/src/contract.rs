@@ -9,7 +9,7 @@ use cw2::set_contract_version;
 use crate::state::{
     read_curr_neighbor_root_index, read_edge, read_neighbor_roots, read_root,
     save_curr_neighbor_root_index, save_edge, save_neighbor_roots, save_root, save_subtree, Anchor,
-    Edge, LinkableMerkleTree, MerkleTree, ANCHOR, ANCHORVERIFIER, NULLIFIERS, POSEIDON,
+    LinkableMerkleTree, MerkleTree, ANCHOR, ANCHORVERIFIER, NULLIFIERS, POSEIDON,
 };
 use codec::Encode;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
@@ -22,22 +22,18 @@ use protocol_cosmwasm::anchor_verifier::AnchorVerifier;
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::poseidon::Poseidon;
+use protocol_cosmwasm::structs::{Edge, COSMOS_CHAIN_TYPE, HISTORY_LENGTH};
 use protocol_cosmwasm::token_wrapper::{
     ConfigResponse as TokenWrapperConfigResp, Cw20HookMsg as TokenWrapperHookMsg,
     ExecuteMsg as TokenWrapperExecuteMsg, GetAmountToWrapResponse,
     QueryMsg as TokenWrapperQueryMsg,
 };
+use protocol_cosmwasm::utils::{compute_chain_id_type, parse_string_to_uint128, truncate_and_pad};
 use protocol_cosmwasm::zeroes::zeroes;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-anchor";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-// ChainType info
-pub const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
-
-// History length for the "Curr_neighbor_root_index".
-const HISTORY_LENGTH: u32 = 30;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -351,7 +347,7 @@ pub fn withdraw(
 
     // Format the public input bytes
     let chain_id_type_bytes =
-        element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
+        element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_be_bytes());
     let recipient_bytes = truncate_and_pad(recipient.as_bytes());
     let relayer_bytes = truncate_and_pad(relayer.as_bytes());
 
@@ -685,7 +681,7 @@ fn withdraw_and_unwrap(
 
     // Format the public input bytes
     let chain_id_type_bytes =
-        element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
+        element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_be_bytes());
     let recipient_bytes = truncate_and_pad(recipient.as_bytes());
     let relayer_bytes = truncate_and_pad(relayer.as_bytes());
 
@@ -922,27 +918,6 @@ pub fn verify(
         .map_err(|_| ContractError::VerifyError)
 }
 
-// Truncate and pad 256 bit slice
-pub fn truncate_and_pad(t: &[u8]) -> Vec<u8> {
-    let mut truncated_bytes = t[..20].to_vec();
-    truncated_bytes.extend_from_slice(&[0u8; 12]);
-    truncated_bytes
-}
-
-// Computes the combination bytes of "chain_type" and "chain_id".
-// Combination rule: 8 bytes array(00 * 2 bytes + [chain_type] 2 bytes + [chain_id] 4 bytes)
-// Example:
-//  chain_type - 0x0401, chain_id - 0x00000001 (big endian)
-//  Result - [00, 00, 04, 01, 00, 00, 00, 01]
-pub fn compute_chain_id_type(chain_id: u64, chain_type: &[u8]) -> u64 {
-    let chain_id_value: u32 = chain_id.try_into().unwrap_or_default();
-    let mut buf = [0u8; 8];
-    #[allow(clippy::needless_borrow)]
-    buf[2..4].copy_from_slice(&chain_type);
-    buf[4..8].copy_from_slice(&chain_id_value.to_be_bytes());
-    u64::from_be_bytes(buf)
-}
-
 pub fn validate_and_store_commitment(
     deps: DepsMut,
     commitment: [u8; 32],
@@ -965,13 +940,5 @@ pub fn validate_and_store_commitment(
         },
     )?;
 
-    Ok(res)
-}
-
-pub fn parse_string_to_uint128(v: String) -> Result<Uint128, StdError> {
-    let res = match v.parse::<u128>() {
-        Ok(v) => Uint128::from(v),
-        Err(e) => return Err(StdError::GenericErr { msg: e.to_string() }),
-    };
     Ok(res)
 }

@@ -5,26 +5,11 @@ use serde::{Deserialize, Serialize};
 
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::poseidon::Poseidon;
+use protocol_cosmwasm::structs::{ChainId, Edge, ROOT_HISTORY_SIZE};
 use protocol_cosmwasm::vanchor_verifier::VAnchorVerifier;
 use protocol_cosmwasm::zeroes;
 
-const ROOT_HISTORY_SIZE: u32 = 100;
-
-pub type ChainId = u64;
-
-// Edge: Directed connection or link between two anchors.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default, Copy)]
-pub struct Edge {
-    /// chain id
-    pub src_chain_id: ChainId,
-    /// root of source chain anchor's native merkle tree
-    pub root: [u8; 32],
-    /// height of source chain anchor's native merkle tree
-    pub latest_leaf_index: u32,
-    /// Target contract address or tree identifier
-    pub target: [u8; 32],
-}
-
+// Chain_ID -> Edge (String(u64) -> Edge)
 pub const EDGES: Map<String, Edge> = Map::new("edges");
 
 pub fn read_edge(store: &dyn Storage, k: ChainId) -> StdResult<Edge> {
@@ -39,6 +24,7 @@ pub fn has_edge(store: &dyn Storage, k: ChainId) -> bool {
     EDGES.has(store, k.to_string())
 }
 
+// Chain_ID -> root_idx (String(u64) -> u32)
 pub const CURR_NEIGHBOR_ROOT_INDEX: Map<String, u32> = Map::new("curr_neighbor_root_index");
 
 pub fn read_curr_neighbor_root_index(store: &dyn Storage, k: ChainId) -> StdResult<u32> {
