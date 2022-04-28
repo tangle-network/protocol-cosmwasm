@@ -39,6 +39,22 @@ pub enum ExecuteMsg {
     /// 1. DepositCw20
     /// 2. WrapToken
     Receive(Cw20ReceiveMsg),
+
+    /// Add an edge to underlying tree
+    AddEdge {
+        src_chain_id: u64,
+        root: [u8; 32],
+        latest_leaf_index: u32,
+        target: [u8; 32],
+    },
+
+    /// Update an edge for underlying tree
+    UpdateEdge {
+        src_chain_id: u64,
+        root: [u8; 32],
+        latest_leaf_index: u32,
+        target: [u8; 32],
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -91,9 +107,10 @@ pub struct ConfigResponse {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct EdgeInfoResponse {
-    pub chain_id: u64,
+    pub src_chain_id: u64,
     pub root: [u8; 32],
     pub latest_leaf_index: u32,
+    pub target: [u8; 32],
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

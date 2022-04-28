@@ -40,6 +40,13 @@ pub enum ContractError {
     ItemNotFound,
     // TokenWrapper-related error
     // For simplicity, it just converts all the cw20_base errors to Std error.
+
+    // Anchor-related error
+    #[error("Edge already exists")]
+    EdgeAlreadyExists,
+
+    #[error("Too many edges")]
+    TooManyEdges,
 }
 
 impl From<cw20_base::ContractError> for ContractError {
