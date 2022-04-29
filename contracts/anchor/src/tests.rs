@@ -14,10 +14,10 @@ use cosmwasm_std::{attr, coins, to_binary, CosmosMsg, Uint128, WasmMsg};
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use protocol_cosmwasm::anchor::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, WithdrawMsg};
+use protocol_cosmwasm::structs::COSMOS_CHAIN_TYPE;
+use protocol_cosmwasm::utils::{compute_chain_id_type, truncate_and_pad};
 
-use crate::contract::{
-    compute_chain_id_type, execute, instantiate, truncate_and_pad, COSMOS_CHAIN_TYPE,
-};
+use crate::contract::{execute, instantiate};
 #[cfg(test)]
 use crate::test_util::Element;
 

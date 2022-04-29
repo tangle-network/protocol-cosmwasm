@@ -6,24 +6,8 @@ use serde::{Deserialize, Serialize};
 use protocol_cosmwasm::anchor_verifier::AnchorVerifier;
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::poseidon::Poseidon;
+use protocol_cosmwasm::structs::{ChainId, Edge, ROOT_HISTORY_SIZE};
 use protocol_cosmwasm::zeroes;
-
-const ROOT_HISTORY_SIZE: u32 = 100;
-
-pub type ChainId = u64;
-
-// Edge: Directed connection or link between two anchors.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default, Copy)]
-pub struct Edge {
-    /// chain id
-    pub src_chain_id: ChainId,
-    /// root of source chain anchor's native merkle tree
-    pub root: [u8; 32],
-    /// height of source chain anchor's native merkle tree
-    pub latest_leaf_index: u32,
-    /// Target contract address or tree identifier
-    pub target: [u8; 32],
-}
 
 pub fn read_edge(store: &dyn Storage, k: ChainId) -> StdResult<Edge> {
     EDGES.load(store, k.to_string())

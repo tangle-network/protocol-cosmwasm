@@ -7,7 +7,8 @@ use cosmwasm_std::{attr, coins, to_binary, Uint128};
 use cw20::Cw20ReceiveMsg;
 use sp_core::hashing::keccak_256;
 
-use crate::contract::{compute_chain_id_type, execute, instantiate};
+use crate::contract::{execute, instantiate};
+use protocol_cosmwasm::utils::compute_chain_id_type;
 use protocol_cosmwasm::vanchor::{
     Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, UpdateConfigMsg,
 };

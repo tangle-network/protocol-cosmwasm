@@ -14,6 +14,7 @@ use protocol_cosmwasm::signature_bridge::{
     ExecProposalWithSigMsg, ExecuteMsg, InstantiateMsg, QueryMsg, SetResourceWithSigMsg,
     StateResponse,
 };
+use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder, get_chain_id_type};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-signature-bridge";
@@ -216,35 +217,6 @@ fn signed_by_governor(
         .secp256k1_verify(&hashed_data, sig, governor.as_bytes());
 
     verify_result.map_err(|e| ContractError::Std(StdError::VerificationErr { source: e }))
-}
-
-// Slice the length of the bytes array into 32bytes
-fn element_encoder(v: &[u8]) -> [u8; 32] {
-    let mut output = [0u8; 32];
-    output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
-    output
-}
-
-// Get the `chain_id_type` from bytes array.
-pub fn get_chain_id_type(chain_id_type: &[u8]) -> u64 {
-    let mut buf = [0u8; 8];
-    #[allow(clippy::needless_borrow)]
-    buf[2..8].copy_from_slice(&chain_id_type);
-    u64::from_be_bytes(buf)
-}
-
-// Computes the combination bytes of "chain_type" and "chain_id".
-// Combination rule: 8 bytes array(00 * 2 bytes + [chain_type] 2 bytes + [chain_id] 4 bytes)
-// Example:
-//  chain_type - 0x0401, chain_id - 0x00000001 (big endian)
-//  Result - [00, 00, 04, 01, 00, 00, 00, 01]
-pub fn compute_chain_id_type(chain_id: u64, chain_type: &[u8]) -> u64 {
-    let chain_id_value: u32 = chain_id.try_into().unwrap_or_default();
-    let mut buf = [0u8; 8];
-    #[allow(clippy::needless_borrow)]
-    buf[2..4].copy_from_slice(&chain_type);
-    buf[4..8].copy_from_slice(&chain_id_value.to_be_bytes());
-    u64::from_be_bytes(buf)
 }
 
 #[cfg(test)]

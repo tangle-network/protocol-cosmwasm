@@ -11,10 +11,12 @@ use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::field_ops::{ArkworksIntoFieldBn254, IntoPrimeField};
 use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::poseidon::Poseidon;
+use protocol_cosmwasm::structs::{Edge, COSMOS_CHAIN_TYPE, HISTORY_LENGTH};
 use protocol_cosmwasm::token_wrapper::{
     ConfigResponse as TokenWrapperConfigResp, Cw20HookMsg as TokenWrapperHookMsg,
     ExecuteMsg as TokenWrapperExecuteMsg, QueryMsg as TokenWrapperQueryMsg,
 };
+use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder, parse_string_to_uint128};
 use protocol_cosmwasm::vanchor::{
     Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, QueryMsg, UpdateConfigMsg,
 };
@@ -23,19 +25,13 @@ use protocol_cosmwasm::zeroes::zeroes;
 
 use crate::state::{
     read_curr_neighbor_root_index, save_curr_neighbor_root_index, save_edge, save_neighbor_roots,
-    save_root, save_subtree, Edge, LinkableMerkleTree, MerkleTree, VAnchor, NULLIFIERS, POSEIDON,
+    save_root, save_subtree, LinkableMerkleTree, MerkleTree, VAnchor, NULLIFIERS, POSEIDON,
     VANCHOR, VERIFIER_16_2, VERIFIER_2_2,
 };
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-vanchor";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-// ChainType info
-const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
-
-// History length for the "Curr_neighbor_root_index".
-const HISTORY_LENGTH: u32 = 30;
 
 const NUM_INS_2: u32 = 2;
 const NUM_OUTS_2: u32 = 2;
@@ -187,12 +183,14 @@ pub fn execute(
             src_chain_id,
             root,
             latest_leaf_index,
-        } => add_edge(deps, info, src_chain_id, root, latest_leaf_index),
+            target,
+        } => add_edge(deps, info, src_chain_id, root, latest_leaf_index, target),
         ExecuteMsg::UpdateEdge {
             src_chain_id,
             root,
             latest_leaf_index,
-        } => update_edge(deps, info, src_chain_id, root, latest_leaf_index),
+            target,
+        } => update_edge(deps, info, src_chain_id, root, latest_leaf_index, target),
     }
 }
 
@@ -653,12 +651,6 @@ fn validate_proof(
         }
     }
 
-    let element_encoder = |v: &[u8]| {
-        let mut output = [0u8; 32];
-        output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
-        output
-    };
-
     // Compute hash of abi encoded ext_data, reduced into field from config
     // Ensure that the passed external data hash matches the computed one
     let mut ext_data_args = Vec::new();
@@ -915,12 +907,14 @@ fn unwrap_into_token(
     ]))
 }
 
+/// Add an edge to underlying linkable tree
 fn add_edge(
     deps: DepsMut,
     info: MessageInfo,
     src_chain_id: u64,
     root: [u8; 32],
     latest_leaf_index: u32,
+    target: [u8; 32],
 ) -> Result<Response, ContractError> {
     // Validation 1. Check if any funds are sent with this message.
     if !info.funds.is_empty() {
@@ -944,9 +938,10 @@ fn add_edge(
 
     // craft edge
     let edge: Edge = Edge {
-        chain_id: src_chain_id,
+        src_chain_id,
         root,
         latest_leaf_index,
+        target,
     };
 
     // update historical neighbor list for this edge's root
@@ -965,12 +960,14 @@ fn add_edge(
     Ok(Response::new().add_attributes(vec![attr("method", "add_edge")]))
 }
 
+/// Update an edge for underlying linkable tree
 fn update_edge(
     deps: DepsMut,
     info: MessageInfo,
     src_chain_id: u64,
     root: [u8; 32],
     latest_leaf_index: u32,
+    target: [u8; 32],
 ) -> Result<Response, ContractError> {
     // Validation 1. Check if any funds are sent with this message.
     if !info.funds.is_empty() {
@@ -986,9 +983,10 @@ fn update_edge(
     }
 
     let edge: Edge = Edge {
-        chain_id: src_chain_id,
+        src_chain_id,
         root,
         latest_leaf_index,
+        target,
     };
     let neighbor_root_idx =
         (read_curr_neighbor_root_index(deps.storage, src_chain_id)? + 1) % HISTORY_LENGTH;
@@ -1005,28 +1003,6 @@ fn is_known_nullifier(store: &dyn Storage, nullifier: [u8; 32]) -> bool {
     NULLIFIERS.has(store, nullifier.to_vec())
 }
 
-// Truncate and pad 256 bit slice
-// NOTE: remove `pub`
-pub fn truncate_and_pad(t: &[u8]) -> Vec<u8> {
-    let mut truncated_bytes = t[..20].to_vec();
-    truncated_bytes.extend_from_slice(&[0u8; 12]);
-    truncated_bytes
-}
-
-// Computes the combination bytes of "chain_type" and "chain_id".
-// Combination rule: 8 bytes array(00 * 2 bytes + [chain_type] 2 bytes + [chain_id] 4 bytes)
-// Example:
-//  chain_type - 0x0401, chain_id - 0x00000001 (big endian)
-//  Result - [00, 00, 04, 01, 00, 00, 00, 01]
-pub fn compute_chain_id_type(chain_id: u64, chain_type: &[u8]) -> u64 {
-    let chain_id_value: u32 = chain_id.try_into().unwrap_or_default();
-    let mut buf = [0u8; 8];
-    #[allow(clippy::needless_borrow)]
-    buf[2..4].copy_from_slice(&chain_type);
-    buf[4..8].copy_from_slice(&chain_id_value.to_be_bytes());
-    u64::from_be_bytes(buf)
-}
-
 // Using "anchor_verifier", verifies if the "proof" really came from "public_input".
 fn verify(
     verifier: VAnchorVerifier,
@@ -1036,14 +1012,6 @@ fn verify(
     verifier
         .verify(public_input, proof_bytes)
         .map_err(|_| ContractError::VerifyError)
-}
-
-pub fn parse_string_to_uint128(v: String) -> Result<Uint128, StdError> {
-    let res = match v.parse::<u128>() {
-        Ok(v) => Uint128::from(v),
-        Err(e) => return Err(StdError::GenericErr { msg: e.to_string() }),
-    };
-    Ok(res)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
