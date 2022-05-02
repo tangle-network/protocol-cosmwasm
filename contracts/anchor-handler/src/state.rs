@@ -53,8 +53,19 @@ pub fn read_whitelist(store: &dyn Storage, contract_addr: Addr) -> StdResult<boo
 }
 /* --------------------------- */
 
+/* ---------- Anchor-Handler specific DS ----------  */
 // sourceChainID => height => Update Record
-pub const UPDATE_RECORDS: Map<(u64, u64), UpdateRecord> = Map::new("update_records");
+// (src_chain_id, height) -> UpdateRecord
+pub const UPDATE_RECORDS: Map<(String, String), UpdateRecord> = Map::new("update_records");
 
 // source chain ID => number of updates
 pub const COUNTS: Map<u64, u64> = Map::new("counts");
+
+pub fn read_update_record(
+    store: &dyn Storage,
+    src_chain_id: u64,
+    height: u64,
+) -> StdResult<UpdateRecord> {
+    UPDATE_RECORDS.load(store, (src_chain_id.to_string(), height.to_string()))
+}
+/* ------------------------------------------------- */
