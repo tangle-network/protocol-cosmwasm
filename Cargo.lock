@@ -710,6 +710,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "cosmwasm-anchor-handler"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std 0.16.7",
+ "cosmwasm-storage",
+ "cw-storage-plus",
+ "cw2",
+ "getrandom 0.2.6",
+ "protocol-cosmwasm",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cosmwasm-bignumber"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
