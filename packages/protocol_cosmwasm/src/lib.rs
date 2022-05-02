@@ -1,4 +1,5 @@
 pub mod anchor;
+pub mod anchor_handler;
 pub mod anchor_verifier;
 pub mod error;
 pub mod executor;

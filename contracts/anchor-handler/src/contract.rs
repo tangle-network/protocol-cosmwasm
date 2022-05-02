@@ -1,23 +1,17 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, WasmMsg,
+    attr, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
 };
 use cw2::set_contract_version;
 
-use crate::state::{State, RESOURCEID2HANDLERADDR, STATE};
+use crate::state::{set_resource, State, STATE};
+use protocol_cosmwasm::anchor_handler::{BridgeAddrResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::executor::ExecuteMsg as ExecutorExecMsg;
 use protocol_cosmwasm::keccak::Keccak256;
-use protocol_cosmwasm::signature_bridge::{
-    ExecProposalWithSigMsg, ExecuteMsg, InstantiateMsg, QueryMsg, SetResourceWithSigMsg,
-    StateResponse,
-};
-use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder, get_chain_id_type};
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:cosmwasm-signature-bridge";
+const CONTRACT_NAME: &str = "crates.io:cosmwasm-anchor-handler";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // ChainType info
@@ -39,20 +33,25 @@ pub fn instantiate(
         return Err(ContractError::UnnecessaryFunds {});
     }
 
-    // Set "state"
-    let governor = deps.api.addr_validate(&msg.initial_governor)?;
-    STATE.save(
-        deps.storage,
-        &State {
-            governor,
-            proposal_nonce: 0,
-        },
-    )?;
+    if msg.initial_resource_ids.len() != msg.initial_contract_addresses.len() {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "initial_resource_ids and initial_contract_addresses len mismatch".to_string(),
+        }));
+    }
 
-    Ok(Response::new().add_attributes(vec![
-        attr("method", "instantiate"),
-        attr("governor", msg.initial_governor),
-    ]))
+    // Set "state"
+    let bridge_addr = deps.api.addr_validate(&msg.bridge_addr)?;
+    STATE.save(deps.storage, &State { bridge_addr })?;
+
+    // Save the initial mapping of `resource_id => contract_addr`
+    let n = msg.initial_resource_ids.len();
+    for i in 0..n {
+        let resource_id = msg.initial_resource_ids[i];
+        let contract_addr = deps.api.addr_validate(&msg.initial_contract_addresses[i])?;
+        set_resource(deps.storage, resource_id, contract_addr)?;
+    }
+
+    Ok(Response::new().add_attributes(vec![attr("method", "instantiate")]))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -63,145 +62,21 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::AdminSetResourceWithSig(msg) => {
-            admin_set_resource_with_signature(deps, info, msg)
-        }
-        ExecuteMsg::ExecProposalWithSig(msg) => exec_proposal_with_signature(deps, info, msg),
+        // TODO
     }
-}
-
-fn admin_set_resource_with_signature(
-    mut deps: DepsMut,
-    _info: MessageInfo,
-    msg: SetResourceWithSigMsg,
-) -> Result<Response, ContractError> {
-    let mut state = STATE.load(deps.storage)?;
-
-    // Validations
-    let mut data: Vec<u8> = Vec::new();
-    data.extend_from_slice(&msg.resource_id);
-    data.extend_from_slice(&msg.function_sig);
-    data.extend_from_slice(&element_encoder(&msg.nonce.to_le_bytes()));
-    data.extend_from_slice(&msg.new_resource_id);
-    data.extend_from_slice(msg.handler_addr.as_bytes());
-    data.extend_from_slice(msg.execution_context_addr.as_bytes());
-
-    if !signed_by_governor(deps.branch(), &data, &msg.sig, state.governor.as_str())? {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid sig from governor".to_string(),
-        }));
-    }
-
-    if msg.nonce != state.proposal_nonce + 1 {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid nonce".to_string(),
-        }));
-    }
-
-    let func_sig = Keccak256::hash(
-        b"adminSetResourceWithSignature(bytes32,bytes4,uint32,bytes32,address,address,bytes)",
-    )
-    .map_err(|_| ContractError::HashError)?;
-    if msg.function_sig != func_sig[0..4] {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid function signature".to_string(),
-        }));
-    }
-
-    // Save the info of "resource_id -> handler(contract)" in this contract.
-    RESOURCEID2HANDLERADDR.save(
-        deps.storage,
-        &msg.new_resource_id,
-        &deps.api.addr_validate(&msg.handler_addr)?,
-    )?;
-
-    state.proposal_nonce = msg.nonce;
-    STATE.save(deps.storage, &state)?;
-
-    // Save the "resource" info in "handler" contract.
-    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: msg.handler_addr,
-        funds: vec![],
-        msg: to_binary(&ExecutorExecMsg::SetResource {
-            resource_id: msg.resource_id,
-            contract_addr: msg.execution_context_addr,
-        })
-        .unwrap(),
-    })];
-
-    Ok(Response::new()
-        .add_messages(msgs)
-        .add_attributes(vec![attr("method", "admin_set_resource_with_sig")]))
-}
-
-fn exec_proposal_with_signature(
-    mut deps: DepsMut,
-    _info: MessageInfo,
-    msg: ExecProposalWithSigMsg,
-) -> Result<Response, ContractError> {
-    let state = STATE.load(deps.storage)?;
-
-    // Validations
-    if !signed_by_governor(deps.branch(), &msg.data, &msg.sig, state.governor.as_str())? {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid sig from governor".to_string(),
-        }));
-    }
-
-    // Parse resourceID from the data
-    let resource_id_bytes = &msg.data[0..32];
-    let resource_id = element_encoder(resource_id_bytes);
-
-    // Parse chain ID + chain type from the resource ID
-    let execution_chain_id_type: u64 = get_chain_id_type(&resource_id_bytes[26..32]);
-
-    // Verify current chain matches chain ID from resource ID
-    //
-    // NOTE:
-    // This part is prone to future changes since the current implementation
-    // is based on assumption that the `chain_id` is number.
-    // In fact, the `chain_id` of Cosmos SDK blockchains is string, not number.
-    // For example, the `chain_id` of Terra blockchain(mainnet) is `columbus-5`.
-    // Eventually, it should replace the `MOCK_CHAIN_ID` with `chain_id` obtained
-    // inside contract(here).
-    if compute_chain_id_type(MOCK_CHAIN_ID, &COSMOS_CHAIN_TYPE) != execution_chain_id_type {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "executing on wrong chain".to_string(),
-        }));
-    }
-
-    // Execute the "proposal" in "handler" contract
-    let handler_addr = RESOURCEID2HANDLERADDR
-        .load(deps.storage, &resource_id)?
-        .to_string();
-    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: handler_addr,
-        funds: vec![],
-        msg: to_binary(&ExecutorExecMsg::ExecuteProposal {
-            resource_id,
-            data: msg.data,
-        })
-        .unwrap(),
-    })];
-
-    Ok(Response::new()
-        .add_messages(msgs)
-        .add_attributes(vec![attr("method", "execute_proposal_with_sig")]))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetState {} => to_binary(&get_state(deps)?),
+        QueryMsg::GetBridgeAddress {} => to_binary(&get_bridge_addr(deps)?),
     }
 }
 
-fn get_state(deps: Deps) -> StdResult<StateResponse> {
-    let state = STATE.load(deps.storage)?;
-    Ok(StateResponse {
-        governor: state.governor.to_string(),
-        proposal_nonce: state.proposal_nonce,
-    })
+// Query the "bridge_addr" from "State".
+fn get_bridge_addr(deps: Deps) -> StdResult<BridgeAddrResponse> {
+    let bridge_addr = STATE.load(deps.storage)?.bridge_addr.to_string();
+    Ok(BridgeAddrResponse { bridge_addr })
 }
 
 // Verifying signature of governor over some datahash
@@ -224,34 +99,28 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{attr, from_binary};
-    use protocol_cosmwasm::signature_bridge::StateResponse;
 
-    const GOVERNOR: &str = "governor";
+    const BRIDGE: &str = "bridge-contract";
 
     #[test]
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            initial_governor: GOVERNOR.to_string(),
+            bridge_addr: BRIDGE.to_string(),
+            initial_resource_ids: vec![],
+            initial_contract_addresses: vec![],
         };
         let info = mock_info("creator", &[]);
 
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(
-            res.attributes,
-            vec![
-                attr("method", "instantiate"),
-                attr("governor", GOVERNOR.to_string())
-            ]
-        );
+        assert_eq!(res.attributes, vec![attr("method", "instantiate"),]);
 
-        // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetState {}).unwrap();
-        let state: StateResponse = from_binary(&res).unwrap();
-        assert_eq!(state.governor, GOVERNOR.to_string());
-        assert_eq!(state.proposal_nonce, 0);
+        // it worked, let's query the state("bridge_addr")
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetBridgeAddress {}).unwrap();
+        let bridge_addr_resp: BridgeAddrResponse = from_binary(&res).unwrap();
+        assert_eq!(bridge_addr_resp.bridge_addr, BRIDGE.to_string());
     }
 }

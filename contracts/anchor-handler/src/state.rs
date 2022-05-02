@@ -1,18 +1,17 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, StdResult, Storage};
 use cw_storage_plus::{Item, Map};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UpdateRecord {
     pub token_addr: Addr,
-    pub  src_chain_id: u64,
+    pub src_chain_id: u64,
     pub resource_id: [u8; 32],
     pub merkle_root: [u8; 32],
     pub leaf_id: u64,
 }
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
@@ -30,6 +29,17 @@ pub const CONTRACTADDRESS2RESOURCEID: Map<Addr, [u8; 32]> = Map::new("contractAd
 
 // Execution contract address => is whitelisted
 pub const CONTRACTWHITELIST: Map<Addr, bool> = Map::new("contract_whitelist");
+
+pub fn set_resource(
+    store: &mut dyn Storage,
+    resource_id: [u8; 32],
+    contract_addr: Addr,
+) -> StdResult<()> {
+    RESOURCEID2CONTRACTADDRESS.save(store, &resource_id, &contract_addr)?;
+    CONTRACTADDRESS2RESOURCEID.save(store, contract_addr.clone(), &resource_id)?;
+    CONTRACTWHITELIST.save(store, contract_addr, &true)
+}
+
 /* --------------------------- */
 
 // sourceChainID => height => Update Record
@@ -37,4 +47,3 @@ pub const UPDATE_RECORDS: Map<(u64, u64), UpdateRecord> = Map::new("update_recor
 
 // source chain ID => number of updates
 pub const COUNTS: Map<u64, u64> = Map::new("counts");
-
