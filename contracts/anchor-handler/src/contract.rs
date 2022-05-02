@@ -1,9 +1,12 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
+    attr, to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, WasmMsg,
 };
 use cw2::set_contract_version;
+use protocol_cosmwasm::keccak::Keccak256;
+use protocol_cosmwasm::utils::{bytes4_encoder, element_encoder};
 
 use crate::state::{
     read_contract_addr, read_resource_id, read_update_record, read_whitelist, set_resource, State,
@@ -14,6 +17,7 @@ use protocol_cosmwasm::anchor_handler::{
     ResourceIdResponse, UpdateRecordResponse, WhitelistCheckResponse,
 };
 use protocol_cosmwasm::error::ContractError;
+use protocol_cosmwasm::linkable_anchor::ExecuteMsg as LinkableAnchorExecMsg;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-anchor-handler";
@@ -74,6 +78,22 @@ pub fn execute(
         } => exec_set_resource(deps, info, resource_id, contract_addr),
         ExecuteMsg::MigrateBridge { new_bridge } => migrate_bridge(deps, info, new_bridge),
         /* ---------------------------- */
+
+        /* ---  Anchor-handler specific execution entries --- */
+        // @notice Proposal execution should be initiated when a proposal is finalized in the Bridge contract.
+        // by a relayer on the deposit's destination chain.
+        //
+        // Params:
+        //   "resource_id": ResourceID corresponding to a particular set of Anchors
+        //   "data": Consists of {sourceChainID}, {leafIndex}, {merkleRoot} all padded to 32 bytes.
+        //
+        // Data passed into the function should be constructed as follows:
+        // chainID                                  u64          bytes  0 - 32
+        // leafIndex                                u64          bytes  32 - 64
+        // merkleRoot                               [u8; 32]     bytes  64 - 96
+        ExecuteMsg::ExecuteProposal { resource_id, data } => {
+            execute_proposal(deps, info, resource_id, data)
+        } /* ---------------------------------------- */
     }
 }
 
@@ -114,6 +134,170 @@ fn migrate_bridge(
     STATE.save(deps.storage, &State { bridge_addr })?;
 
     Ok(Response::new().add_attribute("method", "migrate_bridge"))
+}
+
+fn execute_proposal(
+    deps: DepsMut,
+    info: MessageInfo,
+    resource_id: [u8; 32],
+    data: Vec<u8>,
+) -> Result<Response, ContractError> {
+    // Parse the `data`.
+    let resource_ID = element_encoder(&data);
+    let func_sig = bytes4_encoder(&data[32..36]);
+    let arguments = &data[36..];
+
+    let state = STATE.load(deps.storage)?;
+
+    // Validations
+    if info.sender != state.bridge_addr {
+        return Err(ContractError::Unauthorized {});
+    }
+    let anchor_addr = read_contract_addr(deps.storage, resource_id)?;
+    if !read_whitelist(deps.storage, anchor_addr)? {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "provided tokenAddress is not whitelisted".to_string(),
+        }));
+    }
+
+    // Execute the proposal according to function signature
+    let set_handler_sig = bytes4_encoder(
+        &Keccak256::hash(b"setHandler(address,uint32)").map_err(|_| ContractError::DecodeError)?,
+    );
+    let set_verifier_sig = bytes4_encoder(
+        &Keccak256::hash(b"setVerifier(address,uint32)").map_err(|_| ContractError::DecodeError)?,
+    );
+    let update_edge_sig = bytes4_encoder(
+        &Keccak256::hash(b"updateEdge(uint256,bytes32,uint256,bytes32)")
+            .map_err(|_| ContractError::DecodeError)?,
+    );
+    let min_withdraw_limit_sig = bytes4_encoder(
+        &Keccak256::hash(b"configureMinimalWithdrawalLimit(uint256)")
+            .map_err(|_| ContractError::DecodeError)?,
+    );
+    let max_deposit_limit_sig = bytes4_encoder(
+        &Keccak256::hash(b"configureMaximumDepositLimit(uint256)")
+            .map_err(|_| ContractError::DecodeError)?,
+    );
+
+    match func_sig {
+        set_handler_sig => exec_set_handler(deps, anchor_addr, arguments),
+        set_verifier_sig => exec_set_verifier(deps, anchor_addr, arguments),
+        update_edge_sig => exec_update_edge(deps, anchor_addr, arguments),
+        min_withdraw_limit_sig => exec_configure_min_withdraw_limit(deps, anchor_addr, arguments),
+        max_deposit_limit_sig => exec_configure_max_deposit_limit(deps, anchor_addr, arguments),
+        _ => {
+            return Err(ContractError::Std(StdError::GenericErr {
+                msg: "Invalid function signature".to_string(),
+            }));
+        }
+    }
+}
+
+fn exec_set_handler(
+    deps: DepsMut,
+    anchor_addr: Addr,
+    arguments: &[u8],
+) -> Result<Response, ContractError> {
+    let nonce = u32::from_be_bytes(bytes4_encoder(&arguments[0..4]));
+    let new_handler = &arguments[4..24];
+
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: anchor_addr.to_string(),
+        msg: to_binary(&LinkableAnchorExecMsg::SetHandler {
+            handler: new_handler,
+            nonce,
+        })
+        .unwrap(),
+        funds: vec![],
+    })];
+    Ok(Response::new()
+        .add_messages(msgs)
+        .add_attributes(vec![attr("method", "set_handler")]))
+}
+
+fn exec_set_verifier(
+    deps: DepsMut,
+    anchor_addr: Addr,
+    arguments: &[u8],
+) -> Result<Response, ContractError> {
+    let nonce = u32::from_be_bytes(bytes4_encoder(&arguments[0..4]));
+    let new_verifier = &arguments[4..24];
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: anchor_addr.to_string(),
+        msg: to_binary(&LinkableAnchorExecMsg::SetVerifier {
+            verifier: new_verifier,
+            nonce,
+        })
+        .unwrap(),
+        funds: vec![],
+    })];
+    Ok(Response::new()
+        .add_messages(msgs)
+        .add_attributes(vec![attr("method", "set_verifier")]))
+}
+
+fn exec_update_edge(
+    deps: DepsMut,
+    anchor_addr: Addr,
+    arguments: &[u8],
+) -> Result<Response, ContractError> {
+    let src_chain_id = u64::from_be_bytes(&arguments[4..10]);
+    let leaf_id = u32::from_be_bytes(&arguments[10..14]);
+    let merkle_root = element_encoder(&arguments[14..46]);
+    let target = element_encoder(&arguments[46..78]);
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: anchor_addr.to_string(),
+        msg: to_binary(&LinkableAnchorExecMsg::UpdateEdge {
+            src_chain_id,
+            root: merkle_root,
+            latest_leaf_id: leaf_id,
+            target,
+        })
+        .unwrap(),
+        funds: vec![],
+    })];
+    Ok(Response::new()
+        .add_messages(msgs)
+        .add_attributes(vec![attr("method", "update_edge")]))
+}
+
+fn exec_configure_min_withdraw_limit(
+    deps: DepsMut,
+    anchor_addr: Addr,
+    arguments: &[u8],
+) -> Result<Response, ContractError> {
+    let min_withdraw_limit = &arguments[4..36];
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: anchor_addr.to_string(),
+        msg: to_binary(&LinkableAnchorExecMsg::ConfigureMinimalWithdrawalLimit {
+            minimal_withdrawal_amount: min_withdraw_limit,
+        })
+        .unwrap(),
+        funds: vec![],
+    })];
+    Ok(Response::new()
+        .add_messages(msgs)
+        .add_attributes(vec![attr("method", "configure_min_withdraw_limit")]))
+}
+
+fn exec_configure_max_deposit_limit(
+    deps: DepsMut,
+    anchor_addr: Addr,
+    arguments: &[u8],
+) -> Result<Response, ContractError> {
+    let max_deposit_limit = &arguments[4..36];
+    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: anchor_addr.to_string(),
+        msg: to_binary(&LinkableAnchorExecMsg::ConfigureMaximumDepositLimit {
+            maximum_deposit_amount: max_deposit_limit,
+        })
+        .unwrap(),
+        funds: vec![],
+    })];
+    Ok(Response::new()
+        .add_messages(msgs)
+        .add_attributes(vec![attr("method", "configure_max_deposit_limit")]))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

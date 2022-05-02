@@ -28,6 +28,23 @@ pub enum ExecuteMsg {
         new_bridge: String,
     },
     /* ----------------------------- */
+
+    /* ---  Anchor-handler specific execution entries --- */
+    // @notice Proposal execution should be initiated when a proposal is finalized in the Bridge contract.
+    // by a relayer on the deposit's destination chain.
+    //
+    // Params:
+    //   "resource_id": ResourceID corresponding to a particular set of Anchors
+    //   "data": Consists of {sourceChainID}, {leafIndex}, {merkleRoot} all padded to 32 bytes.
+    //
+    // Data passed into the function should be constructed as follows:
+    // chainID                                  u64          bytes  0 - 32
+    // leafIndex                                u64          bytes  32 - 64
+    // merkleRoot                               [u8; 32]     bytes  64 - 96
+    ExecuteProposal {
+        resource_id: [u8; 32],
+        data: Vec<u8>,
+    }, /* ---------------------------------------- */
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
