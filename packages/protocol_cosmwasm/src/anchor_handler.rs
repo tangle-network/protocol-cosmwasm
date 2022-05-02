@@ -18,16 +18,44 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    // TODO
+    /* ---  Handler common utils --- */
+    SetResource {
+        resource_id: [u8; 32],
+        contract_addr: String,
+    },
+
+    MigrateBridge {
+        new_bridge: String,
+    },
+    /* ----------------------------- */
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     GetBridgeAddress {},
+    GetContractAddress { resource_id: [u8; 32] },
+    GetResourceId { contract_addr: String },
+    IsContractWhitelisted { contract_addr: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct BridgeAddrResponse {
     pub bridge_addr: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct ContractAddrResponse {
+    pub contract_addr: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct ResourceIdResponse {
+    pub resource_id: [u8; 32],
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct WhitelistCheckResponse {
+    pub contract_addr: String,
+    pub is_whitelisted: bool,
 }

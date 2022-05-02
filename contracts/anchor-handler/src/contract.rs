@@ -5,10 +5,14 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 
-use crate::state::{set_resource, State, STATE};
-use protocol_cosmwasm::anchor_handler::{BridgeAddrResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::state::{
+    read_contract_addr, read_resource_id, read_whitelist, set_resource, State, STATE,
+};
+use protocol_cosmwasm::anchor_handler::{
+    BridgeAddrResponse, ContractAddrResponse, ExecuteMsg, InstantiateMsg, QueryMsg,
+    ResourceIdResponse, WhitelistCheckResponse,
+};
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::keccak::Keccak256;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-anchor-handler";
@@ -62,14 +66,68 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        // TODO
+        /* ---  Handler common utils --- */
+        ExecuteMsg::SetResource {
+            resource_id,
+            contract_addr,
+        } => exec_set_resource(deps, info, resource_id, contract_addr),
+        ExecuteMsg::MigrateBridge { new_bridge } => migrate_bridge(deps, info, new_bridge),
+        /* ---------------------------- */
     }
+}
+
+fn exec_set_resource(
+    deps: DepsMut,
+    info: MessageInfo,
+    resource_id: [u8; 32],
+    contract_addr: String,
+) -> Result<Response, ContractError> {
+    let state = STATE.load(deps.storage)?;
+
+    // Validations
+    if info.sender != state.bridge_addr {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // Save/update the mapping `resource_id => contract_addr`
+    let contract_addr = deps.api.addr_validate(&contract_addr)?;
+    set_resource(deps.storage, resource_id, contract_addr)?;
+
+    Ok(Response::new().add_attribute("method", "set_resource"))
+}
+
+fn migrate_bridge(
+    deps: DepsMut,
+    info: MessageInfo,
+    new_bridge: String,
+) -> Result<Response, ContractError> {
+    let state = STATE.load(deps.storage)?;
+
+    // Validations
+    if info.sender != state.bridge_addr {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // Migrage(update) the "bridge_addr" with "new_bridge"
+    let bridge_addr = deps.api.addr_validate(&new_bridge)?;
+    STATE.save(deps.storage, &State { bridge_addr })?;
+
+    Ok(Response::new().add_attribute("method", "migrate_bridge"))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetBridgeAddress {} => to_binary(&get_bridge_addr(deps)?),
+        QueryMsg::GetContractAddress { resource_id } => {
+            to_binary(&get_contract_addr(deps, resource_id)?)
+        }
+        QueryMsg::GetResourceId { contract_addr } => {
+            to_binary(&get_resource_id(deps, contract_addr)?)
+        }
+        QueryMsg::IsContractWhitelisted { contract_addr } => {
+            to_binary(&is_whitelisted(deps, contract_addr)?)
+        }
     }
 }
 
@@ -79,48 +137,25 @@ fn get_bridge_addr(deps: Deps) -> StdResult<BridgeAddrResponse> {
     Ok(BridgeAddrResponse { bridge_addr })
 }
 
-// Verifying signature of governor over some datahash
-fn signed_by_governor(
-    deps: DepsMut,
-    data: &[u8],
-    sig: &[u8],
-    governor: &str,
-) -> Result<bool, ContractError> {
-    let hashed_data = Keccak256::hash(data).map_err(|_| ContractError::HashError)?;
-    let verify_result = deps
-        .api
-        .secp256k1_verify(&hashed_data, sig, governor.as_bytes());
-
-    verify_result.map_err(|e| ContractError::Std(StdError::VerificationErr { source: e }))
+// Query the "contract_addr" by "resource_id".
+fn get_contract_addr(deps: Deps, resource_id: [u8; 32]) -> StdResult<ContractAddrResponse> {
+    let contract_addr = read_contract_addr(deps.storage, resource_id)?.to_string();
+    Ok(ContractAddrResponse { contract_addr })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{attr, from_binary};
+// Query the "resource_id" by "contract_addr"
+fn get_resource_id(deps: Deps, contract_addr: String) -> StdResult<ResourceIdResponse> {
+    let contract_addr = deps.api.addr_validate(&contract_addr)?;
+    let resource_id = read_resource_id(deps.storage, contract_addr)?;
+    Ok(ResourceIdResponse { resource_id })
+}
 
-    const BRIDGE: &str = "bridge-contract";
-
-    #[test]
-    fn proper_initialization() {
-        let mut deps = mock_dependencies(&[]);
-
-        let msg = InstantiateMsg {
-            bridge_addr: BRIDGE.to_string(),
-            initial_resource_ids: vec![],
-            initial_contract_addresses: vec![],
-        };
-        let info = mock_info("creator", &[]);
-
-        // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-        assert_eq!(res.attributes, vec![attr("method", "instantiate"),]);
-
-        // it worked, let's query the state("bridge_addr")
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetBridgeAddress {}).unwrap();
-        let bridge_addr_resp: BridgeAddrResponse = from_binary(&res).unwrap();
-        assert_eq!(bridge_addr_resp.bridge_addr, BRIDGE.to_string());
-    }
+// Query if the given "contract_addr" is whitelisted
+fn is_whitelisted(deps: Deps, contract_addr: String) -> StdResult<WhitelistCheckResponse> {
+    let contract = deps.api.addr_validate(&contract_addr)?;
+    let is_whitelisted = read_whitelist(deps.storage, contract)?;
+    Ok(WhitelistCheckResponse {
+        contract_addr,
+        is_whitelisted,
+    })
 }

@@ -40,6 +40,17 @@ pub fn set_resource(
     CONTRACTWHITELIST.save(store, contract_addr, &true)
 }
 
+pub fn read_contract_addr(store: &dyn Storage, resource_id: [u8; 32]) -> StdResult<Addr> {
+    RESOURCEID2CONTRACTADDRESS.load(store, &resource_id)
+}
+
+pub fn read_resource_id(store: &dyn Storage, contract_addr: Addr) -> StdResult<[u8; 32]> {
+    CONTRACTADDRESS2RESOURCEID.load(store, contract_addr)
+}
+
+pub fn read_whitelist(store: &dyn Storage, contract_addr: Addr) -> StdResult<bool> {
+    CONTRACTWHITELIST.load(store, contract_addr)
+}
 /* --------------------------- */
 
 // sourceChainID => height => Update Record
