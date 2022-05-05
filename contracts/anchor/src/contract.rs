@@ -9,7 +9,7 @@ use cw2::set_contract_version;
 use crate::state::{
     read_curr_neighbor_root_index, read_edge, read_neighbor_roots, read_root,
     save_curr_neighbor_root_index, save_edge, save_neighbor_roots, save_root, save_subtree, Anchor,
-    LinkableMerkleTree, MerkleTree, ANCHOR, ANCHORVERIFIER, NULLIFIERS, POSEIDON,
+    LinkableMerkleTree, MerkleTree, ANCHOR, HASHER, NULLIFIERS, VERIFIER,
 };
 use codec::Encode;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
@@ -52,14 +52,14 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     // Initialize the poseidon hasher
-    POSEIDON.save(deps.storage, &Poseidon::new())?;
+    HASHER.save(deps.storage, &Poseidon::new())?;
 
     // Initialize the Anchor_verifier
     let anchor_verifier = match AnchorVerifier::new(msg.max_edges) {
         Ok(v) => v,
         Err(e) => return Err(ContractError::Std(e)),
     };
-    ANCHORVERIFIER.save(deps.storage, &anchor_verifier)?;
+    VERIFIER.save(deps.storage, &anchor_verifier)?;
 
     // Initialize the merkle tree
     let merkle_tree: MerkleTree = MerkleTree {
@@ -77,6 +77,9 @@ pub fn instantiate(
     // Get the "TokenWrapper" token address.
     let tokenwrapper_addr = deps.api.addr_validate(msg.tokenwrapper_addr.as_str())?;
 
+    // Get the "handler" address
+    let handler = deps.api.addr_validate(&msg.handler)?;
+
     // Initialize the Anchor
     let deposit_size = match parse_string_to_uint128(msg.deposit_size) {
         Ok(v) => v,
@@ -85,9 +88,11 @@ pub fn instantiate(
     let anchor = Anchor {
         chain_id: msg.chain_id,
         linkable_tree: linkable_merkle_tree,
+        proposal_nonce: 0_u32,
         deposit_size,
         merkle_tree,
         tokenwrapper_addr,
+        handler,
     };
     ANCHOR.save(deps.storage, &anchor)?;
 
@@ -365,7 +370,7 @@ pub fn withdraw(
     }
 
     // Verify the proof
-    let verifier = ANCHORVERIFIER.load(deps.storage)?;
+    let verifier = VERIFIER.load(deps.storage)?;
     let result = verify(verifier, bytes, msg.proof_bytes)?;
 
     if !result {
@@ -699,7 +704,7 @@ fn withdraw_and_unwrap(
     }
 
     // Verify the proof
-    let verifier = ANCHORVERIFIER.load(deps.storage)?;
+    let verifier = VERIFIER.load(deps.storage)?;
     let result = verify(verifier, bytes, msg.proof_bytes)?;
 
     if !result {
@@ -919,7 +924,7 @@ pub fn validate_and_store_commitment(
 ) -> Result<u32, ContractError> {
     let anchor = ANCHOR.load(deps.storage)?;
     let mut merkle_tree = anchor.merkle_tree;
-    let poseidon = POSEIDON.load(deps.storage)?;
+    let poseidon = HASHER.load(deps.storage)?;
     let res = merkle_tree
         .insert(poseidon, commitment, deps.storage)
         .map_err(|_| ContractError::MerkleTreeIsFull)?;
@@ -931,6 +936,8 @@ pub fn validate_and_store_commitment(
             deposit_size: anchor.deposit_size,
             linkable_tree: anchor.linkable_tree,
             tokenwrapper_addr: anchor.tokenwrapper_addr,
+            handler: anchor.handler,
+            proposal_nonce: anchor.proposal_nonce,
             merkle_tree,
         },
     )?;

@@ -9,6 +9,36 @@ use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::structs::{ChainId, Edge, ROOT_HISTORY_SIZE};
 use protocol_cosmwasm::zeroes;
 
+pub const ANCHOR: Item<Anchor> = Item::new("anchor");
+pub const HASHER: Item<Poseidon> = Item::new("poseidon_hasher");
+pub const VERIFIER: Item<AnchorVerifier> = Item::new("anchor_verifier");
+
+pub const EDGES: Map<String, Edge> = Map::new("edges");
+pub const CURR_NEIGHBOR_ROOT_INDEX: Map<String, u32> = Map::new("curr_neighbor_root_index");
+pub const NEIGHBOR_ROOTS: Map<(String, String), [u8; 32]> = Map::new("neighbor_roots");
+pub const MERKLEROOTS: Map<String, [u8; 32]> = Map::new("merkle_roots");
+pub const FILLED_SUBTREES: Map<String, [u8; 32]> = Map::new("filled_subtrees");
+pub const NULLIFIERS: Map<Vec<u8>, bool> = Map::new("used_nullifers");
+
+// "Anchor"
+// Connected instances that contains an on-chain merkle tree and
+// tracks a set of connected _anchors_ across chains (through edges)
+// in its local storage.
+
+// NOTE: The `chain_id` field is just for temporary development purpose.
+//       In the future, it should be removed & the contract should use the
+//       `chain_id`(blockchain-unique ID) obtained inside the contract.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct Anchor {
+    pub chain_id: u64,           // ChainID of underlying blockchain(Temporary field)
+    pub handler: Addr,           // Address of "anchor-handler", which add/updte the `edge` info
+    pub proposal_nonce: u32,     // Proposal nonce
+    pub deposit_size: Uint128,   // Minimum `deposit` amount for tx
+    pub merkle_tree: MerkleTree, // Tree data structure to hold the `deposit` info
+    pub linkable_tree: LinkableMerkleTree, // Tree data structure to hold the `edge` info
+    pub tokenwrapper_addr: Addr, // Cw20 token address used for wrapping native & any cw20 token
+}
+
 pub fn read_edge(store: &dyn Storage, k: ChainId) -> StdResult<Edge> {
     EDGES.load(store, k.to_string())
 }
@@ -168,18 +198,6 @@ impl LinkableMerkleTree {
     }
 }
 
-// Anchor: Connected instances that contains an on-chain merkle tree and
-//          tracks a set of connected _anchors_ across chains (through edges)
-//          in its local storage.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Anchor {
-    pub chain_id: u64,
-    pub deposit_size: Uint128,
-    pub merkle_tree: MerkleTree,
-    pub linkable_tree: LinkableMerkleTree,
-    pub tokenwrapper_addr: Addr, // Cw20 token address used for wrapping native & any cw20 token
-}
-
 // MerkleTree
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MerkleTree {
@@ -275,14 +293,3 @@ impl MerkleTree {
         false
     }
 }
-
-pub const EDGES: Map<String, Edge> = Map::new("edges");
-pub const CURR_NEIGHBOR_ROOT_INDEX: Map<String, u32> = Map::new("curr_neighbor_root_index");
-pub const NEIGHBOR_ROOTS: Map<(String, String), [u8; 32]> = Map::new("neighbor_roots");
-pub const MERKLEROOTS: Map<String, [u8; 32]> = Map::new("merkle_roots");
-pub const FILLED_SUBTREES: Map<String, [u8; 32]> = Map::new("filled_subtrees");
-pub const NULLIFIERS: Map<Vec<u8>, bool> = Map::new("used_nullifers");
-
-pub const ANCHOR: Item<Anchor> = Item::new("anchor");
-pub const POSEIDON: Item<Poseidon> = Item::new("poseidon");
-pub const ANCHORVERIFIER: Item<AnchorVerifier> = Item::new("anchor_verifier");

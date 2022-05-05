@@ -26,7 +26,8 @@ const CHAIN_ID: u64 = 1;
 const LEVELS: u32 = 30;
 const CW20_ADDRESS: &str = "terra1340t6lqq6jxhm8d6gtz0hzz5jzcszvm27urkn2";
 const DEPOSIT_SIZE: u128 = 1_000_000;
-const DEPOSITOR: &str = "depositor";
+const DEPOSITOR: &str = "terra1c97dd05nyh08745fadcxz3l6ycmv0gsyf8t3jg";
+const HANDLER: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 
 const RECIPIENT: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
 const RELAYER: &str = "terra17cz29kl6z5wj04ledes9jdmn6pgkelffjxglky";
@@ -44,6 +45,7 @@ fn create_anchor() -> OwnedDeps<MockStorage, MockApi, crate::mock_querier::WasmM
         levels: LEVELS,
         deposit_size: DEPOSIT_SIZE.to_string(),
         tokenwrapper_addr: CW20_ADDRESS.to_string(),
+        handler: HANDLER.to_string(),
     };
 
     // Should pass this "unwrap" if success.
@@ -63,6 +65,7 @@ fn test_anchor_proper_initialization() {
         levels: LEVELS,
         deposit_size: DEPOSIT_SIZE.to_string(),
         tokenwrapper_addr: CW20_ADDRESS.to_string(),
+        handler: HANDLER.to_string(),
     };
 
     // Should pass this "unwrap" if success.

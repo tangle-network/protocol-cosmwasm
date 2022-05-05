@@ -9,6 +9,7 @@ pub struct InstantiateMsg {
     pub levels: u32,
     pub deposit_size: String,
     pub tokenwrapper_addr: String,
+    pub handler: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
