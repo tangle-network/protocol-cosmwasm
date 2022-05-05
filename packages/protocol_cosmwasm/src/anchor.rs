@@ -44,15 +44,7 @@ pub enum ExecuteMsg {
     /// Sets a new handler for contract
     SetHandler { handler: String, nonce: u32 },
 
-    /// Add an edge to underlying tree
-    AddEdge {
-        src_chain_id: u64,
-        root: [u8; 32],
-        latest_leaf_index: u32,
-        target: [u8; 32],
-    },
-
-    /// Update an edge for underlying tree
+    /// Update/add an edge for underlying tree
     UpdateEdge {
         src_chain_id: u64,
         root: [u8; 32],

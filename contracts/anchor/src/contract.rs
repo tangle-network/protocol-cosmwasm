@@ -150,21 +150,20 @@ pub fn execute(
         // Sets a new handler for the contract
         ExecuteMsg::SetHandler { handler, nonce } => set_handler(deps, info, handler, nonce),
 
-        // Add an edge to underlying tree
-        ExecuteMsg::AddEdge {
-            src_chain_id,
-            root,
-            latest_leaf_index,
-            target,
-        } => add_edge(deps, src_chain_id, root, latest_leaf_index, target),
-
-        // Update an edge for underlying tree
+        // Update/add an edge for underlying tree
         ExecuteMsg::UpdateEdge {
             src_chain_id,
             root,
             latest_leaf_index,
             target,
-        } => update_edge(deps, src_chain_id, root, latest_leaf_index, target),
+        } => {
+            let linkable_tree = ANCHOR.load(deps.storage)?.linkable_tree;
+            if linkable_tree.has_edge(src_chain_id, deps.storage) {
+                update_edge(deps, src_chain_id, root, latest_leaf_index, target)
+            } else {
+                add_edge(deps, src_chain_id, root, latest_leaf_index, target)
+            }
+        }
     }
 }
 
@@ -816,28 +815,24 @@ fn add_edge(
     latest_leaf_index: u32,
     target: [u8; 32],
 ) -> Result<Response, ContractError> {
-    let anchor: Anchor = ANCHOR.load(deps.storage)?;
-    let linkable_tree = anchor.linkable_tree;
-    // ensure edge doesn't exist
-    if linkable_tree.has_edge(src_chain_id, deps.storage) {
-        return Err(ContractError::EdgeAlreadyExists {});
-    }
+    let linkable_tree = ANCHOR.load(deps.storage)?.linkable_tree;
 
-    // ensure anchor isn't at maximum edges
+    // Ensure anchor isn't at maximum edges
     let curr_length = linkable_tree.get_latest_neighbor_edges(deps.storage).len();
     if curr_length > linkable_tree.max_edges as usize {
         return Err(ContractError::TooManyEdges {});
     }
 
-    // craft edge
+    // Add new edge to the end of the edge list for the given tree
     let edge: Edge = Edge {
         src_chain_id,
         root,
         latest_leaf_index,
         target,
     };
+    save_edge(deps.storage, src_chain_id, edge)?;
 
-    // update historical neighbor list for this edge's root
+    // Update associated states
     let curr_neighbor_root_idx = read_curr_neighbor_root_index(deps.storage, src_chain_id)?;
     save_curr_neighbor_root_index(
         deps.storage,
@@ -846,9 +841,6 @@ fn add_edge(
     )?;
 
     save_neighbor_roots(deps.storage, (src_chain_id, curr_neighbor_root_idx), root)?;
-
-    // Append new edge to the end of the edge list for the given tree
-    save_edge(deps.storage, src_chain_id, edge)?;
 
     Ok(Response::new().add_attribute("method", "add_edge"))
 }
@@ -861,26 +853,21 @@ fn update_edge(
     latest_leaf_index: u32,
     target: [u8; 32],
 ) -> Result<Response, ContractError> {
-    let anchor = ANCHOR.load(deps.storage)?;
-    let linkable_tree = anchor.linkable_tree;
-    if !linkable_tree.has_edge(src_chain_id, deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Edge does not exist".to_string(),
-        }));
-    }
-
+    // Update an existing edge with new one
     let edge: Edge = Edge {
         src_chain_id,
         root,
         latest_leaf_index,
         target,
     };
+    save_edge(deps.storage, src_chain_id, edge)?;
+    
+    // Update associated states
     let neighbor_root_idx =
         (read_curr_neighbor_root_index(deps.storage, src_chain_id)? + 1) % HISTORY_LENGTH;
     save_curr_neighbor_root_index(deps.storage, src_chain_id, neighbor_root_idx)?;
-    save_neighbor_roots(deps.storage, (src_chain_id, neighbor_root_idx), root)?;
 
-    save_edge(deps.storage, src_chain_id, edge)?;
+    save_neighbor_roots(deps.storage, (src_chain_id, neighbor_root_idx), root)?;
 
     Ok(Response::new().add_attributes(vec![attr("method", "udpate_edge")]))
 }
