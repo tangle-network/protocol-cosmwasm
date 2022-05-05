@@ -154,10 +154,10 @@ fn test_handler_update_edge() {
     // Try to "execute_proposal"
     let info = mock_info(BRIDGE_ADDR, &[]);
 
-    let update_edge_proposal = LinkableAnchorExecMsg::UpdateEdge { 
-        src_chain_id: 1_u64, 
-        root: [1u8; 32], 
-        latest_leaf_id: 2_u32, 
+    let update_edge_proposal = LinkableAnchorExecMsg::UpdateEdge {
+        src_chain_id: 1_u64,
+        root: [1u8; 32],
+        latest_leaf_id: 2_u32,
         target: [2u8; 32],
     };
     let exec_data = proposal_to_exec_data(RESOURCE_ID, update_edge_proposal);
