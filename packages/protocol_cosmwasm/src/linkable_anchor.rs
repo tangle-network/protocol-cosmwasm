@@ -1,4 +1,4 @@
-use cosmwasm_std::Addr;
+use cosmwasm_std::Uint128;
 /**
    @title linkable_anchor(ILinkableAnchor) Interface
    @notice The interface supports updating edges for a graph-like functionality.
@@ -26,25 +26,7 @@ pub enum ExecuteMsg {
        @param handler The new handler address
        @param nonce The nonce for tracking update counts
     */
-    SetHandler { handler: Addr, nonce: u32 },
-    /**
-       @notice Sets the verifier for zkSNARKs
-       @param verifier The new verifier address
-       @param nonce The nonce for tracking update counts
-    */
-    SetVerifier { verifier: Addr, nonce: u32 },
-
-    /**
-       @notice Sets the minimal withdrawal limit for the anchor
-       @param _minimalWithdrawalAmount The new minimal withdrawal limit
-    */
-    ConfigureMinimalWithdrawalLimit { minimal_withdrawal_amount: u64 },
-
-    /**
-       @notice Sets the maximal deposit limit for the anchor
-       @param _maximumDepositAmount The new maximal deposit limit
-    */
-    ConfigureMaximumDepositLimit { maximum_deposit_amount: u64 },
+    SetHandler { handler: String, nonce: u32 },
 
     /**
        @notice The function is used to update the edge data of a LinkableAnchor
@@ -58,4 +40,16 @@ pub enum ExecuteMsg {
         latest_leaf_id: u32,
         target: [u8; 32],
     },
+
+    /**
+       @notice Sets the minimal withdrawal limit for the anchor
+       @param _minimalWithdrawalAmount The new minimal withdrawal limit
+    */
+    ConfigureMinimalWithdrawalLimit { minimal_withdrawal_amount: Uint128 },
+
+    /**
+       @notice Sets the maximal deposit limit for the anchor
+       @param _maximumDepositAmount The new maximal deposit limit
+    */
+    ConfigureMaximumDepositLimit { maximum_deposit_amount: Uint128 },
 }

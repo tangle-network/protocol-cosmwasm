@@ -1,12 +1,12 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, WasmMsg,
+    attr, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, Uint256, WasmMsg,
 };
 use cw2::set_contract_version;
 use protocol_cosmwasm::keccak::Keccak256;
-use protocol_cosmwasm::utils::{bytes4_encoder, element_encoder};
+use protocol_cosmwasm::utils::{bytes4_encoder, element_encoder, get_chain_id_type};
 
 use crate::state::{
     read_contract_addr, read_resource_id, read_update_record, read_whitelist, set_resource, State,
@@ -143,7 +143,7 @@ fn execute_proposal(
     data: Vec<u8>,
 ) -> Result<Response, ContractError> {
     // Parse the `data`.
-    let resource_ID = element_encoder(&data);
+    let parsed_resource_id = element_encoder(&data[0..32]);
     let func_sig = bytes4_encoder(&data[32..36]);
     let arguments = &data[36..];
 
@@ -153,8 +153,13 @@ fn execute_proposal(
     if info.sender != state.bridge_addr {
         return Err(ContractError::Unauthorized {});
     }
+    if parsed_resource_id != resource_id {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid resource id".to_string(),
+        }));
+    }
     let anchor_addr = read_contract_addr(deps.storage, resource_id)?;
-    if !read_whitelist(deps.storage, anchor_addr)? {
+    if !read_whitelist(deps.storage, anchor_addr.clone())? {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "provided tokenAddress is not whitelisted".to_string(),
         }));
@@ -162,92 +167,59 @@ fn execute_proposal(
 
     // Execute the proposal according to function signature
     let set_handler_sig = bytes4_encoder(
-        &Keccak256::hash(b"setHandler(address,uint32)").map_err(|_| ContractError::DecodeError)?,
-    );
-    let set_verifier_sig = bytes4_encoder(
-        &Keccak256::hash(b"setVerifier(address,uint32)").map_err(|_| ContractError::DecodeError)?,
+        &Keccak256::hash(b"SetHandler(String,u32)").map_err(|_| ContractError::DecodeError)?,
     );
     let update_edge_sig = bytes4_encoder(
-        &Keccak256::hash(b"updateEdge(uint256,bytes32,uint256,bytes32)")
+        &Keccak256::hash(b"UpdateEdge(u64,[u8;32],u32,[u8;32])")
             .map_err(|_| ContractError::DecodeError)?,
     );
     let min_withdraw_limit_sig = bytes4_encoder(
-        &Keccak256::hash(b"configureMinimalWithdrawalLimit(uint256)")
+        &Keccak256::hash(b"ConfigureMinimalWithdrawalLimit(Uint128)")
             .map_err(|_| ContractError::DecodeError)?,
     );
     let max_deposit_limit_sig = bytes4_encoder(
-        &Keccak256::hash(b"configureMaximumDepositLimit(uint256)")
+        &Keccak256::hash(b"ConfigureMaximumDepositLimit(Uint128)")
             .map_err(|_| ContractError::DecodeError)?,
     );
 
-    match func_sig {
-        set_handler_sig => exec_set_handler(deps, anchor_addr, arguments),
-        set_verifier_sig => exec_set_verifier(deps, anchor_addr, arguments),
-        update_edge_sig => exec_update_edge(deps, anchor_addr, arguments),
-        min_withdraw_limit_sig => exec_configure_min_withdraw_limit(deps, anchor_addr, arguments),
-        max_deposit_limit_sig => exec_configure_max_deposit_limit(deps, anchor_addr, arguments),
-        _ => {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Invalid function signature".to_string(),
-            }));
-        }
+    if func_sig == set_handler_sig {
+        exec_set_handler(anchor_addr.to_string(), arguments)
+    } else if func_sig == update_edge_sig {
+        exec_update_edge(anchor_addr.to_string(), arguments)
+    } else if func_sig == min_withdraw_limit_sig {
+        exec_configure_min_withdraw_limit(anchor_addr.to_string(), arguments)
+    } else if func_sig == max_deposit_limit_sig {
+        exec_configure_max_deposit_limit(anchor_addr.to_string(), arguments)
+    } else {
+        Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid function signature".to_string(),
+        }))
     }
 }
 
-fn exec_set_handler(
-    deps: DepsMut,
-    anchor_addr: Addr,
-    arguments: &[u8],
-) -> Result<Response, ContractError> {
+fn exec_set_handler(anchor_addr: String, arguments: &[u8]) -> Result<Response, ContractError> {
     let nonce = u32::from_be_bytes(bytes4_encoder(&arguments[0..4]));
-    let new_handler = &arguments[4..24];
+    let handler: String = String::from_utf8_lossy(&arguments[4..24]).to_string();
 
     let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: anchor_addr.to_string(),
-        msg: to_binary(&LinkableAnchorExecMsg::SetHandler {
-            handler: new_handler,
-            nonce,
-        })
-        .unwrap(),
+        contract_addr: anchor_addr,
+        msg: to_binary(&LinkableAnchorExecMsg::SetHandler { handler, nonce }).unwrap(),
         funds: vec![],
     })];
+
     Ok(Response::new()
         .add_messages(msgs)
         .add_attributes(vec![attr("method", "set_handler")]))
 }
 
-fn exec_set_verifier(
-    deps: DepsMut,
-    anchor_addr: Addr,
-    arguments: &[u8],
-) -> Result<Response, ContractError> {
-    let nonce = u32::from_be_bytes(bytes4_encoder(&arguments[0..4]));
-    let new_verifier = &arguments[4..24];
-    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: anchor_addr.to_string(),
-        msg: to_binary(&LinkableAnchorExecMsg::SetVerifier {
-            verifier: new_verifier,
-            nonce,
-        })
-        .unwrap(),
-        funds: vec![],
-    })];
-    Ok(Response::new()
-        .add_messages(msgs)
-        .add_attributes(vec![attr("method", "set_verifier")]))
-}
-
-fn exec_update_edge(
-    deps: DepsMut,
-    anchor_addr: Addr,
-    arguments: &[u8],
-) -> Result<Response, ContractError> {
-    let src_chain_id = u64::from_be_bytes(&arguments[4..10]);
-    let leaf_id = u32::from_be_bytes(&arguments[10..14]);
+fn exec_update_edge(anchor_addr: String, arguments: &[u8]) -> Result<Response, ContractError> {
+    let src_chain_id = get_chain_id_type(&arguments[4..10]);
+    let leaf_id = u32::from_be_bytes(bytes4_encoder(&arguments[10..14]));
     let merkle_root = element_encoder(&arguments[14..46]);
     let target = element_encoder(&arguments[46..78]);
+
     let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: anchor_addr.to_string(),
+        contract_addr: anchor_addr,
         msg: to_binary(&LinkableAnchorExecMsg::UpdateEdge {
             src_chain_id,
             root: merkle_root,
@@ -263,15 +235,21 @@ fn exec_update_edge(
 }
 
 fn exec_configure_min_withdraw_limit(
-    deps: DepsMut,
-    anchor_addr: Addr,
+    anchor_addr: String,
     arguments: &[u8],
 ) -> Result<Response, ContractError> {
-    let min_withdraw_limit = &arguments[4..36];
+    let minimal_withdrawal_amount = Uint256::from_be_bytes(element_encoder(&arguments[4..36]))
+        .try_into()
+        .map_err(|_| {
+            ContractError::Std(StdError::GenericErr {
+                msg: "Cannot parse minimal_withdraw_amount".to_string(),
+            })
+        })?;
+
     let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: anchor_addr.to_string(),
+        contract_addr: anchor_addr,
         msg: to_binary(&LinkableAnchorExecMsg::ConfigureMinimalWithdrawalLimit {
-            minimal_withdrawal_amount: min_withdraw_limit,
+            minimal_withdrawal_amount,
         })
         .unwrap(),
         funds: vec![],
@@ -282,15 +260,21 @@ fn exec_configure_min_withdraw_limit(
 }
 
 fn exec_configure_max_deposit_limit(
-    deps: DepsMut,
-    anchor_addr: Addr,
+    anchor_addr: String,
     arguments: &[u8],
 ) -> Result<Response, ContractError> {
-    let max_deposit_limit = &arguments[4..36];
+    let maximum_deposit_amount = Uint256::from_be_bytes(element_encoder(&arguments[4..36]))
+        .try_into()
+        .map_err(|_| {
+            ContractError::Std(StdError::GenericErr {
+                msg: "Cannot parse maximum_deposit_amount".to_string(),
+            })
+        })?;
+
     let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: anchor_addr.to_string(),
+        contract_addr: anchor_addr,
         msg: to_binary(&LinkableAnchorExecMsg::ConfigureMaximumDepositLimit {
-            maximum_deposit_amount: max_deposit_limit,
+            maximum_deposit_amount,
         })
         .unwrap(),
         funds: vec![],
