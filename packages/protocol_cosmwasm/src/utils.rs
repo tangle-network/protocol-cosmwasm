@@ -7,6 +7,13 @@ pub fn element_encoder(v: &[u8]) -> [u8; 32] {
     output
 }
 
+// Slice the length of bytes array into 4 bytes
+pub fn bytes4_encoder(v: &[u8]) -> [u8; 4] {
+    let mut output = [0u8; 4];
+    output.iter_mut().zip(v).for_each(|(b1, b2)| *b1 = *b2);
+    output
+}
+
 // Computes the combination bytes of "chain_type" and "chain_id".
 // Combination rule: 8 bytes array(00 * 2 bytes + [chain_type] 2 bytes + [chain_id] 4 bytes)
 // Example:
