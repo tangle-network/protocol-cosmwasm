@@ -30,7 +30,6 @@ const CHAIN_ID: u64 = 1;
 const LEVELS: u32 = 30;
 const CW20_ADDRESS: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 const DEPOSIT_SIZE: u128 = 1_000_000;
-const DEPOSITOR: &str = "terra1c97dd05nyh08745fadcxz3l6ycmv0gsyf8t3jg";
 const HANDLER: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 
 #[test]

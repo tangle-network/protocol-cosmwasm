@@ -147,6 +147,9 @@ pub fn execute(
         // Withdraws the deposit & unwraps to valid token for `sender`
         ExecuteMsg::WithdrawAndUnwrap(msg) => withdraw_and_unwrap(deps, info, msg),
 
+        // Sets a new handler for the contract
+        ExecuteMsg::SetHandler { handler, nonce } => set_handler(deps, info, handler, nonce),
+
         // Add an edge to underlying tree
         ExecuteMsg::AddEdge {
             src_chain_id,
@@ -768,6 +771,41 @@ fn withdraw_and_unwrap(
     Ok(Response::new()
         .add_attributes(vec![attr("method", "withdraw_and_unwrap")])
         .add_messages(msgs))
+}
+
+/// Sets a new handler for the contract
+fn set_handler(
+    deps: DepsMut,
+    info: MessageInfo,
+    handler: String,
+    nonce: u32,
+) -> Result<Response, ContractError> {
+    let mut anchor = ANCHOR.load(deps.storage)?;
+    let curr_handler = anchor.handler;
+    let proposal_nonce = anchor.proposal_nonce;
+
+    // Validations
+    if info.sender != curr_handler {
+        return Err(ContractError::Unauthorized {});
+    }
+    if nonce <= proposal_nonce || proposal_nonce + 1048 < nonce {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid nonce".to_string(),
+        }));
+    }
+
+    // Save a new "handler"
+    let new_handler = deps.api.addr_validate(&handler)?;
+    anchor.handler = new_handler;
+    anchor.proposal_nonce = nonce;
+
+    ANCHOR.save(deps.storage, &anchor)?;
+
+    Ok(Response::new().add_attributes(vec![
+        attr("method", "set_handler"),
+        attr("handler", handler),
+        attr("nonce", nonce.to_string()),
+    ]))
 }
 
 /// Add an edge to underlying linkable tree

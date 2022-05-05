@@ -1,7 +1,7 @@
 use cosmwasm_std::StdError;
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
@@ -16,6 +16,8 @@ pub enum ContractError {
     InsufficientFunds {},
     // Add any other custom errors you like here.
     // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.
+
+    /* -------   mixer related error  ------- */
     /// Returned if the mixer is not initialized
     #[error("NotInitialized")]
     NotInitialized,
@@ -38,15 +40,33 @@ pub enum ContractError {
     // Returned if a mapping item is not found
     #[error("Mapping item not found")]
     ItemNotFound,
-    // TokenWrapper-related error
-    // For simplicity, it just converts all the cw20_base errors to Std error.
 
-    // Anchor-related error
+    /*  ------ Anchor errors ------ */
+    #[error("Invalid merkle roots")]
+    InvaidMerkleRoots,
+
+    #[error("Unknown root")]
+    UnknownRoot,
+
+    #[error("Invalid withdraw proof")]
+    InvalidWithdrawProof,
+
+    #[error("No anchor found")]
+    NoAnchorFound,
+
+    #[error("Invalid arbitrary data passed")]
+    InvalidArbitraryData,
+
+    #[error("Invalid nullifier that is already used")]
+    AlreadyRevealedNullfier,
+
     #[error("Edge already exists")]
     EdgeAlreadyExists,
 
     #[error("Too many edges")]
     TooManyEdges,
+    /*  ------ TokenWrapper errors ------ */
+    // For simplicity, it just converts all the cw20_base errors to Std error.
 }
 
 impl From<cw20_base::ContractError> for ContractError {

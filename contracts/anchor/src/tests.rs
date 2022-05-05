@@ -1,3 +1,5 @@
+use std::vec;
+
 use ark_bn254::Fr;
 use ark_ff::BigInteger;
 use ark_ff::PrimeField;
@@ -10,10 +12,12 @@ use cosmwasm_std::testing::MockApi;
 use cosmwasm_std::testing::MockStorage;
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::OwnedDeps;
+use cosmwasm_std::StdError;
 use cosmwasm_std::{attr, coins, to_binary, CosmosMsg, Uint128, WasmMsg};
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use protocol_cosmwasm::anchor::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, WithdrawMsg};
+use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::structs::COSMOS_CHAIN_TYPE;
 use protocol_cosmwasm::utils::{compute_chain_id_type, truncate_and_pad};
 
@@ -838,5 +842,52 @@ fn test_anchor_withdraw_and_unwrap_native() {
     assert_eq!(
         response.attributes,
         vec![attr("method", "withdraw_and_unwrap")]
+    );
+}
+
+#[test]
+fn test_anchor_set_handler() {
+    let new_handler: &str = "new-handler-address";
+    let nonce: u32 = 2u32;
+
+    let mut deps = create_anchor();
+
+    // Fails to "set handler" if tx sender is not current handler addr
+    let info = mock_info("anyone", &[]);
+    let set_handler_msg = ExecuteMsg::SetHandler {
+        handler: new_handler.to_string(),
+        nonce,
+    };
+    let err = execute(deps.as_mut(), mock_env(), info, set_handler_msg).unwrap_err();
+    assert_eq!(err, ContractError::Unauthorized {});
+
+    // Fails to "set handler" if "nonce" is too big or small
+    let info = mock_info(HANDLER, &[]);
+    let set_handler_msg = ExecuteMsg::SetHandler {
+        handler: new_handler.to_string(),
+        nonce: nonce + 2000,
+    };
+    let err = execute(deps.as_mut(), mock_env(), info, set_handler_msg).unwrap_err();
+    assert_eq!(
+        err,
+        ContractError::Std(StdError::GenericErr {
+            msg: "Invalid nonce".to_string()
+        })
+    );
+
+    // Succeed to "set handler"
+    let info = mock_info(HANDLER, &[]);
+    let set_handler_msg = ExecuteMsg::SetHandler {
+        handler: new_handler.to_string(),
+        nonce,
+    };
+    let res = execute(deps.as_mut(), mock_env(), info, set_handler_msg).unwrap();
+    assert_eq!(
+        res.attributes,
+        vec![
+            attr("method", "set_handler"),
+            attr("handler", new_handler),
+            attr("nonce", nonce.to_string()),
+        ]
     );
 }

@@ -41,6 +41,9 @@ pub enum ExecuteMsg {
     /// 2. WrapToken
     Receive(Cw20ReceiveMsg),
 
+    /// Sets a new handler for contract
+    SetHandler { handler: String, nonce: u32 },
+
     /// Add an edge to underlying tree
     AddEdge {
         src_chain_id: u64,
