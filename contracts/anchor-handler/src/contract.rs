@@ -5,8 +5,7 @@ use cosmwasm_std::{
     StdResult, WasmMsg,
 };
 use cw2::set_contract_version;
-use protocol_cosmwasm::keccak::Keccak256;
-use protocol_cosmwasm::utils::{bytes4_encoder, element_encoder};
+use protocol_cosmwasm::utils::element_encoder;
 
 use crate::state::{
     read_contract_addr, read_resource_id, read_update_record, read_whitelist, set_resource, State,
@@ -133,8 +132,7 @@ fn execute_proposal(
 ) -> Result<Response, ContractError> {
     // Parse the (proposal)`data`.
     let parsed_resource_id = element_encoder(&data[0..32]);
-    let parsed_proposal_sig = bytes4_encoder(&data[32..36]);
-    let base64_encoded_proposal = &data[36..];
+    let base64_encoded_proposal = &data[32..];
 
     let bridge_addr = STATE.load(deps.storage)?.bridge_addr;
 
@@ -151,14 +149,6 @@ fn execute_proposal(
     if !read_whitelist(deps.storage, anchor_addr.clone())? {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "provided tokenAddress is not whitelisted".to_string(),
-        }));
-    }
-    let proposal_sig = bytes4_encoder(
-        &Keccak256::hash(base64_encoded_proposal).map_err(|_| ContractError::DecodeError)?,
-    );
-    if parsed_proposal_sig != proposal_sig {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid proposal signature".to_string(),
         }));
     }
 
