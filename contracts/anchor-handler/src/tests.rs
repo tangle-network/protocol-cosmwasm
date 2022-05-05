@@ -2,10 +2,13 @@ use crate::contract::*;
 use cosmwasm_std::testing::{
     mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
 };
-use cosmwasm_std::{attr, from_binary, OwnedDeps};
+use cosmwasm_std::{attr, from_binary, to_binary, OwnedDeps};
 
 use protocol_cosmwasm::anchor_handler::{BridgeAddrResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use protocol_cosmwasm::error::ContractError;
+use protocol_cosmwasm::keccak::Keccak256;
+use protocol_cosmwasm::linkable_anchor::ExecuteMsg as LinkableAnchorExecMsg;
+use protocol_cosmwasm::utils::bytes4_encoder;
 
 const BRIDGE: &str = "bridge-contract";
 const RESOURCE_ID: [u8; 32] = [1u8; 32];
@@ -24,6 +27,18 @@ fn instantiate_anchor_handler() -> OwnedDeps<MockStorage, MockApi, MockQuerier> 
     let _ = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     deps
+}
+
+fn proposal_to_exec_data(resource_id: [u8; 32], proposal: LinkableAnchorExecMsg) -> Vec<u8> {
+    let base64_encoded_proposal = to_binary(&proposal).unwrap().0;
+
+    let proposal_sig = bytes4_encoder(&Keccak256::hash(&base64_encoded_proposal).unwrap());
+
+    let mut execution_data: Vec<u8> = vec![];
+    execution_data.extend_from_slice(&resource_id);
+    execution_data.extend_from_slice(&proposal_sig);
+    execution_data.extend_from_slice(&base64_encoded_proposal);
+    execution_data
 }
 
 #[test]
@@ -92,4 +107,34 @@ fn test_handler_migrate_bridge() {
     let res = query(deps.as_ref(), mock_env(), QueryMsg::GetBridgeAddress {}).unwrap();
     let bridge_addr_resp: BridgeAddrResponse = from_binary(&res).unwrap();
     assert_eq!(bridge_addr_resp.bridge_addr, new_bridge.to_string());
+}
+
+#[test]
+fn test_handler_execute_proposal() {
+    // Instantiate the "anchor_handler"
+    let mut deps = instantiate_anchor_handler();
+
+    // Set the "resource_id"
+    let info = mock_info(BRIDGE, &[]);
+    let set_resource_msg = ExecuteMsg::SetResource {
+        resource_id: RESOURCE_ID,
+        contract_addr: "anchor-contract".to_string(),
+    };
+    let _res = execute(deps.as_mut(), mock_env(), info, set_resource_msg).unwrap();
+
+    // Try to "execute_proposal"
+    let info = mock_info(BRIDGE, &[]);
+
+    let proposal = LinkableAnchorExecMsg::SetHandler {
+        handler: "new-handler".to_string(),
+        nonce: 20_u32,
+    };
+    let exec_data = proposal_to_exec_data(RESOURCE_ID, proposal);
+    let exec_proposal_msg = ExecuteMsg::ExecuteProposal {
+        resource_id: RESOURCE_ID,
+        data: exec_data,
+    };
+
+    let res = execute(deps.as_mut(), mock_env(), info, exec_proposal_msg).unwrap();
+    assert_eq!(res.messages.len(), 1);
 }
