@@ -41,7 +41,7 @@ fn integration_test_instantiate_anchor() {
         max_edges: MAX_EDGES,
         chain_id: CHAIN_ID,
         levels: LEVELS,
-        deposit_size: DEPOSIT_SIZE.to_string(),
+        deposit_size: Uint128::from(DEPOSIT_SIZE),
         tokenwrapper_addr: CW20_ADDRESS.to_string(),
         handler: HANDLER.to_string(),
     };
@@ -66,7 +66,7 @@ fn test_deposit_cw20() {
         max_edges: MAX_EDGES,
         chain_id: CHAIN_ID,
         levels: LEVELS,
-        deposit_size: DEPOSIT_SIZE.to_string(),
+        deposit_size: Uint128::from(DEPOSIT_SIZE),
         tokenwrapper_addr: CW20_ADDRESS.to_string(),
         handler: HANDLER.to_string(),
     };

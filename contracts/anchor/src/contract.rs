@@ -81,10 +81,7 @@ pub fn instantiate(
     let handler = deps.api.addr_validate(&msg.handler)?;
 
     // Initialize the Anchor
-    let deposit_size = match parse_string_to_uint128(msg.deposit_size) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
+    let deposit_size = msg.deposit_size;
     let anchor = Anchor {
         chain_id: msg.chain_id,
         linkable_tree: linkable_merkle_tree,
@@ -273,9 +270,8 @@ fn unwrap_into_token(
     deps: DepsMut,
     sender: String,
     token_addr: String,
-    amount: String,
+    amount: Uint128,
 ) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
     let anchor = ANCHOR.load(deps.storage)?;
 
     // Handle the "Unwrap"
@@ -305,14 +301,8 @@ pub fn withdraw(
 ) -> Result<Response, ContractError> {
     let recipient = msg.recipient;
     let relayer = msg.relayer;
-    let fee = match parse_string_to_uint128(msg.fee) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
-    let refund = match parse_string_to_uint128(msg.refund) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
+    let fee = msg.fee;
+    let refund = msg.refund;
     let sent_funds = info.funds;
     if !refund.is_zero() && (sent_funds.len() != 1 || sent_funds[0].amount != refund) {
         return Err(ContractError::InsufficientFunds {});
@@ -433,10 +423,9 @@ pub fn withdraw(
 fn wrap_native(
     deps: DepsMut,
     sender: String,
-    amount: String,
+    amount: Uint128,
     sent_funds: Vec<Coin>,
 ) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
     let anchor = ANCHOR.load(deps.storage)?;
 
     // Validations
@@ -471,8 +460,11 @@ fn wrap_native(
 }
 
 /// Unwrap the "TokenWrapper" token into "token"
-fn unwrap_native(deps: DepsMut, sender: String, amount: String) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
+fn unwrap_native(
+    deps: DepsMut,
+    sender: String,
+    amount: Uint128,
+) -> Result<Response, ContractError> {
     let anchor = ANCHOR.load(deps.storage)?;
 
     // Handle the "Unwrap"
@@ -499,7 +491,7 @@ fn wrap_and_deposit_native(
     sender: String,
     recipient: String,
     commitment: Option<[u8; 32]>,
-    amount: String,
+    amount: Uint128,
     sent_funds: Vec<Coin>,
 ) -> Result<Response, ContractError> {
     let anchor = ANCHOR.load(deps.storage)?;
@@ -515,7 +507,7 @@ fn wrap_and_deposit_native(
     let amt_to_wrap_query: GetAmountToWrapResponse = deps.querier.query_wasm_smart(
         tokenwrapper.to_string(),
         &TokenWrapperQueryMsg::GetAmountToWrap {
-            target_amount: amount,
+            target_amount: amount.to_string(),
         },
     )?;
     let amt_to_wrap = parse_string_to_uint128(amt_to_wrap_query.amount_to_wrap)?;
@@ -560,11 +552,10 @@ fn wrap_and_deposit_cw20(
     sender: String,
     recipient: String,
     commitment: Option<[u8; 32]>,
-    amount: String,
+    amount: Uint128,
     recv_token_addr: String,
     recv_token_amt: Uint128,
 ) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
     let anchor = ANCHOR.load(deps.storage)?;
     let tokenwrapper = anchor.tokenwrapper_addr.as_str();
 
@@ -620,14 +611,8 @@ fn withdraw_and_unwrap(
 ) -> Result<Response, ContractError> {
     let recipient = msg.recipient;
     let relayer = msg.relayer;
-    let fee = match parse_string_to_uint128(msg.fee) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
-    let refund = match parse_string_to_uint128(msg.refund) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
+    let fee = msg.fee;
+    let refund = msg.refund;
     let sent_funds = info.funds;
     if !refund.is_zero() && (sent_funds.len() != 1 || sent_funds[0].amount != refund) {
         return Err(ContractError::InsufficientFunds {});

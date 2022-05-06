@@ -46,7 +46,7 @@ fn create_anchor() -> OwnedDeps<MockStorage, MockApi, crate::mock_querier::WasmM
         max_edges: MAX_EDGES,
         chain_id: CHAIN_ID,
         levels: LEVELS,
-        deposit_size: DEPOSIT_SIZE.to_string(),
+        deposit_size: Uint128::from(DEPOSIT_SIZE),
         tokenwrapper_addr: CW20_ADDRESS.to_string(),
         handler: HANDLER.to_string(),
     };
@@ -66,7 +66,7 @@ fn test_anchor_proper_initialization() {
         max_edges: MAX_EDGES,
         chain_id: CHAIN_ID,
         levels: LEVELS,
-        deposit_size: DEPOSIT_SIZE.to_string(),
+        deposit_size: Uint128::from(DEPOSIT_SIZE),
         tokenwrapper_addr: CW20_ADDRESS.to_string(),
         handler: HANDLER.to_string(),
     };
@@ -172,8 +172,8 @@ fn test_anchor_fail_when_any_byte_is_changed_in_proof() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         commitment: commitment_element.0,
         cw20_address: Some(CW20_ADDRESS.to_string()),
     };
@@ -251,8 +251,8 @@ fn test_anchor_fail_when_invalid_merkle_roots() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         commitment: commitment_element.0,
         cw20_address: Some(CW20_ADDRESS.to_string()),
     };
@@ -327,8 +327,8 @@ fn test_anchor_works_with_wasm_utils() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         commitment: commitment_element.0,
         cw20_address: Some(CW20_ADDRESS.to_string()),
     };
@@ -414,8 +414,8 @@ fn test_anchor_works() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         commitment: commitment_element.0,
         cw20_address: Some(CW20_ADDRESS.to_string()),
     };
@@ -502,8 +502,8 @@ fn test_anchor_fail_when_relayer_is_diff_from_that_in_proof_generation() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: hex::encode(wrong_relayer_bytes.to_vec()),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         commitment: commitment_element.0,
         cw20_address: Some(CW20_ADDRESS.to_string()),
     };
@@ -578,8 +578,8 @@ fn test_anchor_fail_when_fee_submitted_is_changed() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: changed_fee_value.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(changed_fee_value),
+        refund: Uint128::from(REFUND),
         commitment: commitment_element.0,
         cw20_address: Some(CW20_ADDRESS.to_string()),
     };
@@ -624,13 +624,13 @@ fn test_anchor_wrap_token() {
 fn test_anchor_unwrap_into_token() {
     let mut deps = create_anchor();
 
-    let unwrap_amt = "100";
+    let unwrap_amt = Uint128::from(100_u128);
     let recv_token = "recv_token";
 
     let info = mock_info("anyone", &[]);
     let unwrap_into_token_msg = ExecuteMsg::UnwrapIntoToken {
         token_addr: recv_token.to_string(),
-        amount: unwrap_amt.to_string(),
+        amount: unwrap_amt,
     };
     let response = execute(deps.as_mut(), mock_env(), info, unwrap_into_token_msg).unwrap();
 
@@ -652,9 +652,7 @@ fn test_anchor_wrap_native() {
     let wrap_amt = Uint128::from(100_u128);
 
     let info = mock_info("anyone", &coins(wrap_amt.u128(), "uusd"));
-    let wrap_native_msg = ExecuteMsg::WrapNative {
-        amount: wrap_amt.to_string(),
-    };
+    let wrap_native_msg = ExecuteMsg::WrapNative { amount: wrap_amt };
     let response = execute(deps.as_mut(), mock_env(), info, wrap_native_msg).unwrap();
 
     assert_eq!(response.messages.len(), 1);
@@ -675,9 +673,7 @@ fn test_anchor_unwrap_native() {
     let unwrap_amt = Uint128::from(100_u128);
 
     let info = mock_info("anyone", &[]);
-    let unwrap_native_msg = ExecuteMsg::UnwrapNative {
-        amount: unwrap_amt.to_string(),
-    };
+    let unwrap_native_msg = ExecuteMsg::UnwrapNative { amount: unwrap_amt };
     let response = execute(deps.as_mut(), mock_env(), info, unwrap_native_msg).unwrap();
 
     assert_eq!(response.messages.len(), 1);
@@ -705,7 +701,7 @@ fn test_anchor_wrap_and_deposit_native() {
     let info = mock_info(DEPOSITOR, &coins(DEPOSIT_SIZE, "uusd"));
     let wrap_and_deposit_native_msg = ExecuteMsg::WrapAndDeposit {
         commitment: Some(commitment),
-        amount: DEPOSIT_SIZE.to_string(),
+        amount: Uint128::from(DEPOSIT_SIZE),
     };
     let res = execute(deps.as_mut(), mock_env(), info, wrap_and_deposit_native_msg).unwrap();
 
@@ -739,7 +735,7 @@ fn test_anchor_wrap_and_deposit_cw20() {
         amount: Uint128::from(DEPOSIT_SIZE),
         msg: to_binary(&Cw20HookMsg::WrapAndDeposit {
             commitment: Some(commitment),
-            amount: DEPOSIT_SIZE.to_string(),
+            amount: Uint128::from(DEPOSIT_SIZE),
         })
         .unwrap(),
     });
@@ -787,7 +783,7 @@ fn test_anchor_withdraw_and_unwrap_native() {
     let info = mock_info(DEPOSITOR, &coins(DEPOSIT_SIZE, "uusd"));
     let wrap_and_deposit_native_msg = ExecuteMsg::WrapAndDeposit {
         commitment: Some(leaf_element.0),
-        amount: DEPOSIT_SIZE.to_string(),
+        amount: Uint128::from(DEPOSIT_SIZE),
     };
     let res = execute(deps.as_mut(), mock_env(), info, wrap_and_deposit_native_msg).unwrap();
 
@@ -816,8 +812,8 @@ fn test_anchor_withdraw_and_unwrap_native() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         commitment: commitment_element.0,
         cw20_address: Some(any_cw20_address.to_string()),
     };

@@ -1,3 +1,4 @@
+use cosmwasm_std::Uint128;
 use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -7,7 +8,7 @@ pub struct InstantiateMsg {
     pub max_edges: u32,
     pub chain_id: u64,
     pub levels: u32,
-    pub deposit_size: String,
+    pub deposit_size: Uint128,
     pub tokenwrapper_addr: String,
     pub handler: String,
 }
@@ -20,17 +21,17 @@ pub enum ExecuteMsg {
 
     /// Unwraps the Anchor's TokenWrapper token for the `sender`
     /// into one of its wrappable tokens.
-    UnwrapIntoToken { token_addr: String, amount: String },
+    UnwrapIntoToken { token_addr: String, amount: Uint128 },
 
     /// Wraps the native token to "TokenWrapper" token
-    WrapNative { amount: String },
+    WrapNative { amount: Uint128 },
     /// Unwraps the "TokenWrapper" token to native token
-    UnwrapNative { amount: String },
+    UnwrapNative { amount: Uint128 },
 
     /// Wraps the native token & deposit it into the contract
     WrapAndDeposit {
         commitment: Option<[u8; 32]>,
-        amount: String,
+        amount: Uint128,
     },
 
     /// Withdraws the deposit & unwraps into valid token for `sender`
@@ -67,7 +68,7 @@ pub enum Cw20HookMsg {
     /// & deposit it into the contract.
     WrapAndDeposit {
         commitment: Option<[u8; 32]>,
-        amount: String,
+        amount: Uint128,
     },
 }
 
@@ -78,8 +79,8 @@ pub struct WithdrawMsg {
     pub nullifier_hash: [u8; 32],
     pub recipient: String,
     pub relayer: String,
-    pub fee: String,
-    pub refund: String,
+    pub fee: Uint128,
+    pub refund: Uint128,
     pub commitment: [u8; 32],
     pub cw20_address: Option<String>,
 }
