@@ -16,6 +16,8 @@ pub enum ContractError {
     InsufficientFunds {},
     // Add any other custom errors you like here.
     // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.
+    #[error("Invalid Cw20 Hook message")]
+    InvalidCw20HookMsg,
 
     /* -------   mixer related error  ------- */
     /// Returned if the mixer is not initialized
@@ -65,8 +67,14 @@ pub enum ContractError {
 
     #[error("Too many edges")]
     TooManyEdges,
+
+    #[error("Invalid nonce")]
+    InvalidNonce,
+
     /*  ------ TokenWrapper errors ------ */
     // For simplicity, it just converts all the cw20_base errors to Std error.
+    #[error("Invalid CW20 token address")]
+    InvalidCw20Token,
 }
 
 impl From<cw20_base::ContractError> for ContractError {

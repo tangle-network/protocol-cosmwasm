@@ -12,7 +12,6 @@ use cosmwasm_std::testing::MockApi;
 use cosmwasm_std::testing::MockStorage;
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::OwnedDeps;
-use cosmwasm_std::StdError;
 use cosmwasm_std::{attr, coins, to_binary, CosmosMsg, Uint128, WasmMsg};
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
@@ -265,10 +264,7 @@ fn test_anchor_fail_when_invalid_merkle_roots() {
         ExecuteMsg::Withdraw(withdraw_msg),
     )
     .unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "Generic error: Root is not known".to_string()
-    );
+    assert_eq!(err, ContractError::UnknownRoot);
 }
 
 #[test]
@@ -519,10 +515,7 @@ fn test_anchor_fail_when_relayer_is_diff_from_that_in_proof_generation() {
         ExecuteMsg::Withdraw(withdraw_msg),
     )
     .unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "Generic error: Invalid withdraw proof".to_string()
-    );
+    assert_eq!(err, ContractError::InvalidWithdrawProof);
 }
 
 #[test]
@@ -598,10 +591,7 @@ fn test_anchor_fail_when_fee_submitted_is_changed() {
         ExecuteMsg::Withdraw(withdraw_msg),
     )
     .unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "Generic error: Invalid withdraw proof".to_string()
-    );
+    assert_eq!(err, ContractError::InvalidWithdrawProof);
 }
 
 #[test]
@@ -868,12 +858,7 @@ fn test_anchor_set_handler() {
         nonce: nonce + 2000,
     };
     let err = execute(deps.as_mut(), mock_env(), info, set_handler_msg).unwrap_err();
-    assert_eq!(
-        err,
-        ContractError::Std(StdError::GenericErr {
-            msg: "Invalid nonce".to_string()
-        })
-    );
+    assert_eq!(err, ContractError::InvalidNonce);
 
     // Succeed to "set handler"
     let info = mock_info(HANDLER, &[]);

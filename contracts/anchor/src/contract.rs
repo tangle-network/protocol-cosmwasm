@@ -190,9 +190,7 @@ pub fn receive_cw20(
             recv_token_addr,
             recv_token_amt,
         ),
-        Err(_) => Err(ContractError::Std(StdError::generic_err(
-            "invalid cw20 hook msg",
-        ))),
+        Err(_) => Err(ContractError::InvalidCw20HookMsg {}),
     }
 }
 
@@ -317,9 +315,7 @@ pub fn withdraw(
     };
     let sent_funds = info.funds;
     if !refund.is_zero() && (sent_funds.len() != 1 || sent_funds[0].amount != refund) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Sent insufficent refund".to_string(),
-        }));
+        return Err(ContractError::InsufficientFunds {});
     }
 
     let anchor = ANCHOR.load(deps.storage)?;
@@ -327,24 +323,18 @@ pub fn withdraw(
     // Validation 1. Check if the root is known to merkle tree.
     let merkle_tree = anchor.merkle_tree;
     if !merkle_tree.is_known_root(msg.roots[0], deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Root is not known".to_string(),
-        }));
+        return Err(ContractError::UnknownRoot {});
     }
 
     // Validation 2. Check if the roots are valid in linkable tree.
     let linkable_tree = anchor.linkable_tree;
     if !linkable_tree.is_valid_neighbor_roots(&msg.roots[1..], deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Neighbor roots are not valid".to_string(),
-        }));
+        return Err(ContractError::InvaidMerkleRoots {});
     }
 
     // Validation 3. Check if the nullifier already used.
     if is_known_nullifier(deps.storage, msg.nullifier_hash) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Nullifier is known".to_string(),
-        }));
+        return Err(ContractError::AlreadyRevealedNullfier {});
     }
 
     // Format the public input bytes
@@ -376,9 +366,7 @@ pub fn withdraw(
     let result = verify(verifier, bytes, msg.proof_bytes)?;
 
     if !result {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid withdraw proof".to_string(),
-        }));
+        return Err(ContractError::InvalidWithdrawProof {});
     }
 
     // Set used nullifier to true after successful verification
@@ -389,9 +377,7 @@ pub fn withdraw(
         .cw20_address
         .expect("Token address should be given for the withdrawal");
     if anchor.tokenwrapper_addr != deps.api.addr_validate(cw20_address.as_str())? {
-        return Err(ContractError::Std(StdError::generic_err(
-            "Invalid cw20 address",
-        )));
+        return Err(ContractError::InvalidCw20Token);
     }
 
     // Send the funds
@@ -644,9 +630,7 @@ fn withdraw_and_unwrap(
     };
     let sent_funds = info.funds;
     if !refund.is_zero() && (sent_funds.len() != 1 || sent_funds[0].amount != refund) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Sent insufficent refund".to_string(),
-        }));
+        return Err(ContractError::InsufficientFunds {});
     }
 
     let anchor = ANCHOR.load(deps.storage)?;
@@ -654,9 +638,7 @@ fn withdraw_and_unwrap(
     // Validation 1. Check if the root is known to merkle tree.
     let merkle_tree = anchor.merkle_tree;
     if !merkle_tree.is_known_root(msg.roots[0], deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Root is not known".to_string(),
-        }));
+        return Err(ContractError::UnknownRoot {});
     }
 
     // Validation 2. Check if the roots are valid in linkable tree.
@@ -669,9 +651,7 @@ fn withdraw_and_unwrap(
 
     // Validation 3. Check if the nullifier already used.
     if is_known_nullifier(deps.storage, msg.nullifier_hash) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Nullifier is known".to_string(),
-        }));
+        return Err(ContractError::AlreadyRevealedNullfier {});
     }
 
     //
@@ -710,9 +690,7 @@ fn withdraw_and_unwrap(
     let result = verify(verifier, bytes, msg.proof_bytes)?;
 
     if !result {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid withdraw proof".to_string(),
-        }));
+        return Err(ContractError::InvalidWithdrawProof {});
     }
 
     // Set used nullifier to true after successful verification
@@ -788,9 +766,7 @@ fn set_handler(
         return Err(ContractError::Unauthorized {});
     }
     if nonce <= proposal_nonce || proposal_nonce + 1048 < nonce {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid nonce".to_string(),
-        }));
+        return Err(ContractError::InvalidNonce);
     }
 
     // Save a new "handler"
@@ -861,7 +837,7 @@ fn update_edge(
         target,
     };
     save_edge(deps.storage, src_chain_id, edge)?;
-    
+
     // Update associated states
     let neighbor_root_idx =
         (read_curr_neighbor_root_index(deps.storage, src_chain_id)? + 1) % HISTORY_LENGTH;
