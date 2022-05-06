@@ -15,7 +15,7 @@ use codec::Encode;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use protocol_cosmwasm::anchor::{
     ConfigResponse, Cw20HookMsg, EdgeInfoResponse, ExecuteMsg, InstantiateMsg,
-    MerkleRootInfoResponse, MerkleTreeInfoResponse, NeighborRootInfoResponse, QueryMsg,
+    MerkleRootInfoResponse, MerkleTreeInfoResponse, MigrateMsg, NeighborRootInfoResponse, QueryMsg,
     WithdrawMsg,
 };
 use protocol_cosmwasm::anchor_verifier::AnchorVerifier;
@@ -931,4 +931,9 @@ pub fn validate_and_store_commitment(
     )?;
 
     Ok(res)
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    Ok(Response::default())
 }

@@ -128,3 +128,6 @@ pub struct MerkleTreeInfoResponse {
 pub struct MerkleRootInfoResponse {
     pub root: [u8; 32],
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrateMsg {}
