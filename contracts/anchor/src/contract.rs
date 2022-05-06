@@ -849,6 +849,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn get_config(deps: Deps) -> StdResult<ConfigResponse> {
     let anchor = ANCHOR.load(deps.storage)?;
     Ok(ConfigResponse {
+        handler: anchor.handler.to_string(),
+        proposal_nonce: anchor.proposal_nonce,
         chain_id: anchor.chain_id,
         tokenwrapper_addr: anchor.tokenwrapper_addr.to_string(),
         deposit_size: anchor.deposit_size.to_string(),

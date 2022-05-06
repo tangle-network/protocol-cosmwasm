@@ -97,6 +97,8 @@ pub enum QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
+    pub handler: String,
+    pub proposal_nonce: u32,
     pub tokenwrapper_addr: String,
     pub chain_id: u64,
     pub deposit_size: String,
