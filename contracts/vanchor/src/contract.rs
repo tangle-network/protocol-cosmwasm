@@ -181,6 +181,9 @@ pub fn execute(
             token_addr,
         } => transact_withdraw_unwrap(deps, proof_data, ext_data, token_addr),
 
+        // Sets a new handler for the contract
+        ExecuteMsg::SetHandler { handler, nonce } => set_handler(deps, info, handler, nonce),
+
         ExecuteMsg::AddEdge {
             src_chain_id,
             root,
@@ -1000,6 +1003,41 @@ fn update_edge(
     save_edge(deps.storage, src_chain_id, edge)?;
 
     Ok(Response::new().add_attributes(vec![attr("method", "udpate_edge")]))
+}
+
+/// Sets a new handler for the contract
+fn set_handler(
+    deps: DepsMut,
+    info: MessageInfo,
+    handler: String,
+    nonce: u32,
+) -> Result<Response, ContractError> {
+    let mut vanchor = VANCHOR.load(deps.storage)?;
+    let curr_handler = vanchor.handler;
+    let proposal_nonce = vanchor.proposal_nonce;
+
+    // Validations
+    if info.sender != curr_handler {
+        return Err(ContractError::Unauthorized {});
+    }
+    if nonce <= proposal_nonce || proposal_nonce + 1048 < nonce {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "Invalid nonce".to_string(),
+        }));
+    }
+
+    // Save a new "handler"
+    let new_handler = deps.api.addr_validate(&handler)?;
+    vanchor.handler = new_handler;
+    vanchor.proposal_nonce = nonce;
+
+    VANCHOR.save(deps.storage, &vanchor)?;
+
+    Ok(Response::new().add_attributes(vec![
+        attr("method", "set_handler"),
+        attr("handler", handler),
+        attr("nonce", nonce.to_string()),
+    ]))
 }
 
 // Check if the "nullifier" is already used or not.

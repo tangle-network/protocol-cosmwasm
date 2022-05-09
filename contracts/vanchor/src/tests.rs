@@ -3,8 +3,10 @@ use ark_ff::PrimeField;
 use arkworks_setups::Curve;
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MockApi, MockStorage};
 use cosmwasm_std::OwnedDeps;
+use cosmwasm_std::StdError;
 use cosmwasm_std::{attr, coins, to_binary, Uint128};
 use cw20::Cw20ReceiveMsg;
+use protocol_cosmwasm::error::ContractError;
 use sp_core::hashing::keccak_256;
 
 use crate::contract::{execute, instantiate};
@@ -1598,6 +1600,53 @@ fn test_vanchor_withdraw_and_unwrap_native() {
         vec![
             attr("method", "transact_withdraw_unwrap"),
             attr("ext_amt", "-5"),
+        ]
+    );
+}
+
+#[test]
+fn test_vanchor_set_handler() {
+    let new_handler: &str = "new-handler-address";
+    let nonce: u32 = 2u32;
+
+    let mut deps = create_vanchor();
+
+    // Fails to "set handler" if tx sender is not current handler addr
+    let info = mock_info("anyone", &[]);
+    let set_handler_msg = ExecuteMsg::SetHandler {
+        handler: new_handler.to_string(),
+        nonce,
+    };
+    let err = execute(deps.as_mut(), mock_env(), info, set_handler_msg).unwrap_err();
+    assert_eq!(err, ContractError::Unauthorized {});
+
+    // Fails to "set handler" if "nonce" is too big or small
+    let info = mock_info(HANDLER, &[]);
+    let set_handler_msg = ExecuteMsg::SetHandler {
+        handler: new_handler.to_string(),
+        nonce: nonce + 2000,
+    };
+    let err = execute(deps.as_mut(), mock_env(), info, set_handler_msg).unwrap_err();
+    assert_eq!(
+        err,
+        ContractError::Std(StdError::GenericErr {
+            msg: "Invalid nonce".to_string()
+        })
+    );
+
+    // Succeed to "set handler"
+    let info = mock_info(HANDLER, &[]);
+    let set_handler_msg = ExecuteMsg::SetHandler {
+        handler: new_handler.to_string(),
+        nonce,
+    };
+    let res = execute(deps.as_mut(), mock_env(), info, set_handler_msg).unwrap();
+    assert_eq!(
+        res.attributes,
+        vec![
+            attr("method", "set_handler"),
+            attr("handler", new_handler),
+            attr("nonce", nonce.to_string()),
         ]
     );
 }

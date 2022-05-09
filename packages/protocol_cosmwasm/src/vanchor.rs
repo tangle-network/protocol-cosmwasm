@@ -85,6 +85,9 @@ pub enum ExecuteMsg {
         latest_leaf_index: u32,
         target: [u8; 32],
     },
+
+    /// Sets a new handler for the contract
+    SetHandler { handler: String, nonce: u32 },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
