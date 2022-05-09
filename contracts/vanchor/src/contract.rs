@@ -25,8 +25,8 @@ use protocol_cosmwasm::zeroes::zeroes;
 
 use crate::state::{
     read_curr_neighbor_root_index, save_curr_neighbor_root_index, save_edge, save_neighbor_roots,
-    save_root, save_subtree, LinkableMerkleTree, MerkleTree, VAnchor, NULLIFIERS, POSEIDON,
-    VANCHOR, VERIFIER_16_2, VERIFIER_2_2,
+    save_root, save_subtree, LinkableMerkleTree, MerkleTree, VAnchor, HASHER, NULLIFIERS, VANCHOR,
+    VERIFIER_16_2, VERIFIER_2_2,
 };
 
 // version info for migration info
@@ -53,7 +53,7 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     // Initialize the poseidon hasher
-    POSEIDON.save(deps.storage, &Poseidon::new())?;
+    HASHER.save(deps.storage, &Poseidon::new())?;
 
     // Initialize the vanchor verifiers
     let verifier_2_2 = match VAnchorVerifier::new(msg.max_edges, NUM_INS_2, NUM_OUTS_2) {
@@ -94,6 +94,8 @@ pub fn instantiate(
         linkable_tree: linkable_merkle_tree,
         merkle_tree,
         tokenwrapper_addr,
+        handler: deps.api.addr_validate(&msg.handler)?,
+        proposal_nonce: 0_u32,
     };
     VANCHOR.save(deps.storage, &anchor)?;
 
@@ -749,7 +751,7 @@ fn execute_insertions(deps: DepsMut, proof_data: ProofData) -> Result<(), Contra
     // Insert output commitments into the tree
     let mut merkle_tree = vanchor.merkle_tree;
     for comm in &proof_data.output_commitments {
-        let poseidon: Poseidon = POSEIDON.load(deps.storage)?;
+        let poseidon: Poseidon = HASHER.load(deps.storage)?;
         merkle_tree.insert(poseidon, *comm, deps.storage)?;
     }
 
@@ -765,6 +767,8 @@ fn execute_insertions(deps: DepsMut, proof_data: ProofData) -> Result<(), Contra
             min_withdraw_amt: vanchor.min_withdraw_amt,
             max_fee: vanchor.max_fee,
             max_ext_amt: vanchor.max_ext_amt,
+            handler: vanchor.handler,
+            proposal_nonce: vanchor.proposal_nonce,
         },
     )?;
     Ok(())

@@ -28,6 +28,7 @@ const CW20_ADDRESS: &str = "terra1340t6lqq6jxhm8d6gtz0hzz5jzcszvm27urkn2";
 const TRANSACTOR: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
 const RECIPIENT: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
 const RELAYER: &str = "terra1jrj2vh6cstqwk3pg8nkmdf0r9z0n3q3f3jk5xn";
+const HANDLER: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 
 fn element_encoder(v: &[u8]) -> [u8; 32] {
     let mut output = [0u8; 32];
@@ -47,6 +48,7 @@ fn create_vanchor() -> OwnedDeps<MockStorage, MockApi, crate::mock_querier::Wasm
         max_ext_amt: Uint128::from(MAX_EXT_AMT),
         max_fee: Uint128::from(MAX_FEE),
         tokenwrapper_addr: CW20_ADDRESS.to_string(),
+        handler: HANDLER.to_string(),
     };
     let info = mock_info("creator", &[]);
 
@@ -85,6 +87,7 @@ fn test_vanchor_proper_initialization() {
         max_ext_amt: Uint128::from(MAX_EXT_AMT),
         max_fee: Uint128::from(MAX_FEE),
         tokenwrapper_addr: CW20_ADDRESS.to_string(),
+        handler: HANDLER.to_string(),
     };
     let info = mock_info("creator", &[]);
 

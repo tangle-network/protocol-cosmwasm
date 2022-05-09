@@ -13,6 +13,7 @@ pub struct InstantiateMsg {
     pub min_withdraw_amt: Uint128,
     pub max_ext_amt: Uint128,
     pub max_fee: Uint128,
+    pub handler: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
