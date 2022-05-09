@@ -70,14 +70,6 @@ pub enum ExecuteMsg {
         ext_data: ExtData,
     },
 
-    /// Add an edge to underlying tree
-    AddEdge {
-        src_chain_id: u64,
-        root: [u8; 32],
-        latest_leaf_index: u32,
-        target: [u8; 32],
-    },
-
     /// Update an edge for underlying tree
     UpdateEdge {
         src_chain_id: u64,

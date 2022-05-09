@@ -184,18 +184,20 @@ pub fn execute(
         // Sets a new handler for the contract
         ExecuteMsg::SetHandler { handler, nonce } => set_handler(deps, info, handler, nonce),
 
-        ExecuteMsg::AddEdge {
-            src_chain_id,
-            root,
-            latest_leaf_index,
-            target,
-        } => add_edge(deps, info, src_chain_id, root, latest_leaf_index, target),
+        // Add/Update an Edge for the underlying tree
         ExecuteMsg::UpdateEdge {
             src_chain_id,
             root,
             latest_leaf_index,
             target,
-        } => update_edge(deps, info, src_chain_id, root, latest_leaf_index, target),
+        } => {
+            let linkable_tree = VANCHOR.load(deps.storage)?.linkable_tree;
+            if linkable_tree.has_edge(src_chain_id, deps.storage) {
+                update_edge(deps, src_chain_id, root, latest_leaf_index, target)
+            } else {
+                add_edge(deps, src_chain_id, root, latest_leaf_index, target)
+            }
+        }
     }
 }
 
@@ -917,24 +919,13 @@ fn unwrap_into_token(
 /// Add an edge to underlying linkable tree
 fn add_edge(
     deps: DepsMut,
-    info: MessageInfo,
     src_chain_id: u64,
     root: [u8; 32],
     latest_leaf_index: u32,
     target: [u8; 32],
 ) -> Result<Response, ContractError> {
-    // Validation 1. Check if any funds are sent with this message.
-    if !info.funds.is_empty() {
-        return Err(ContractError::UnnecessaryFunds {});
-    }
-
     let vanchor = VANCHOR.load(deps.storage)?;
     let linkable_tree = vanchor.linkable_tree;
-    if linkable_tree.has_edge(src_chain_id, deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Edge already exists".to_string(),
-        }));
-    }
 
     let curr_length = linkable_tree.get_latest_neighbor_edges(deps.storage).len();
     if curr_length > linkable_tree.max_edges as usize {
@@ -970,25 +961,11 @@ fn add_edge(
 /// Update an edge for underlying linkable tree
 fn update_edge(
     deps: DepsMut,
-    info: MessageInfo,
     src_chain_id: u64,
     root: [u8; 32],
     latest_leaf_index: u32,
     target: [u8; 32],
 ) -> Result<Response, ContractError> {
-    // Validation 1. Check if any funds are sent with this message.
-    if !info.funds.is_empty() {
-        return Err(ContractError::UnnecessaryFunds {});
-    }
-
-    let vanchor = VANCHOR.load(deps.storage)?;
-    let linkable_tree = vanchor.linkable_tree;
-    if !linkable_tree.has_edge(src_chain_id, deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Edge does not exist".to_string(),
-        }));
-    }
-
     let edge: Edge = Edge {
         src_chain_id,
         root,
