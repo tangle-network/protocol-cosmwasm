@@ -6,11 +6,11 @@ use cw_storage_plus::{Item, Map};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UpdateRecord {
-    pub token_addr: Addr,
-    pub src_chain_id: u64,
+    pub tokenwrapper_addr: Addr,
+    pub exec_chain_id: u64,
+    pub nonce: u64,
     pub resource_id: [u8; 32],
-    pub merkle_root: [u8; 32],
-    pub leaf_id: u64,
+    pub update_value: [u8; 32],
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -53,9 +53,9 @@ pub fn read_whitelist(store: &dyn Storage, contract_addr: Addr) -> StdResult<boo
 }
 /* --------------------------- */
 
-/* ---------- Anchor-Handler specific DS ----------  */
-// sourceChainID => height => Update Record
-// (src_chain_id, height) -> UpdateRecord
+/* ---------- TokenWrapper-Handler specific DS ----------  */
+// sourceChainID => nonce => Update Record
+// (src_chain_id, nonce) -> UpdateRecord
 pub const UPDATE_RECORDS: Map<(String, String), UpdateRecord> = Map::new("update_records");
 
 // source chain ID => number of updates
@@ -64,8 +64,8 @@ pub const COUNTS: Map<u64, u64> = Map::new("counts");
 pub fn read_update_record(
     store: &dyn Storage,
     src_chain_id: u64,
-    height: u64,
+    nonce: u64,
 ) -> StdResult<UpdateRecord> {
-    UPDATE_RECORDS.load(store, (src_chain_id.to_string(), height.to_string()))
+    UPDATE_RECORDS.load(store, (src_chain_id.to_string(), nonce.to_string()))
 }
 /* ------------------------------------------------- */
