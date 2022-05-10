@@ -23,11 +23,6 @@ use protocol_cosmwasm::tokenwrapper_handler::{
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-tokenwrapper-handler";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-// ChainType info
-pub const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
-
-pub const MOCK_CHAIN_ID: u64 = 1;
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -63,6 +58,8 @@ pub fn instantiate(
     Ok(Response::new().add_attributes(vec![attr("method", "instantiate")]))
 }
 
+// Entry for handling various execution (function) messages
+// Handles the `SetResource`, `MigrateBridge` & `ExecuteProposal` messages
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
@@ -76,6 +73,7 @@ pub fn execute(
             resource_id,
             contract_addr,
         } => exec_set_resource(deps, info, resource_id, contract_addr),
+
         ExecuteMsg::MigrateBridge { new_bridge } => migrate_bridge(deps, info, new_bridge),
 
         /* ---  Tokenwrapper-handler specific execution entries --- */
