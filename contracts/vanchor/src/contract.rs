@@ -268,9 +268,7 @@ fn receive_cw20(
         }) => {
             transact_deposit_wrap_cw20(deps, proof_data, ext_data, recv_token_addr, recv_token_amt)
         }
-        Err(_) => Err(ContractError::Std(StdError::generic_err(
-            "invalid cw20 hook msg",
-        ))),
+        Err(_) => Err(ContractError::InvalidCw20HookMsg),
     }
 }
 
@@ -299,19 +297,13 @@ fn transact_deposit(
 
     let is_withdraw = ext_amt.is_negative();
     if is_withdraw {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid execute entry".to_string(),
-        }));
+        return Err(ContractError::InvalidExecutionEntry);
     } else {
         if Uint128::from(abs_ext_amt) > vanchor.max_deposit_amt {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Invalid deposit amount".to_string(),
-            }));
+            return Err(ContractError::InvalidDepositAmount);
         };
         if abs_ext_amt != recv_token_amt.u128() {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Did not send enough tokens".to_string(),
-            }));
+            return Err(ContractError::InsufficientFunds {});
         };
         // No need to call "transfer from transactor to this contract"
         // since this message is the result of sending.
@@ -372,19 +364,13 @@ fn transact_deposit_wrap_native(
 
     let is_withdraw = ext_amt.is_negative();
     if is_withdraw {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid execute entry".to_string(),
-        }));
+        return Err(ContractError::InvalidExecutionEntry);
     } else {
         if Uint128::from(abs_ext_amt) > vanchor.max_deposit_amt {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Invalid deposit amount".to_string(),
-            }));
+            return Err(ContractError::InvalidDepositAmount);
         };
         if abs_ext_amt != recv_token_amt.u128() {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Did not send enough tokens".to_string(),
-            }));
+            return Err(ContractError::InsufficientFunds {});
         };
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: vanchor.tokenwrapper_addr.to_string(),
@@ -443,19 +429,13 @@ fn transact_deposit_wrap_cw20(
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     if ext_amt.is_negative() {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid execute entry".to_string(),
-        }));
+        return Err(ContractError::InvalidExecutionEntry);
     } else {
         if Uint128::from(abs_ext_amt) > vanchor.max_deposit_amt {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Invalid deposit amount".to_string(),
-            }));
+            return Err(ContractError::InvalidDepositAmount);
         };
         if abs_ext_amt != recv_token_amt.u128() {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Did not send enough tokens".to_string(),
-            }));
+            return Err(ContractError::InsufficientFunds {});
         };
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: recv_token_addr,
@@ -510,14 +490,10 @@ fn transact_withdraw(
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     if ext_amt.is_positive() {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid execute entry".to_string(),
-        }));
+        return Err(ContractError::InvalidExecutionEntry);
     } else {
         if Uint128::from(abs_ext_amt) < vanchor.min_withdraw_amt {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Invalid withdraw amount".to_string(),
-            }));
+            return Err(ContractError::InvalidWithdrawAmount);
         }
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: vanchor.tokenwrapper_addr.to_string(),
@@ -570,14 +546,10 @@ fn transact_withdraw_unwrap(
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     if ext_amt.is_positive() {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid execute entry".to_string(),
-        }));
+        return Err(ContractError::InvalidExecutionEntry);
     } else {
         if Uint128::from(abs_ext_amt) < vanchor.min_withdraw_amt {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Invalid withdraw amount".to_string(),
-            }));
+            return Err(ContractError::InvalidWithdrawAmount);
         }
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: vanchor.tokenwrapper_addr.to_string(),
@@ -636,25 +608,19 @@ fn validate_proof(
         .merkle_tree
         .is_known_root(proof_data.roots[0], deps.storage)
     {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Root is not known".to_string(),
-        }));
+        return Err(ContractError::UnknownRoot);
     }
 
     // Validation 3. Check if the roots are valid in linkable tree.
     let linkable_tree = vanchor.linkable_tree;
     if !linkable_tree.is_valid_neighbor_roots(&proof_data.roots[1..], deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Neighbor roots are not valid".to_string(),
-        }));
+        return Err(ContractError::InvaidMerkleRoots);
     }
 
     // Check nullifier and add or return `InvalidNullifier`
     for nullifier in &proof_data.input_nullifiers {
         if is_known_nullifier(deps.storage, *nullifier) {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Nullifier is known".to_string(),
-            }));
+            return Err(ContractError::AlreadyRevealedNullfier);
         }
     }
 
@@ -675,23 +641,17 @@ fn validate_proof(
     let computed_ext_data_hash =
         Keccak256::hash(&ext_data_args).map_err(|_| ContractError::HashError)?;
     if computed_ext_data_hash != proof_data.ext_data_hash {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid ext data".to_string(),
-        }));
+        return Err(ContractError::InvalidExtData);
     }
 
     let abs_ext_amt = ext_amt.unsigned_abs();
     // Making sure that public amount and fee are correct
     if Uint128::from(ext_data_fee) > vanchor.max_fee {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid fee amount".to_string(),
-        }));
+        return Err(ContractError::InvalidFeeAmount);
     }
 
     if Uint128::from(abs_ext_amt) > vanchor.max_ext_amt {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid ext amount".to_string(),
-        }));
+        return Err(ContractError::InvalidExtAmount);
     }
 
     // Public amounnt can also be negative, in which
@@ -701,9 +661,7 @@ fn validate_proof(
     let calc_public_amt_bytes =
         element_encoder(&ArkworksIntoFieldBn254::into_field(calc_public_amt));
     if calc_public_amt_bytes != proof_data.public_amount {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid public amount".to_string(),
-        }));
+        return Err(ContractError::InvalidPublicAmount);
     }
 
     // Construct public inputs
@@ -737,9 +695,7 @@ fn validate_proof(
     };
 
     if !result {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid transaction proof".to_string(),
-        }));
+        return Err(ContractError::InvalidTxProof);
     }
 
     // Flag nullifiers as used
@@ -929,9 +885,7 @@ fn add_edge(
 
     let curr_length = linkable_tree.get_latest_neighbor_edges(deps.storage).len();
     if curr_length > linkable_tree.max_edges as usize {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Too many edges".to_string(),
-        }));
+        return Err(ContractError::TooManyEdges);
     }
 
     // craft edge
@@ -998,9 +952,7 @@ fn set_handler(
         return Err(ContractError::Unauthorized {});
     }
     if nonce <= proposal_nonce || proposal_nonce + 1048 < nonce {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid nonce".to_string(),
-        }));
+        return Err(ContractError::InvalidNonce);
     }
 
     // Save a new "handler"

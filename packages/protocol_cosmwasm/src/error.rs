@@ -71,6 +71,31 @@ pub enum ContractError {
     #[error("Invalid nonce")]
     InvalidNonce,
 
+    /*  ------ VAnchor errors ------ */
+    #[error("Invalid execution entry")]
+    InvalidExecutionEntry,
+
+    #[error("Invalid deposit amount")]
+    InvalidDepositAmount,
+
+    #[error("Invalid withdraw amount")]
+    InvalidWithdrawAmount,
+
+    #[error("Invalid ext data")]
+    InvalidExtData,
+
+    #[error("Invalid fee amount")]
+    InvalidFeeAmount,
+
+    #[error("Invalid ext amount")]
+    InvalidExtAmount,
+
+    #[error("Invalid public amount")]
+    InvalidPublicAmount,
+
+    #[error("Invalid transaction proof")]
+    InvalidTxProof,
+
     /*  ------ TokenWrapper errors ------ */
     // For simplicity, it just converts all the cw20_base errors to Std error.
     #[error("Invalid CW20 token address")]

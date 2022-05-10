@@ -2,9 +2,7 @@ use ark_ff::BigInteger;
 use ark_ff::PrimeField;
 use arkworks_setups::Curve;
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MockApi, MockStorage};
-use cosmwasm_std::OwnedDeps;
-use cosmwasm_std::StdError;
-use cosmwasm_std::{attr, coins, to_binary, Uint128};
+use cosmwasm_std::{attr, coins, to_binary, OwnedDeps, Uint128};
 use cw20::Cw20ReceiveMsg;
 use protocol_cosmwasm::error::ContractError;
 use sp_core::hashing::keccak_256;
@@ -537,10 +535,7 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
     };
 
     let err = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "Generic error: Invalid ext data".to_string()
-    );
+    assert_eq!(err.to_string(), "Invalid ext data".to_string());
 }
 
 #[test]
@@ -691,10 +686,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
     };
 
     let err = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "Generic error: Invalid transaction proof".to_string()
-    );
+    assert_eq!(err.to_string(), "Invalid transaction proof".to_string());
 }
 
 #[test]
@@ -845,10 +837,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
     };
 
     let err = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "Generic error: Invalid transaction proof".to_string()
-    );
+    assert_eq!(err.to_string(), "Invalid transaction proof".to_string());
 }
 
 #[test]
@@ -1011,7 +1000,7 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
     let err = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "Generic error: Nullifier is known".to_string()
+        "Invalid nullifier that is already used".to_string()
     );
 }
 
@@ -1627,12 +1616,7 @@ fn test_vanchor_set_handler() {
         nonce: nonce + 2000,
     };
     let err = execute(deps.as_mut(), mock_env(), info, set_handler_msg).unwrap_err();
-    assert_eq!(
-        err,
-        ContractError::Std(StdError::GenericErr {
-            msg: "Invalid nonce".to_string()
-        })
-    );
+    assert_eq!(err, ContractError::InvalidNonce);
 
     // Succeed to "set handler"
     let info = mock_info(HANDLER, &[]);
