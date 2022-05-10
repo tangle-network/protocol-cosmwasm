@@ -14,15 +14,16 @@ use crate::state::{
 use codec::Encode;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use protocol_cosmwasm::anchor::{
-    ConfigResponse, Cw20HookMsg, EdgeInfoResponse, ExecuteMsg, InstantiateMsg,
-    MerkleRootInfoResponse, MerkleTreeInfoResponse, MigrateMsg, NeighborRootInfoResponse, QueryMsg,
-    WithdrawMsg,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg, WithdrawMsg,
 };
 use protocol_cosmwasm::anchor_verifier::AnchorVerifier;
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::poseidon::Poseidon;
-use protocol_cosmwasm::structs::{Edge, COSMOS_CHAIN_TYPE, HISTORY_LENGTH};
+use protocol_cosmwasm::structs::{
+    Edge, EdgeInfoResponse, MerkleRootInfoResponse, MerkleTreeInfoResponse,
+    NeighborRootInfoResponse, COSMOS_CHAIN_TYPE, HISTORY_LENGTH,
+};
 use protocol_cosmwasm::token_wrapper::{
     ConfigResponse as TokenWrapperConfigResp, Cw20HookMsg as TokenWrapperHookMsg,
     ExecuteMsg as TokenWrapperExecuteMsg, GetAmountToWrapResponse,
