@@ -18,7 +18,7 @@ const FEE_RECIPIENT: &str = "terra1qca9hs2qk2w29gqduaq9k720k9293qt7q8nszl";
 const FEE_PERCENTAGE: &str = "1";
 const NATIVE_TOKEN_DENOM: &str = "uusd";
 const CW20_TOKEN: &str = "cw20_token";
-const WRAPPING_LIMIT: &str = "5000000";
+const WRAPPING_LIMIT: u128 = 5000000;
 const IS_NATIVE_ALLOWED: u32 = 1;
 
 fn init_tokenwrapper(coins: Vec<Coin>) -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
@@ -34,7 +34,7 @@ fn init_tokenwrapper(coins: Vec<Coin>) -> OwnedDeps<MockStorage, MockApi, MockQu
         fee_percentage: FEE_PERCENTAGE.to_string(),
         native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
         is_native_allowed: IS_NATIVE_ALLOWED,
-        wrapping_limit: WRAPPING_LIMIT.to_string(),
+        wrapping_limit: Uint128::from(WRAPPING_LIMIT),
     };
 
     // We call ".unwrap()" to ensure succeed
@@ -56,7 +56,7 @@ fn proper_initialization() {
         fee_percentage: FEE_PERCENTAGE.to_string(),
         native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
         is_native_allowed: IS_NATIVE_ALLOWED,
-        wrapping_limit: WRAPPING_LIMIT.to_string(),
+        wrapping_limit: Uint128::from(WRAPPING_LIMIT),
     };
 
     // We call ".unwrap()" to ensure succeed
