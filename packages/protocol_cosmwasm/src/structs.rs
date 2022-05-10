@@ -27,6 +27,7 @@ pub struct Edge {
     pub target: Element,
 }
 
+/* ------     Anchor/Vanchor-common responses  -------- */
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct EdgeInfoResponse {
     pub src_chain_id: u64,
@@ -50,4 +51,26 @@ pub struct MerkleTreeInfoResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MerkleRootInfoResponse {
     pub root: [u8; 32],
+}
+
+/* ------    Handler-common responses     ------ */
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct BridgeAddrResponse {
+    pub bridge_addr: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct ContractAddrResponse {
+    pub contract_addr: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct ResourceIdResponse {
+    pub resource_id: [u8; 32],
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct WhitelistCheckResponse {
+    pub contract_addr: String,
+    pub is_whitelisted: bool,
 }

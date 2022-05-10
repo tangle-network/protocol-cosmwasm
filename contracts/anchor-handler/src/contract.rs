@@ -12,10 +12,12 @@ use crate::state::{
     STATE,
 };
 use protocol_cosmwasm::anchor_handler::{
-    BridgeAddrResponse, ContractAddrResponse, ExecuteMsg, InstantiateMsg, QueryMsg,
-    ResourceIdResponse, UpdateRecordResponse, WhitelistCheckResponse,
+    ExecuteMsg, InstantiateMsg, QueryMsg, UpdateRecordResponse,
 };
 use protocol_cosmwasm::error::ContractError;
+use protocol_cosmwasm::structs::{
+    BridgeAddrResponse, ContractAddrResponse, ResourceIdResponse, WhitelistCheckResponse,
+};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-anchor-handler";
