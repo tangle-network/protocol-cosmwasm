@@ -11,22 +11,27 @@ use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::field_ops::{ArkworksIntoFieldBn254, IntoPrimeField};
 use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::poseidon::Poseidon;
-use protocol_cosmwasm::structs::{Edge, COSMOS_CHAIN_TYPE, HISTORY_LENGTH};
+use protocol_cosmwasm::structs::{
+    Edge, EdgeInfoResponse, MerkleRootInfoResponse, MerkleTreeInfoResponse,
+    NeighborRootInfoResponse, COSMOS_CHAIN_TYPE, HISTORY_LENGTH,
+};
 use protocol_cosmwasm::token_wrapper::{
     ConfigResponse as TokenWrapperConfigResp, Cw20HookMsg as TokenWrapperHookMsg,
     ExecuteMsg as TokenWrapperExecuteMsg, QueryMsg as TokenWrapperQueryMsg,
 };
 use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder};
 use protocol_cosmwasm::vanchor::{
-    Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, QueryMsg, UpdateConfigMsg,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, MigrateMsg, ProofData,
+    QueryMsg, UpdateConfigMsg,
 };
 use protocol_cosmwasm::vanchor_verifier::VAnchorVerifier;
 use protocol_cosmwasm::zeroes::zeroes;
 
 use crate::state::{
-    read_curr_neighbor_root_index, save_curr_neighbor_root_index, save_edge, save_neighbor_roots,
-    save_root, save_subtree, LinkableMerkleTree, MerkleTree, VAnchor, HASHER, NULLIFIERS, VANCHOR,
-    VERIFIER_16_2, VERIFIER_2_2,
+    read_curr_neighbor_root_index, read_edge, read_neighbor_roots, read_root,
+    save_curr_neighbor_root_index, save_edge, save_neighbor_roots, save_root, save_subtree,
+    LinkableMerkleTree, MerkleTree, VAnchor, HASHER, NULLIFIERS, VANCHOR, VERIFIER_16_2,
+    VERIFIER_2_2,
 };
 
 // version info for migration info
@@ -1017,8 +1022,66 @@ fn verify(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        // TODO
+        QueryMsg::Config {} => to_binary(&get_config(deps)?),
+        QueryMsg::EdgeInfo { id } => to_binary(&get_edge_info(deps, id)?),
+        QueryMsg::NeighborRootInfo { chain_id, id } => {
+            to_binary(&get_neighbor_root_info(deps, chain_id, id)?)
+        }
+        QueryMsg::MerkleTreeInfo {} => to_binary(&get_merkle_tree_info(deps)?),
+        QueryMsg::MerkleRootInfo { id } => to_binary(&get_merkle_root(deps, id)?),
     }
+}
+
+pub fn get_config(deps: Deps) -> StdResult<ConfigResponse> {
+    let vanchor = VANCHOR.load(deps.storage)?;
+    Ok(ConfigResponse {
+        handler: vanchor.handler.to_string(),
+        proposal_nonce: vanchor.proposal_nonce,
+        chain_id: vanchor.chain_id,
+        tokenwrapper_addr: vanchor.tokenwrapper_addr.to_string(),
+        max_deposit_amt: vanchor.max_deposit_amt.to_string(),
+        min_withdraw_amt: vanchor.min_withdraw_amt.to_string(),
+        max_ext_amt: vanchor.max_ext_amt.to_string(),
+        max_fee: vanchor.max_fee.to_string(),
+    })
+}
+
+pub fn get_edge_info(deps: Deps, id: u64) -> StdResult<EdgeInfoResponse> {
+    let edge = read_edge(deps.storage, id)?;
+    Ok(EdgeInfoResponse {
+        src_chain_id: edge.src_chain_id,
+        root: edge.root,
+        latest_leaf_index: edge.latest_leaf_index,
+        target: edge.target,
+    })
+}
+
+pub fn get_neighbor_root_info(
+    deps: Deps,
+    chain_id: u64,
+    id: u32,
+) -> StdResult<NeighborRootInfoResponse> {
+    let neighbor_root = read_neighbor_roots(deps.storage, (chain_id, id))?;
+    Ok(NeighborRootInfoResponse { neighbor_root })
+}
+
+pub fn get_merkle_tree_info(deps: Deps) -> StdResult<MerkleTreeInfoResponse> {
+    let vanchor = VANCHOR.load(deps.storage)?;
+    Ok(MerkleTreeInfoResponse {
+        levels: vanchor.merkle_tree.levels,
+        curr_root_index: vanchor.merkle_tree.current_root_index,
+        next_index: vanchor.merkle_tree.next_index,
+    })
+}
+
+pub fn get_merkle_root(deps: Deps, id: u32) -> StdResult<MerkleRootInfoResponse> {
+    let root = read_root(deps.storage, id)?;
+    Ok(MerkleRootInfoResponse { root })
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    Ok(Response::default())
 }

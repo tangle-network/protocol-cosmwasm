@@ -167,5 +167,24 @@ pub struct ExtData {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    // TODO
+    Config {},
+    EdgeInfo { id: u64 },
+    NeighborRootInfo { chain_id: u64, id: u32 },
+    MerkleTreeInfo {},
+    MerkleRootInfo { id: u32 },
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct ConfigResponse {
+    pub handler: String,
+    pub proposal_nonce: u32,
+    pub tokenwrapper_addr: String,
+    pub chain_id: u64,
+    pub max_deposit_amt: String,
+    pub min_withdraw_amt: String,
+    pub max_ext_amt: String,
+    pub max_fee: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrateMsg {}
