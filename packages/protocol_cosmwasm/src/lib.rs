@@ -12,6 +12,7 @@ pub mod poseidon;
 pub mod signature_bridge;
 pub mod structs;
 pub mod token_wrapper;
+pub mod tokenwrapper_handler;
 pub mod utils;
 pub mod vanchor;
 pub mod vanchor_verifier;
