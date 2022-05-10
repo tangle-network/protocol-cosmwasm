@@ -168,7 +168,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_deposit_cw20() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -254,7 +254,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -327,7 +327,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -409,7 +409,7 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -482,7 +482,7 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -508,7 +508,7 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: [0u8; 32],
     };
@@ -570,7 +570,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -643,7 +643,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -721,7 +721,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -794,7 +794,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -872,7 +872,7 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -945,7 +945,7 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -1036,7 +1036,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_deposit_cw20() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -1122,7 +1122,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -1195,7 +1195,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -1253,7 +1253,7 @@ fn test_vanchor_wrap_native() {
 
     let info = mock_info("anyone", &coins(wrap_amt.u128(), "uusd"));
     let wrap_native_msg = ExecuteMsg::WrapNative {
-        amount: wrap_amt.to_string(),
+        amount: Uint128::from(wrap_amt),
         is_deposit: false,
     };
     let response = execute(deps.as_mut(), mock_env(), info, wrap_native_msg).unwrap();
@@ -1277,7 +1277,7 @@ fn test_vanchor_unwrap_native() {
 
     let info = mock_info("anyone", &[]);
     let unwrap_native_msg = ExecuteMsg::UnwrapNative {
-        amount: unwrap_amt.to_string(),
+        amount: unwrap_amt,
         recipient: None,
     };
     let response = execute(deps.as_mut(), mock_env(), info, unwrap_native_msg).unwrap();
@@ -1322,13 +1322,13 @@ fn test_vanchor_wrap_token() {
 fn test_vanchor_unwrap_into_token() {
     let mut deps = create_vanchor();
 
-    let unwrap_amt = "100";
+    let unwrap_amt = 100_u128;
     let recv_token = "recv_token";
 
     let info = mock_info("anyone", &[]);
     let unwrap_into_token_msg = ExecuteMsg::UnwrapIntoToken {
         token_addr: recv_token.to_string(),
-        amount: unwrap_amt.to_string(),
+        amount: Uint128::from(unwrap_amt),
         recipient: None,
     };
     let response = execute(deps.as_mut(), mock_env(), info, unwrap_into_token_msg).unwrap();
@@ -1339,7 +1339,7 @@ fn test_vanchor_unwrap_into_token() {
         vec![
             attr("method", "unwrap_into_token"),
             attr("token", recv_token),
-            attr("amount", unwrap_amt),
+            attr("amount", unwrap_amt.to_string()),
         ]
     );
 }
@@ -1376,7 +1376,7 @@ fn test_vanchor_wrap_and_deposit_cw20() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -1466,7 +1466,7 @@ fn test_vanchor_withdraw_and_unwrap_native() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -1539,7 +1539,7 @@ fn test_vanchor_withdraw_and_unwrap_native() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };

@@ -35,12 +35,12 @@ pub enum ExecuteMsg {
 
     /// Wraps the native token to "TokenWrapper" token
     /// Send the tokens back to `tx sender` or deposit to `this` contract
-    WrapNative { amount: String, is_deposit: bool },
+    WrapNative { amount: Uint128, is_deposit: bool },
 
     /// Unwraps the "TokenWrapper" token to native token
     /// Send the tokens back to `tx sender` or `recipient`
     UnwrapNative {
-        amount: String,
+        amount: Uint128,
         recipient: Option<String>,
     },
 
@@ -49,7 +49,7 @@ pub enum ExecuteMsg {
     /// Send the tokens back to `tx sender` or `recipient`
     UnwrapIntoToken {
         token_addr: String,
-        amount: String,
+        amount: Uint128,
         recipient: Option<String>,
     },
 
@@ -146,8 +146,8 @@ impl ProofData {
 pub struct ExtData {
     pub recipient: String,
     pub relayer: String,
-    pub ext_amount: String,
-    pub fee: String,
+    pub ext_amount: String, // Still `String` since represents `i128` value
+    pub fee: Uint128,
     pub encrypted_output1: [u8; 32],
     pub encrypted_output2: [u8; 32],
 }

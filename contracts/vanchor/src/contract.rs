@@ -16,7 +16,7 @@ use protocol_cosmwasm::token_wrapper::{
     ConfigResponse as TokenWrapperConfigResp, Cw20HookMsg as TokenWrapperHookMsg,
     ExecuteMsg as TokenWrapperExecuteMsg, QueryMsg as TokenWrapperQueryMsg,
 };
-use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder, parse_string_to_uint128};
+use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder};
 use protocol_cosmwasm::vanchor::{
     Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, QueryMsg, UpdateConfigMsg,
 };
@@ -288,7 +288,7 @@ fn transact_deposit(
 
     validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
 
-    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_data_fee: u128 = ext_data.fee.u128();
     let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
     let abs_ext_amt = ext_amt.unsigned_abs();
 
@@ -355,7 +355,7 @@ fn transact_deposit_wrap_native(
 
     validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
 
-    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_data_fee: u128 = ext_data.fee.u128();
     let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
     let abs_ext_amt = ext_amt.unsigned_abs();
 
@@ -421,7 +421,7 @@ fn transact_deposit_wrap_cw20(
 
     validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
 
-    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_data_fee: u128 = ext_data.fee.u128();
     let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
     let abs_ext_amt = ext_amt.unsigned_abs();
 
@@ -482,7 +482,7 @@ fn transact_withdraw(
     validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
 
     let vanchor = VANCHOR.load(deps.storage)?;
-    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_data_fee: u128 = ext_data.fee.u128();
     let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
     let abs_ext_amt = ext_amt.unsigned_abs();
 
@@ -538,7 +538,7 @@ fn transact_withdraw_unwrap(
     validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
 
     let vanchor = VANCHOR.load(deps.storage)?;
-    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_data_fee: u128 = ext_data.fee.u128();
     let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
     let abs_ext_amt = ext_amt.unsigned_abs();
 
@@ -593,7 +593,7 @@ fn validate_proof(
 ) -> Result<(), ContractError> {
     let vanchor = VANCHOR.load(deps.storage)?;
 
-    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_data_fee: u128 = ext_data.fee.u128();
     let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
 
     // Validation 1. Double check the number of roots.
@@ -740,10 +740,9 @@ fn wrap_native(
     deps: DepsMut,
     sender: String,
     recipient: String,
-    amount: String,
+    amount: Uint128,
     sent_funds: Vec<Coin>,
 ) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
     let vanchor = VANCHOR.load(deps.storage)?;
 
     // Validations
@@ -782,9 +781,8 @@ fn unwrap_native(
     deps: DepsMut,
     sender: String,
     recipient: String,
-    amount: String,
+    amount: Uint128,
 ) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
     let vanchor = VANCHOR.load(deps.storage)?;
 
     // Handle the "Unwrap"
@@ -848,9 +846,8 @@ fn unwrap_into_token(
     sender: String,
     recipient: String,
     token_addr: String,
-    amount: String,
+    amount: Uint128,
 ) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
     let vanchor = VANCHOR.load(deps.storage)?;
 
     // Handle the "Unwrap"
