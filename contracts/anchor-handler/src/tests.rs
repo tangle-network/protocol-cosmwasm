@@ -4,11 +4,10 @@ use cosmwasm_std::testing::{
 };
 use cosmwasm_std::{attr, from_binary, to_binary, OwnedDeps};
 
-use protocol_cosmwasm::anchor_handler::{BridgeAddrResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
+use protocol_cosmwasm::anchor_handler::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::linkable_anchor::ExecuteMsg as LinkableAnchorExecMsg;
-use protocol_cosmwasm::utils::bytes4_encoder;
+use protocol_cosmwasm::structs::BridgeAddrResponse;
 
 const BRIDGE_ADDR: &str = "bridge-contract";
 const RESOURCE_ID: [u8; 32] = [1u8; 32];

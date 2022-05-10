@@ -78,7 +78,7 @@ pub fn execute(
         } => exec_set_resource(deps, info, resource_id, contract_addr),
         ExecuteMsg::MigrateBridge { new_bridge } => migrate_bridge(deps, info, new_bridge),
 
-        /* ---  Anchor-handler specific execution entries --- */
+        /* ---  Tokenwrapper-handler specific execution entries --- */
         // Proposal execution should be initiated when a proposal is finalized in the Bridge contract.
         // by a relayer on the deposit's destination chain
         ExecuteMsg::ExecuteProposal { resource_id, data } => {
@@ -147,8 +147,8 @@ fn execute_proposal(
             msg: "Invalid resource id".to_string(),
         }));
     }
-    let anchor_addr = read_contract_addr(deps.storage, resource_id)?;
-    if !read_whitelist(deps.storage, anchor_addr.clone())? {
+    let tokenwrapper_addr = read_contract_addr(deps.storage, resource_id)?;
+    if !read_whitelist(deps.storage, tokenwrapper_addr.clone())? {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "provided tokenAddress is not whitelisted".to_string(),
         }));
@@ -156,7 +156,7 @@ fn execute_proposal(
 
     // Execute the proposal according to function signature
     let msgs = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: anchor_addr.to_string(),
+        contract_addr: tokenwrapper_addr.to_string(),
         msg: Binary::from(base64_encoded_proposal),
         funds: vec![],
     })];
