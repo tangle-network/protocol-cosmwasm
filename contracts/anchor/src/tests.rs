@@ -1,3 +1,5 @@
+use std::vec;
+
 use ark_bn254::Fr;
 use ark_ff::BigInteger;
 use ark_ff::PrimeField;
@@ -14,6 +16,7 @@ use cosmwasm_std::{attr, coins, to_binary, CosmosMsg, Uint128, WasmMsg};
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use protocol_cosmwasm::anchor::{Cw20HookMsg, ExecuteMsg, InstantiateMsg, WithdrawMsg};
+use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::structs::COSMOS_CHAIN_TYPE;
 use protocol_cosmwasm::utils::{compute_chain_id_type, truncate_and_pad};
 
@@ -24,9 +27,10 @@ use crate::test_util::Element;
 const MAX_EDGES: u32 = 2;
 const CHAIN_ID: u64 = 1;
 const LEVELS: u32 = 30;
-const CW20_ADDRESS: &str = "terra1340t6lqq6jxhm8d6gtz0hzz5jzcszvm27urkn2";
+const TOKENWRAPPER_ADDR: &str = "terra1340t6lqq6jxhm8d6gtz0hzz5jzcszvm27urkn2"; // Cw20 token
 const DEPOSIT_SIZE: u128 = 1_000_000;
-const DEPOSITOR: &str = "depositor";
+const DEPOSITOR: &str = "terra1c97dd05nyh08745fadcxz3l6ycmv0gsyf8t3jg";
+const HANDLER: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 
 const RECIPIENT: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
 const RELAYER: &str = "terra17cz29kl6z5wj04ledes9jdmn6pgkelffjxglky";
@@ -42,8 +46,9 @@ fn create_anchor() -> OwnedDeps<MockStorage, MockApi, crate::mock_querier::WasmM
         max_edges: MAX_EDGES,
         chain_id: CHAIN_ID,
         levels: LEVELS,
-        deposit_size: DEPOSIT_SIZE.to_string(),
-        tokenwrapper_addr: CW20_ADDRESS.to_string(),
+        deposit_size: Uint128::from(DEPOSIT_SIZE),
+        tokenwrapper_addr: TOKENWRAPPER_ADDR.to_string(),
+        handler: HANDLER.to_string(),
     };
 
     // Should pass this "unwrap" if success.
@@ -61,8 +66,9 @@ fn test_anchor_proper_initialization() {
         max_edges: MAX_EDGES,
         chain_id: CHAIN_ID,
         levels: LEVELS,
-        deposit_size: DEPOSIT_SIZE.to_string(),
-        tokenwrapper_addr: CW20_ADDRESS.to_string(),
+        deposit_size: Uint128::from(DEPOSIT_SIZE),
+        tokenwrapper_addr: TOKENWRAPPER_ADDR.to_string(),
+        handler: HANDLER.to_string(),
     };
 
     // Should pass this "unwrap" if success.
@@ -86,7 +92,7 @@ fn test_anchor_should_be_able_to_deposit() {
     element.copy_from_slice(&res.into_repr().to_bytes_le());
 
     // Should "deposit" cw20 tokens with success.
-    let info = mock_info(CW20_ADDRESS, &[]);
+    let info = mock_info(TOKENWRAPPER_ADDR, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: DEPOSITOR.to_string(),
         amount: Uint128::from(DEPOSIT_SIZE),
@@ -131,7 +137,7 @@ fn test_anchor_fail_when_any_byte_is_changed_in_proof() {
     let mut deps = create_anchor();
 
     // Should "deposit" cw20 tokens with success.
-    let info = mock_info(CW20_ADDRESS, &[]);
+    let info = mock_info(TOKENWRAPPER_ADDR, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: DEPOSITOR.to_string(),
         amount: Uint128::from(DEPOSIT_SIZE),
@@ -166,10 +172,10 @@ fn test_anchor_fail_when_any_byte_is_changed_in_proof() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         commitment: commitment_element.0,
-        cw20_address: Some(CW20_ADDRESS.to_string()),
+        cw20_address: Some(TOKENWRAPPER_ADDR.to_string()),
     };
     let info = mock_info("withdraw", &[]);
     assert!(
@@ -212,7 +218,7 @@ fn test_anchor_fail_when_invalid_merkle_roots() {
     let mut deps = create_anchor();
 
     // Should "deposit" cw20 tokens with success.
-    let info = mock_info(CW20_ADDRESS, &[]);
+    let info = mock_info(TOKENWRAPPER_ADDR, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: DEPOSITOR.to_string(),
         amount: Uint128::from(DEPOSIT_SIZE),
@@ -245,10 +251,10 @@ fn test_anchor_fail_when_invalid_merkle_roots() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         commitment: commitment_element.0,
-        cw20_address: Some(CW20_ADDRESS.to_string()),
+        cw20_address: Some(TOKENWRAPPER_ADDR.to_string()),
     };
     let info = mock_info("withdraw", &[]);
     let err = execute(
@@ -258,10 +264,7 @@ fn test_anchor_fail_when_invalid_merkle_roots() {
         ExecuteMsg::Withdraw(withdraw_msg),
     )
     .unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "Generic error: Root is not known".to_string()
-    );
+    assert_eq!(err, ContractError::UnknownRoot);
 }
 
 #[test]
@@ -292,7 +295,7 @@ fn test_anchor_works_with_wasm_utils() {
     let mut deps = create_anchor();
 
     // Should "deposit" cw20 tokens with success.
-    let info = mock_info(CW20_ADDRESS, &[]);
+    let info = mock_info(TOKENWRAPPER_ADDR, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: DEPOSITOR.to_string(),
         amount: Uint128::from(DEPOSIT_SIZE),
@@ -324,10 +327,10 @@ fn test_anchor_works_with_wasm_utils() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         commitment: commitment_element.0,
-        cw20_address: Some(CW20_ADDRESS.to_string()),
+        cw20_address: Some(TOKENWRAPPER_ADDR.to_string()),
     };
     let info = mock_info("withdraw", &[]);
     let response = execute(
@@ -341,7 +344,7 @@ fn test_anchor_works_with_wasm_utils() {
 
     let expected_recipient = RECIPIENT.to_string();
     let expected_messages: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: CW20_ADDRESS.to_string(),
+        contract_addr: TOKENWRAPPER_ADDR.to_string(),
         funds: [].to_vec(),
         msg: to_binary(&Cw20ExecuteMsg::Transfer {
             recipient: expected_recipient,
@@ -380,7 +383,7 @@ fn test_anchor_works() {
     let mut deps = create_anchor();
 
     // Should "deposit" cw20 tokens with success.
-    let info = mock_info(CW20_ADDRESS, &[]);
+    let info = mock_info(TOKENWRAPPER_ADDR, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: DEPOSITOR.to_string(),
         amount: Uint128::from(DEPOSIT_SIZE),
@@ -411,10 +414,10 @@ fn test_anchor_works() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         commitment: commitment_element.0,
-        cw20_address: Some(CW20_ADDRESS.to_string()),
+        cw20_address: Some(TOKENWRAPPER_ADDR.to_string()),
     };
     let info = mock_info("withdraw", &[]);
     let response = execute(
@@ -428,7 +431,7 @@ fn test_anchor_works() {
 
     let expected_recipient = RECIPIENT.to_string();
     let expected_messages: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: CW20_ADDRESS.to_string(),
+        contract_addr: TOKENWRAPPER_ADDR.to_string(),
         funds: [].to_vec(),
         msg: to_binary(&Cw20ExecuteMsg::Transfer {
             recipient: expected_recipient,
@@ -467,7 +470,7 @@ fn test_anchor_fail_when_relayer_is_diff_from_that_in_proof_generation() {
     let mut deps = create_anchor();
 
     // Should "deposit" cw20 tokens with success.
-    let info = mock_info(CW20_ADDRESS, &[]);
+    let info = mock_info(TOKENWRAPPER_ADDR, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: DEPOSITOR.to_string(),
         amount: Uint128::from(DEPOSIT_SIZE),
@@ -499,10 +502,10 @@ fn test_anchor_fail_when_relayer_is_diff_from_that_in_proof_generation() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: hex::encode(wrong_relayer_bytes.to_vec()),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         commitment: commitment_element.0,
-        cw20_address: Some(CW20_ADDRESS.to_string()),
+        cw20_address: Some(TOKENWRAPPER_ADDR.to_string()),
     };
     let info = mock_info("withdraw", &[]);
     let err = execute(
@@ -512,10 +515,7 @@ fn test_anchor_fail_when_relayer_is_diff_from_that_in_proof_generation() {
         ExecuteMsg::Withdraw(withdraw_msg),
     )
     .unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "Generic error: Invalid withdraw proof".to_string()
-    );
+    assert_eq!(err, ContractError::InvalidWithdrawProof);
 }
 
 #[test]
@@ -546,7 +546,7 @@ fn test_anchor_fail_when_fee_submitted_is_changed() {
     let mut deps = create_anchor();
 
     // Should "deposit" cw20 tokens with success.
-    let info = mock_info(CW20_ADDRESS, &[]);
+    let info = mock_info(TOKENWRAPPER_ADDR, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: DEPOSITOR.to_string(),
         amount: Uint128::from(DEPOSIT_SIZE),
@@ -578,10 +578,10 @@ fn test_anchor_fail_when_fee_submitted_is_changed() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: changed_fee_value.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(changed_fee_value),
+        refund: Uint128::from(REFUND),
         commitment: commitment_element.0,
-        cw20_address: Some(CW20_ADDRESS.to_string()),
+        cw20_address: Some(TOKENWRAPPER_ADDR.to_string()),
     };
     let info = mock_info("withdraw", &[]);
     let err = execute(
@@ -591,10 +591,7 @@ fn test_anchor_fail_when_fee_submitted_is_changed() {
         ExecuteMsg::Withdraw(withdraw_msg),
     )
     .unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "Generic error: Invalid withdraw proof".to_string()
-    );
+    assert_eq!(err, ContractError::InvalidWithdrawProof);
 }
 
 #[test]
@@ -627,13 +624,13 @@ fn test_anchor_wrap_token() {
 fn test_anchor_unwrap_into_token() {
     let mut deps = create_anchor();
 
-    let unwrap_amt = "100";
+    let unwrap_amt = Uint128::from(100_u128);
     let recv_token = "recv_token";
 
     let info = mock_info("anyone", &[]);
     let unwrap_into_token_msg = ExecuteMsg::UnwrapIntoToken {
         token_addr: recv_token.to_string(),
-        amount: unwrap_amt.to_string(),
+        amount: unwrap_amt,
     };
     let response = execute(deps.as_mut(), mock_env(), info, unwrap_into_token_msg).unwrap();
 
@@ -655,9 +652,7 @@ fn test_anchor_wrap_native() {
     let wrap_amt = Uint128::from(100_u128);
 
     let info = mock_info("anyone", &coins(wrap_amt.u128(), "uusd"));
-    let wrap_native_msg = ExecuteMsg::WrapNative {
-        amount: wrap_amt.to_string(),
-    };
+    let wrap_native_msg = ExecuteMsg::WrapNative { amount: wrap_amt };
     let response = execute(deps.as_mut(), mock_env(), info, wrap_native_msg).unwrap();
 
     assert_eq!(response.messages.len(), 1);
@@ -678,9 +673,7 @@ fn test_anchor_unwrap_native() {
     let unwrap_amt = Uint128::from(100_u128);
 
     let info = mock_info("anyone", &[]);
-    let unwrap_native_msg = ExecuteMsg::UnwrapNative {
-        amount: unwrap_amt.to_string(),
-    };
+    let unwrap_native_msg = ExecuteMsg::UnwrapNative { amount: unwrap_amt };
     let response = execute(deps.as_mut(), mock_env(), info, unwrap_native_msg).unwrap();
 
     assert_eq!(response.messages.len(), 1);
@@ -708,7 +701,7 @@ fn test_anchor_wrap_and_deposit_native() {
     let info = mock_info(DEPOSITOR, &coins(DEPOSIT_SIZE, "uusd"));
     let wrap_and_deposit_native_msg = ExecuteMsg::WrapAndDeposit {
         commitment: Some(commitment),
-        amount: DEPOSIT_SIZE.to_string(),
+        amount: Uint128::from(DEPOSIT_SIZE),
     };
     let res = execute(deps.as_mut(), mock_env(), info, wrap_and_deposit_native_msg).unwrap();
 
@@ -742,7 +735,7 @@ fn test_anchor_wrap_and_deposit_cw20() {
         amount: Uint128::from(DEPOSIT_SIZE),
         msg: to_binary(&Cw20HookMsg::WrapAndDeposit {
             commitment: Some(commitment),
-            amount: DEPOSIT_SIZE.to_string(),
+            amount: Uint128::from(DEPOSIT_SIZE),
         })
         .unwrap(),
     });
@@ -790,7 +783,7 @@ fn test_anchor_withdraw_and_unwrap_native() {
     let info = mock_info(DEPOSITOR, &coins(DEPOSIT_SIZE, "uusd"));
     let wrap_and_deposit_native_msg = ExecuteMsg::WrapAndDeposit {
         commitment: Some(leaf_element.0),
-        amount: DEPOSIT_SIZE.to_string(),
+        amount: Uint128::from(DEPOSIT_SIZE),
     };
     let res = execute(deps.as_mut(), mock_env(), info, wrap_and_deposit_native_msg).unwrap();
 
@@ -819,8 +812,8 @@ fn test_anchor_withdraw_and_unwrap_native() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         commitment: commitment_element.0,
         cw20_address: Some(any_cw20_address.to_string()),
     };
@@ -835,5 +828,47 @@ fn test_anchor_withdraw_and_unwrap_native() {
     assert_eq!(
         response.attributes,
         vec![attr("method", "withdraw_and_unwrap")]
+    );
+}
+
+#[test]
+fn test_anchor_set_handler() {
+    let new_handler: &str = "new-handler-address";
+    let nonce: u32 = 2u32;
+
+    let mut deps = create_anchor();
+
+    // Fails to "set handler" if tx sender is not current handler addr
+    let info = mock_info("anyone", &[]);
+    let set_handler_msg = ExecuteMsg::SetHandler {
+        handler: new_handler.to_string(),
+        nonce,
+    };
+    let err = execute(deps.as_mut(), mock_env(), info, set_handler_msg).unwrap_err();
+    assert_eq!(err, ContractError::Unauthorized {});
+
+    // Fails to "set handler" if "nonce" is too big or small
+    let info = mock_info(HANDLER, &[]);
+    let set_handler_msg = ExecuteMsg::SetHandler {
+        handler: new_handler.to_string(),
+        nonce: nonce + 2000,
+    };
+    let err = execute(deps.as_mut(), mock_env(), info, set_handler_msg).unwrap_err();
+    assert_eq!(err, ContractError::InvalidNonce);
+
+    // Succeed to "set handler"
+    let info = mock_info(HANDLER, &[]);
+    let set_handler_msg = ExecuteMsg::SetHandler {
+        handler: new_handler.to_string(),
+        nonce,
+    };
+    let res = execute(deps.as_mut(), mock_env(), info, set_handler_msg).unwrap();
+    assert_eq!(
+        res.attributes,
+        vec![
+            attr("method", "set_handler"),
+            attr("handler", new_handler),
+            attr("nonce", nonce.to_string()),
+        ]
     );
 }

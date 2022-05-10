@@ -30,7 +30,7 @@ const CHAIN_ID: u64 = 1;
 const LEVELS: u32 = 30;
 const CW20_ADDRESS: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 const DEPOSIT_SIZE: u128 = 1_000_000;
-const DEPOSITOR: &str = "depositor";
+const HANDLER: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 
 #[test]
 fn integration_test_instantiate_anchor() {
@@ -41,8 +41,9 @@ fn integration_test_instantiate_anchor() {
         max_edges: MAX_EDGES,
         chain_id: CHAIN_ID,
         levels: LEVELS,
-        deposit_size: DEPOSIT_SIZE.to_string(),
+        deposit_size: Uint128::from(DEPOSIT_SIZE),
         tokenwrapper_addr: CW20_ADDRESS.to_string(),
+        handler: HANDLER.to_string(),
     };
 
     let info = mock_info("anyone", &[]);
@@ -65,8 +66,9 @@ fn test_deposit_cw20() {
         max_edges: MAX_EDGES,
         chain_id: CHAIN_ID,
         levels: LEVELS,
-        deposit_size: DEPOSIT_SIZE.to_string(),
+        deposit_size: Uint128::from(DEPOSIT_SIZE),
         tokenwrapper_addr: CW20_ADDRESS.to_string(),
+        handler: HANDLER.to_string(),
     };
 
     let _res: Response = instantiate(&mut deps, env, info, instantiate_msg).unwrap();

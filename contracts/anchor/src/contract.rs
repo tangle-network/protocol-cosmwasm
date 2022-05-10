@@ -9,13 +9,13 @@ use cw2::set_contract_version;
 use crate::state::{
     read_curr_neighbor_root_index, read_edge, read_neighbor_roots, read_root,
     save_curr_neighbor_root_index, save_edge, save_neighbor_roots, save_root, save_subtree, Anchor,
-    LinkableMerkleTree, MerkleTree, ANCHOR, ANCHORVERIFIER, NULLIFIERS, POSEIDON,
+    LinkableMerkleTree, MerkleTree, ANCHOR, HASHER, NULLIFIERS, VERIFIER,
 };
 use codec::Encode;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use protocol_cosmwasm::anchor::{
     ConfigResponse, Cw20HookMsg, EdgeInfoResponse, ExecuteMsg, InstantiateMsg,
-    MerkleRootInfoResponse, MerkleTreeInfoResponse, NeighborRootInfoResponse, QueryMsg,
+    MerkleRootInfoResponse, MerkleTreeInfoResponse, MigrateMsg, NeighborRootInfoResponse, QueryMsg,
     WithdrawMsg,
 };
 use protocol_cosmwasm::anchor_verifier::AnchorVerifier;
@@ -52,14 +52,14 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     // Initialize the poseidon hasher
-    POSEIDON.save(deps.storage, &Poseidon::new())?;
+    HASHER.save(deps.storage, &Poseidon::new())?;
 
     // Initialize the Anchor_verifier
     let anchor_verifier = match AnchorVerifier::new(msg.max_edges) {
         Ok(v) => v,
         Err(e) => return Err(ContractError::Std(e)),
     };
-    ANCHORVERIFIER.save(deps.storage, &anchor_verifier)?;
+    VERIFIER.save(deps.storage, &anchor_verifier)?;
 
     // Initialize the merkle tree
     let merkle_tree: MerkleTree = MerkleTree {
@@ -77,17 +77,19 @@ pub fn instantiate(
     // Get the "TokenWrapper" token address.
     let tokenwrapper_addr = deps.api.addr_validate(msg.tokenwrapper_addr.as_str())?;
 
+    // Get the "handler" address
+    let handler = deps.api.addr_validate(&msg.handler)?;
+
     // Initialize the Anchor
-    let deposit_size = match parse_string_to_uint128(msg.deposit_size) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
+    let deposit_size = msg.deposit_size;
     let anchor = Anchor {
         chain_id: msg.chain_id,
         linkable_tree: linkable_merkle_tree,
+        proposal_nonce: 0_u32,
         deposit_size,
         merkle_tree,
         tokenwrapper_addr,
+        handler,
     };
     ANCHOR.save(deps.storage, &anchor)?;
 
@@ -142,21 +144,23 @@ pub fn execute(
         // Withdraws the deposit & unwraps to valid token for `sender`
         ExecuteMsg::WithdrawAndUnwrap(msg) => withdraw_and_unwrap(deps, info, msg),
 
-        // Add an edge to underlying tree
-        ExecuteMsg::AddEdge {
-            src_chain_id,
-            root,
-            latest_leaf_index,
-            target,
-        } => add_edge(deps, src_chain_id, root, latest_leaf_index, target),
+        // Sets a new handler for the contract
+        ExecuteMsg::SetHandler { handler, nonce } => set_handler(deps, info, handler, nonce),
 
-        // Update an edge for underlying tree
+        // Update/add an edge for underlying tree
         ExecuteMsg::UpdateEdge {
             src_chain_id,
             root,
             latest_leaf_index,
             target,
-        } => update_edge(deps, src_chain_id, root, latest_leaf_index, target),
+        } => {
+            let linkable_tree = ANCHOR.load(deps.storage)?.linkable_tree;
+            if linkable_tree.has_edge(src_chain_id, deps.storage) {
+                update_edge(deps, src_chain_id, root, latest_leaf_index, target)
+            } else {
+                add_edge(deps, src_chain_id, root, latest_leaf_index, target)
+            }
+        }
     }
 }
 
@@ -183,9 +187,7 @@ pub fn receive_cw20(
             recv_token_addr,
             recv_token_amt,
         ),
-        Err(_) => Err(ContractError::Std(StdError::generic_err(
-            "invalid cw20 hook msg",
-        ))),
+        Err(_) => Err(ContractError::InvalidCw20HookMsg {}),
     }
 }
 
@@ -268,9 +270,8 @@ fn unwrap_into_token(
     deps: DepsMut,
     sender: String,
     token_addr: String,
-    amount: String,
+    amount: Uint128,
 ) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
     let anchor = ANCHOR.load(deps.storage)?;
 
     // Handle the "Unwrap"
@@ -300,19 +301,11 @@ pub fn withdraw(
 ) -> Result<Response, ContractError> {
     let recipient = msg.recipient;
     let relayer = msg.relayer;
-    let fee = match parse_string_to_uint128(msg.fee) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
-    let refund = match parse_string_to_uint128(msg.refund) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
+    let fee = msg.fee;
+    let refund = msg.refund;
     let sent_funds = info.funds;
     if !refund.is_zero() && (sent_funds.len() != 1 || sent_funds[0].amount != refund) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Sent insufficent refund".to_string(),
-        }));
+        return Err(ContractError::InsufficientFunds {});
     }
 
     let anchor = ANCHOR.load(deps.storage)?;
@@ -320,24 +313,18 @@ pub fn withdraw(
     // Validation 1. Check if the root is known to merkle tree.
     let merkle_tree = anchor.merkle_tree;
     if !merkle_tree.is_known_root(msg.roots[0], deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Root is not known".to_string(),
-        }));
+        return Err(ContractError::UnknownRoot {});
     }
 
     // Validation 2. Check if the roots are valid in linkable tree.
     let linkable_tree = anchor.linkable_tree;
     if !linkable_tree.is_valid_neighbor_roots(&msg.roots[1..], deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Neighbor roots are not valid".to_string(),
-        }));
+        return Err(ContractError::InvaidMerkleRoots {});
     }
 
     // Validation 3. Check if the nullifier already used.
     if is_known_nullifier(deps.storage, msg.nullifier_hash) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Nullifier is known".to_string(),
-        }));
+        return Err(ContractError::AlreadyRevealedNullfier {});
     }
 
     // Format the public input bytes
@@ -365,13 +352,11 @@ pub fn withdraw(
     }
 
     // Verify the proof
-    let verifier = ANCHORVERIFIER.load(deps.storage)?;
+    let verifier = VERIFIER.load(deps.storage)?;
     let result = verify(verifier, bytes, msg.proof_bytes)?;
 
     if !result {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid withdraw proof".to_string(),
-        }));
+        return Err(ContractError::InvalidWithdrawProof {});
     }
 
     // Set used nullifier to true after successful verification
@@ -382,9 +367,7 @@ pub fn withdraw(
         .cw20_address
         .expect("Token address should be given for the withdrawal");
     if anchor.tokenwrapper_addr != deps.api.addr_validate(cw20_address.as_str())? {
-        return Err(ContractError::Std(StdError::generic_err(
-            "Invalid cw20 address",
-        )));
+        return Err(ContractError::InvalidCw20Token);
     }
 
     // Send the funds
@@ -440,10 +423,9 @@ pub fn withdraw(
 fn wrap_native(
     deps: DepsMut,
     sender: String,
-    amount: String,
+    amount: Uint128,
     sent_funds: Vec<Coin>,
 ) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
     let anchor = ANCHOR.load(deps.storage)?;
 
     // Validations
@@ -478,8 +460,11 @@ fn wrap_native(
 }
 
 /// Unwrap the "TokenWrapper" token into "token"
-fn unwrap_native(deps: DepsMut, sender: String, amount: String) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
+fn unwrap_native(
+    deps: DepsMut,
+    sender: String,
+    amount: Uint128,
+) -> Result<Response, ContractError> {
     let anchor = ANCHOR.load(deps.storage)?;
 
     // Handle the "Unwrap"
@@ -506,7 +491,7 @@ fn wrap_and_deposit_native(
     sender: String,
     recipient: String,
     commitment: Option<[u8; 32]>,
-    amount: String,
+    amount: Uint128,
     sent_funds: Vec<Coin>,
 ) -> Result<Response, ContractError> {
     let anchor = ANCHOR.load(deps.storage)?;
@@ -522,7 +507,7 @@ fn wrap_and_deposit_native(
     let amt_to_wrap_query: GetAmountToWrapResponse = deps.querier.query_wasm_smart(
         tokenwrapper.to_string(),
         &TokenWrapperQueryMsg::GetAmountToWrap {
-            target_amount: amount,
+            target_amount: amount.to_string(),
         },
     )?;
     let amt_to_wrap = parse_string_to_uint128(amt_to_wrap_query.amount_to_wrap)?;
@@ -567,11 +552,10 @@ fn wrap_and_deposit_cw20(
     sender: String,
     recipient: String,
     commitment: Option<[u8; 32]>,
-    amount: String,
+    amount: Uint128,
     recv_token_addr: String,
     recv_token_amt: Uint128,
 ) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
     let anchor = ANCHOR.load(deps.storage)?;
     let tokenwrapper = anchor.tokenwrapper_addr.as_str();
 
@@ -627,19 +611,11 @@ fn withdraw_and_unwrap(
 ) -> Result<Response, ContractError> {
     let recipient = msg.recipient;
     let relayer = msg.relayer;
-    let fee = match parse_string_to_uint128(msg.fee) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
-    let refund = match parse_string_to_uint128(msg.refund) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
+    let fee = msg.fee;
+    let refund = msg.refund;
     let sent_funds = info.funds;
     if !refund.is_zero() && (sent_funds.len() != 1 || sent_funds[0].amount != refund) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Sent insufficent refund".to_string(),
-        }));
+        return Err(ContractError::InsufficientFunds {});
     }
 
     let anchor = ANCHOR.load(deps.storage)?;
@@ -647,9 +623,7 @@ fn withdraw_and_unwrap(
     // Validation 1. Check if the root is known to merkle tree.
     let merkle_tree = anchor.merkle_tree;
     if !merkle_tree.is_known_root(msg.roots[0], deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Root is not known".to_string(),
-        }));
+        return Err(ContractError::UnknownRoot {});
     }
 
     // Validation 2. Check if the roots are valid in linkable tree.
@@ -662,9 +636,7 @@ fn withdraw_and_unwrap(
 
     // Validation 3. Check if the nullifier already used.
     if is_known_nullifier(deps.storage, msg.nullifier_hash) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Nullifier is known".to_string(),
-        }));
+        return Err(ContractError::AlreadyRevealedNullfier {});
     }
 
     //
@@ -699,13 +671,11 @@ fn withdraw_and_unwrap(
     }
 
     // Verify the proof
-    let verifier = ANCHORVERIFIER.load(deps.storage)?;
+    let verifier = VERIFIER.load(deps.storage)?;
     let result = verify(verifier, bytes, msg.proof_bytes)?;
 
     if !result {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid withdraw proof".to_string(),
-        }));
+        return Err(ContractError::InvalidWithdrawProof {});
     }
 
     // Set used nullifier to true after successful verification
@@ -765,6 +735,39 @@ fn withdraw_and_unwrap(
         .add_messages(msgs))
 }
 
+/// Sets a new handler for the contract
+fn set_handler(
+    deps: DepsMut,
+    info: MessageInfo,
+    handler: String,
+    nonce: u32,
+) -> Result<Response, ContractError> {
+    let mut anchor = ANCHOR.load(deps.storage)?;
+    let curr_handler = anchor.handler;
+    let proposal_nonce = anchor.proposal_nonce;
+
+    // Validations
+    if info.sender != curr_handler {
+        return Err(ContractError::Unauthorized {});
+    }
+    if nonce <= proposal_nonce || proposal_nonce + 1048 < nonce {
+        return Err(ContractError::InvalidNonce);
+    }
+
+    // Save a new "handler"
+    let new_handler = deps.api.addr_validate(&handler)?;
+    anchor.handler = new_handler;
+    anchor.proposal_nonce = nonce;
+
+    ANCHOR.save(deps.storage, &anchor)?;
+
+    Ok(Response::new().add_attributes(vec![
+        attr("method", "set_handler"),
+        attr("handler", handler),
+        attr("nonce", nonce.to_string()),
+    ]))
+}
+
 /// Add an edge to underlying linkable tree
 fn add_edge(
     deps: DepsMut,
@@ -773,28 +776,24 @@ fn add_edge(
     latest_leaf_index: u32,
     target: [u8; 32],
 ) -> Result<Response, ContractError> {
-    let anchor: Anchor = ANCHOR.load(deps.storage)?;
-    let linkable_tree = anchor.linkable_tree;
-    // ensure edge doesn't exist
-    if linkable_tree.has_edge(src_chain_id, deps.storage) {
-        return Err(ContractError::EdgeAlreadyExists {});
-    }
+    let linkable_tree = ANCHOR.load(deps.storage)?.linkable_tree;
 
-    // ensure anchor isn't at maximum edges
+    // Ensure anchor isn't at maximum edges
     let curr_length = linkable_tree.get_latest_neighbor_edges(deps.storage).len();
     if curr_length > linkable_tree.max_edges as usize {
         return Err(ContractError::TooManyEdges {});
     }
 
-    // craft edge
+    // Add new edge to the end of the edge list for the given tree
     let edge: Edge = Edge {
         src_chain_id,
         root,
         latest_leaf_index,
         target,
     };
+    save_edge(deps.storage, src_chain_id, edge)?;
 
-    // update historical neighbor list for this edge's root
+    // Update associated states
     let curr_neighbor_root_idx = read_curr_neighbor_root_index(deps.storage, src_chain_id)?;
     save_curr_neighbor_root_index(
         deps.storage,
@@ -803,9 +802,6 @@ fn add_edge(
     )?;
 
     save_neighbor_roots(deps.storage, (src_chain_id, curr_neighbor_root_idx), root)?;
-
-    // Append new edge to the end of the edge list for the given tree
-    save_edge(deps.storage, src_chain_id, edge)?;
 
     Ok(Response::new().add_attribute("method", "add_edge"))
 }
@@ -818,26 +814,21 @@ fn update_edge(
     latest_leaf_index: u32,
     target: [u8; 32],
 ) -> Result<Response, ContractError> {
-    let anchor = ANCHOR.load(deps.storage)?;
-    let linkable_tree = anchor.linkable_tree;
-    if !linkable_tree.has_edge(src_chain_id, deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Edge does not exist".to_string(),
-        }));
-    }
-
+    // Update an existing edge with new one
     let edge: Edge = Edge {
         src_chain_id,
         root,
         latest_leaf_index,
         target,
     };
+    save_edge(deps.storage, src_chain_id, edge)?;
+
+    // Update associated states
     let neighbor_root_idx =
         (read_curr_neighbor_root_index(deps.storage, src_chain_id)? + 1) % HISTORY_LENGTH;
     save_curr_neighbor_root_index(deps.storage, src_chain_id, neighbor_root_idx)?;
-    save_neighbor_roots(deps.storage, (src_chain_id, neighbor_root_idx), root)?;
 
-    save_edge(deps.storage, src_chain_id, edge)?;
+    save_neighbor_roots(deps.storage, (src_chain_id, neighbor_root_idx), root)?;
 
     Ok(Response::new().add_attributes(vec![attr("method", "udpate_edge")]))
 }
@@ -858,6 +849,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn get_config(deps: Deps) -> StdResult<ConfigResponse> {
     let anchor = ANCHOR.load(deps.storage)?;
     Ok(ConfigResponse {
+        handler: anchor.handler.to_string(),
+        proposal_nonce: anchor.proposal_nonce,
         chain_id: anchor.chain_id,
         tokenwrapper_addr: anchor.tokenwrapper_addr.to_string(),
         deposit_size: anchor.deposit_size.to_string(),
@@ -919,7 +912,7 @@ pub fn validate_and_store_commitment(
 ) -> Result<u32, ContractError> {
     let anchor = ANCHOR.load(deps.storage)?;
     let mut merkle_tree = anchor.merkle_tree;
-    let poseidon = POSEIDON.load(deps.storage)?;
+    let poseidon = HASHER.load(deps.storage)?;
     let res = merkle_tree
         .insert(poseidon, commitment, deps.storage)
         .map_err(|_| ContractError::MerkleTreeIsFull)?;
@@ -931,9 +924,16 @@ pub fn validate_and_store_commitment(
             deposit_size: anchor.deposit_size,
             linkable_tree: anchor.linkable_tree,
             tokenwrapper_addr: anchor.tokenwrapper_addr,
+            handler: anchor.handler,
+            proposal_nonce: anchor.proposal_nonce,
             merkle_tree,
         },
     )?;
 
     Ok(res)
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    Ok(Response::default())
 }
