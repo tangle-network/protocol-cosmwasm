@@ -2,9 +2,9 @@ use ark_ff::BigInteger;
 use ark_ff::PrimeField;
 use arkworks_setups::Curve;
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MockApi, MockStorage};
-use cosmwasm_std::OwnedDeps;
-use cosmwasm_std::{attr, coins, to_binary, Uint128};
+use cosmwasm_std::{attr, coins, to_binary, OwnedDeps, Uint128};
 use cw20::Cw20ReceiveMsg;
+use protocol_cosmwasm::error::ContractError;
 use sp_core::hashing::keccak_256;
 
 use crate::contract::{execute, instantiate};
@@ -28,6 +28,7 @@ const CW20_ADDRESS: &str = "terra1340t6lqq6jxhm8d6gtz0hzz5jzcszvm27urkn2";
 const TRANSACTOR: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
 const RECIPIENT: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
 const RELAYER: &str = "terra1jrj2vh6cstqwk3pg8nkmdf0r9z0n3q3f3jk5xn";
+const HANDLER: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 
 fn element_encoder(v: &[u8]) -> [u8; 32] {
     let mut output = [0u8; 32];
@@ -47,6 +48,7 @@ fn create_vanchor() -> OwnedDeps<MockStorage, MockApi, crate::mock_querier::Wasm
         max_ext_amt: Uint128::from(MAX_EXT_AMT),
         max_fee: Uint128::from(MAX_FEE),
         tokenwrapper_addr: CW20_ADDRESS.to_string(),
+        handler: HANDLER.to_string(),
     };
     let info = mock_info("creator", &[]);
 
@@ -85,6 +87,7 @@ fn test_vanchor_proper_initialization() {
         max_ext_amt: Uint128::from(MAX_EXT_AMT),
         max_fee: Uint128::from(MAX_FEE),
         tokenwrapper_addr: CW20_ADDRESS.to_string(),
+        handler: HANDLER.to_string(),
     };
     let info = mock_info("creator", &[]);
 
@@ -99,8 +102,6 @@ fn test_vanchor_update_config() {
 
     // Fail to update the config with "unauthorized" error.
     let update_config_msg = UpdateConfigMsg {
-        max_deposit_amt: Some(Uint128::from(1u128)),
-        min_withdraw_amt: Some(Uint128::from(1u128)),
         max_ext_amt: Some(Uint128::from(1u128)),
         max_fee: Some(Uint128::from(1u128)),
     };
@@ -118,8 +119,6 @@ fn test_vanchor_update_config() {
 
     // We can just call .unwrap() to assert "execute" was success
     let update_config_msg = UpdateConfigMsg {
-        max_deposit_amt: Some(Uint128::from(1u128)),
-        min_withdraw_amt: Some(Uint128::from(1u128)),
         max_ext_amt: Some(Uint128::from(1u128)),
         max_fee: Some(Uint128::from(1u128)),
     };
@@ -165,7 +164,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_deposit_cw20() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -251,7 +250,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -324,7 +323,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -406,7 +405,7 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -479,7 +478,7 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -505,7 +504,7 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: [0u8; 32],
     };
@@ -532,10 +531,7 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
     };
 
     let err = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "Generic error: Invalid ext data".to_string()
-    );
+    assert_eq!(err.to_string(), "Invalid ext data".to_string());
 }
 
 #[test]
@@ -570,7 +566,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -643,7 +639,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -686,10 +682,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
     };
 
     let err = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "Generic error: Invalid transaction proof".to_string()
-    );
+    assert_eq!(err.to_string(), "Invalid transaction proof".to_string());
 }
 
 #[test]
@@ -724,7 +717,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -797,7 +790,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -840,10 +833,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
     };
 
     let err = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "Generic error: Invalid transaction proof".to_string()
-    );
+    assert_eq!(err.to_string(), "Invalid transaction proof".to_string());
 }
 
 #[test]
@@ -878,7 +868,7 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -951,7 +941,7 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -1006,7 +996,7 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
     let err = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "Generic error: Nullifier is known".to_string()
+        "Invalid nullifier that is already used".to_string()
     );
 }
 
@@ -1042,7 +1032,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_deposit_cw20() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -1128,7 +1118,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -1201,7 +1191,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -1259,7 +1249,7 @@ fn test_vanchor_wrap_native() {
 
     let info = mock_info("anyone", &coins(wrap_amt.u128(), "uusd"));
     let wrap_native_msg = ExecuteMsg::WrapNative {
-        amount: wrap_amt.to_string(),
+        amount: Uint128::from(wrap_amt),
         is_deposit: false,
     };
     let response = execute(deps.as_mut(), mock_env(), info, wrap_native_msg).unwrap();
@@ -1283,7 +1273,7 @@ fn test_vanchor_unwrap_native() {
 
     let info = mock_info("anyone", &[]);
     let unwrap_native_msg = ExecuteMsg::UnwrapNative {
-        amount: unwrap_amt.to_string(),
+        amount: unwrap_amt,
         recipient: None,
     };
     let response = execute(deps.as_mut(), mock_env(), info, unwrap_native_msg).unwrap();
@@ -1328,13 +1318,13 @@ fn test_vanchor_wrap_token() {
 fn test_vanchor_unwrap_into_token() {
     let mut deps = create_vanchor();
 
-    let unwrap_amt = "100";
+    let unwrap_amt = 100_u128;
     let recv_token = "recv_token";
 
     let info = mock_info("anyone", &[]);
     let unwrap_into_token_msg = ExecuteMsg::UnwrapIntoToken {
         token_addr: recv_token.to_string(),
-        amount: unwrap_amt.to_string(),
+        amount: Uint128::from(unwrap_amt),
         recipient: None,
     };
     let response = execute(deps.as_mut(), mock_env(), info, unwrap_into_token_msg).unwrap();
@@ -1345,7 +1335,7 @@ fn test_vanchor_unwrap_into_token() {
         vec![
             attr("method", "unwrap_into_token"),
             attr("token", recv_token),
-            attr("amount", unwrap_amt),
+            attr("amount", unwrap_amt.to_string()),
         ]
     );
 }
@@ -1382,7 +1372,7 @@ fn test_vanchor_wrap_and_deposit_cw20() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -1472,7 +1462,7 @@ fn test_vanchor_withdraw_and_unwrap_native() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -1545,7 +1535,7 @@ fn test_vanchor_withdraw_and_unwrap_native() {
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
-        fee: fee.to_string(),
+        fee: Uint128::from(fee),
         encrypted_output1: element_encoder(&output1),
         encrypted_output2: element_encoder(&output2),
     };
@@ -1595,6 +1585,48 @@ fn test_vanchor_withdraw_and_unwrap_native() {
         vec![
             attr("method", "transact_withdraw_unwrap"),
             attr("ext_amt", "-5"),
+        ]
+    );
+}
+
+#[test]
+fn test_vanchor_set_handler() {
+    let new_handler: &str = "new-handler-address";
+    let nonce: u32 = 2u32;
+
+    let mut deps = create_vanchor();
+
+    // Fails to "set handler" if tx sender is not current handler addr
+    let info = mock_info("anyone", &[]);
+    let set_handler_msg = ExecuteMsg::SetHandler {
+        handler: new_handler.to_string(),
+        nonce,
+    };
+    let err = execute(deps.as_mut(), mock_env(), info, set_handler_msg).unwrap_err();
+    assert_eq!(err, ContractError::Unauthorized {});
+
+    // Fails to "set handler" if "nonce" is too big or small
+    let info = mock_info(HANDLER, &[]);
+    let set_handler_msg = ExecuteMsg::SetHandler {
+        handler: new_handler.to_string(),
+        nonce: nonce + 2000,
+    };
+    let err = execute(deps.as_mut(), mock_env(), info, set_handler_msg).unwrap_err();
+    assert_eq!(err, ContractError::InvalidNonce);
+
+    // Succeed to "set handler"
+    let info = mock_info(HANDLER, &[]);
+    let set_handler_msg = ExecuteMsg::SetHandler {
+        handler: new_handler.to_string(),
+        nonce,
+    };
+    let res = execute(deps.as_mut(), mock_env(), info, set_handler_msg).unwrap();
+    assert_eq!(
+        res.attributes,
+        vec![
+            attr("method", "set_handler"),
+            attr("handler", new_handler),
+            attr("nonce", nonce.to_string()),
         ]
     );
 }

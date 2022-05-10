@@ -105,29 +105,4 @@ pub struct ConfigResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct EdgeInfoResponse {
-    pub src_chain_id: u64,
-    pub root: [u8; 32],
-    pub latest_leaf_index: u32,
-    pub target: [u8; 32],
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct NeighborRootInfoResponse {
-    pub neighbor_root: [u8; 32],
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct MerkleTreeInfoResponse {
-    pub levels: u32,
-    pub curr_root_index: u32,
-    pub next_index: u32,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct MerkleRootInfoResponse {
-    pub root: [u8; 32],
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MigrateMsg {}

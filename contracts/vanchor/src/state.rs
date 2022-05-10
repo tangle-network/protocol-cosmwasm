@@ -188,6 +188,8 @@ pub struct VAnchor {
     pub min_withdraw_amt: Uint128,
     pub max_ext_amt: Uint128,
     pub max_fee: Uint128,
+    pub proposal_nonce: u32,
+    pub handler: Addr,
 }
 
 pub const VANCHOR: Item<VAnchor> = Item::new("vanchor");
@@ -196,7 +198,7 @@ pub const VANCHOR: Item<VAnchor> = Item::new("vanchor");
 pub const NULLIFIERS: Map<Vec<u8>, bool> = Map::new("used_nullifers");
 
 // "Poseidon hasher"
-pub const POSEIDON: Item<Poseidon> = Item::new("poseidon");
+pub const HASHER: Item<Poseidon> = Item::new("poseidon");
 
 // "VAnchorVerifier (2 * 2)
 pub const VERIFIER_2_2: Item<VAnchorVerifier> = Item::new("vanchor_verifier_2_2");

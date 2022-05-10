@@ -11,22 +11,27 @@ use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::field_ops::{ArkworksIntoFieldBn254, IntoPrimeField};
 use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::poseidon::Poseidon;
-use protocol_cosmwasm::structs::{Edge, COSMOS_CHAIN_TYPE, HISTORY_LENGTH};
+use protocol_cosmwasm::structs::{
+    Edge, EdgeInfoResponse, MerkleRootInfoResponse, MerkleTreeInfoResponse,
+    NeighborRootInfoResponse, COSMOS_CHAIN_TYPE, HISTORY_LENGTH,
+};
 use protocol_cosmwasm::token_wrapper::{
     ConfigResponse as TokenWrapperConfigResp, Cw20HookMsg as TokenWrapperHookMsg,
     ExecuteMsg as TokenWrapperExecuteMsg, QueryMsg as TokenWrapperQueryMsg,
 };
-use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder, parse_string_to_uint128};
+use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder};
 use protocol_cosmwasm::vanchor::{
-    Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, ProofData, QueryMsg, UpdateConfigMsg,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, MigrateMsg, ProofData,
+    QueryMsg, UpdateConfigMsg,
 };
 use protocol_cosmwasm::vanchor_verifier::VAnchorVerifier;
 use protocol_cosmwasm::zeroes::zeroes;
 
 use crate::state::{
-    read_curr_neighbor_root_index, save_curr_neighbor_root_index, save_edge, save_neighbor_roots,
-    save_root, save_subtree, LinkableMerkleTree, MerkleTree, VAnchor, NULLIFIERS, POSEIDON,
-    VANCHOR, VERIFIER_16_2, VERIFIER_2_2,
+    read_curr_neighbor_root_index, read_edge, read_neighbor_roots, read_root,
+    save_curr_neighbor_root_index, save_edge, save_neighbor_roots, save_root, save_subtree,
+    LinkableMerkleTree, MerkleTree, VAnchor, HASHER, NULLIFIERS, VANCHOR, VERIFIER_16_2,
+    VERIFIER_2_2,
 };
 
 // version info for migration info
@@ -53,7 +58,7 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     // Initialize the poseidon hasher
-    POSEIDON.save(deps.storage, &Poseidon::new())?;
+    HASHER.save(deps.storage, &Poseidon::new())?;
 
     // Initialize the vanchor verifiers
     let verifier_2_2 = match VAnchorVerifier::new(msg.max_edges, NUM_INS_2, NUM_OUTS_2) {
@@ -94,6 +99,8 @@ pub fn instantiate(
         linkable_tree: linkable_merkle_tree,
         merkle_tree,
         tokenwrapper_addr,
+        handler: deps.api.addr_validate(&msg.handler)?,
+        proposal_nonce: 0_u32,
     };
     VANCHOR.save(deps.storage, &anchor)?;
 
@@ -179,19 +186,66 @@ pub fn execute(
             token_addr,
         } => transact_withdraw_unwrap(deps, proof_data, ext_data, token_addr),
 
-        ExecuteMsg::AddEdge {
-            src_chain_id,
-            root,
-            latest_leaf_index,
-            target,
-        } => add_edge(deps, info, src_chain_id, root, latest_leaf_index, target),
+        // Sets a new handler for the contract
+        ExecuteMsg::SetHandler { handler, nonce } => set_handler(deps, info, handler, nonce),
+
+        // Add/Update an Edge for the underlying tree
         ExecuteMsg::UpdateEdge {
             src_chain_id,
             root,
-            latest_leaf_index,
+            latest_leaf_id,
             target,
-        } => update_edge(deps, info, src_chain_id, root, latest_leaf_index, target),
+        } => {
+            let linkable_tree = VANCHOR.load(deps.storage)?.linkable_tree;
+            if linkable_tree.has_edge(src_chain_id, deps.storage) {
+                update_edge(deps, src_chain_id, root, latest_leaf_id, target)
+            } else {
+                add_edge(deps, src_chain_id, root, latest_leaf_id, target)
+            }
+        }
+
+        ExecuteMsg::ConfigureMaximumDepositLimit {
+            maximum_deposit_amount,
+        } => config_max_deposit_limit(deps, info, maximum_deposit_amount),
+
+        ExecuteMsg::ConfigureMinimalWithdrawalLimit {
+            minimal_withdrawal_amount,
+        } => config_min_withdraw_limit(deps, info, minimal_withdrawal_amount),
     }
+}
+
+fn config_max_deposit_limit(
+    deps: DepsMut,
+    info: MessageInfo,
+    maximum_deposit_amount: Uint128,
+) -> Result<Response, ContractError> {
+    let mut vanchor = VANCHOR.load(deps.storage)?;
+
+    if info.sender != vanchor.handler {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    vanchor.max_deposit_amt = maximum_deposit_amount;
+    VANCHOR.save(deps.storage, &vanchor)?;
+
+    Ok(Response::new().add_attributes(vec![attr("method", "config_max_deposit_amount")]))
+}
+
+fn config_min_withdraw_limit(
+    deps: DepsMut,
+    info: MessageInfo,
+    minimal_withdrawal_amount: Uint128,
+) -> Result<Response, ContractError> {
+    let mut vanchor = VANCHOR.load(deps.storage)?;
+
+    if info.sender != vanchor.handler {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    vanchor.min_withdraw_amt = minimal_withdrawal_amount;
+    VANCHOR.save(deps.storage, &vanchor)?;
+
+    Ok(Response::new().add_attributes(vec![attr("method", "config_min_withdraw_amount")]))
 }
 
 fn update_vanchor_config(
@@ -211,14 +265,6 @@ fn update_vanchor_config(
     }
 
     // Update the vanchor config.
-    if let Some(max_deposit_amt) = msg.max_deposit_amt {
-        vanchor.max_deposit_amt = max_deposit_amt;
-    }
-
-    if let Some(min_withdraw_amt) = msg.min_withdraw_amt {
-        vanchor.min_withdraw_amt = min_withdraw_amt;
-    }
-
     if let Some(max_ext_amt) = msg.max_ext_amt {
         vanchor.max_ext_amt = max_ext_amt;
     }
@@ -261,9 +307,7 @@ fn receive_cw20(
         }) => {
             transact_deposit_wrap_cw20(deps, proof_data, ext_data, recv_token_addr, recv_token_amt)
         }
-        Err(_) => Err(ContractError::Std(StdError::generic_err(
-            "invalid cw20 hook msg",
-        ))),
+        Err(_) => Err(ContractError::InvalidCw20HookMsg),
     }
 }
 
@@ -283,7 +327,7 @@ fn transact_deposit(
 
     validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
 
-    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_data_fee: u128 = ext_data.fee.u128();
     let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
     let abs_ext_amt = ext_amt.unsigned_abs();
 
@@ -292,19 +336,13 @@ fn transact_deposit(
 
     let is_withdraw = ext_amt.is_negative();
     if is_withdraw {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid execute entry".to_string(),
-        }));
+        return Err(ContractError::InvalidExecutionEntry);
     } else {
         if Uint128::from(abs_ext_amt) > vanchor.max_deposit_amt {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Invalid deposit amount".to_string(),
-            }));
+            return Err(ContractError::InvalidDepositAmount);
         };
         if abs_ext_amt != recv_token_amt.u128() {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Did not send enough tokens".to_string(),
-            }));
+            return Err(ContractError::InsufficientFunds {});
         };
         // No need to call "transfer from transactor to this contract"
         // since this message is the result of sending.
@@ -356,7 +394,7 @@ fn transact_deposit_wrap_native(
 
     validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
 
-    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_data_fee: u128 = ext_data.fee.u128();
     let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
     let abs_ext_amt = ext_amt.unsigned_abs();
 
@@ -365,19 +403,13 @@ fn transact_deposit_wrap_native(
 
     let is_withdraw = ext_amt.is_negative();
     if is_withdraw {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid execute entry".to_string(),
-        }));
+        return Err(ContractError::InvalidExecutionEntry);
     } else {
         if Uint128::from(abs_ext_amt) > vanchor.max_deposit_amt {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Invalid deposit amount".to_string(),
-            }));
+            return Err(ContractError::InvalidDepositAmount);
         };
         if abs_ext_amt != recv_token_amt.u128() {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Did not send enough tokens".to_string(),
-            }));
+            return Err(ContractError::InsufficientFunds {});
         };
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: vanchor.tokenwrapper_addr.to_string(),
@@ -428,7 +460,7 @@ fn transact_deposit_wrap_cw20(
 
     validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
 
-    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_data_fee: u128 = ext_data.fee.u128();
     let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
     let abs_ext_amt = ext_amt.unsigned_abs();
 
@@ -436,19 +468,13 @@ fn transact_deposit_wrap_cw20(
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     if ext_amt.is_negative() {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid execute entry".to_string(),
-        }));
+        return Err(ContractError::InvalidExecutionEntry);
     } else {
         if Uint128::from(abs_ext_amt) > vanchor.max_deposit_amt {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Invalid deposit amount".to_string(),
-            }));
+            return Err(ContractError::InvalidDepositAmount);
         };
         if abs_ext_amt != recv_token_amt.u128() {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Did not send enough tokens".to_string(),
-            }));
+            return Err(ContractError::InsufficientFunds {});
         };
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: recv_token_addr,
@@ -495,7 +521,7 @@ fn transact_withdraw(
     validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
 
     let vanchor = VANCHOR.load(deps.storage)?;
-    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_data_fee: u128 = ext_data.fee.u128();
     let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
     let abs_ext_amt = ext_amt.unsigned_abs();
 
@@ -503,14 +529,10 @@ fn transact_withdraw(
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     if ext_amt.is_positive() {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid execute entry".to_string(),
-        }));
+        return Err(ContractError::InvalidExecutionEntry);
     } else {
         if Uint128::from(abs_ext_amt) < vanchor.min_withdraw_amt {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Invalid withdraw amount".to_string(),
-            }));
+            return Err(ContractError::InvalidWithdrawAmount);
         }
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: vanchor.tokenwrapper_addr.to_string(),
@@ -555,7 +577,7 @@ fn transact_withdraw_unwrap(
     validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
 
     let vanchor = VANCHOR.load(deps.storage)?;
-    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_data_fee: u128 = ext_data.fee.u128();
     let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
     let abs_ext_amt = ext_amt.unsigned_abs();
 
@@ -563,14 +585,10 @@ fn transact_withdraw_unwrap(
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     if ext_amt.is_positive() {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid execute entry".to_string(),
-        }));
+        return Err(ContractError::InvalidExecutionEntry);
     } else {
         if Uint128::from(abs_ext_amt) < vanchor.min_withdraw_amt {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Invalid withdraw amount".to_string(),
-            }));
+            return Err(ContractError::InvalidWithdrawAmount);
         }
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: vanchor.tokenwrapper_addr.to_string(),
@@ -614,7 +632,7 @@ fn validate_proof(
 ) -> Result<(), ContractError> {
     let vanchor = VANCHOR.load(deps.storage)?;
 
-    let ext_data_fee: u128 = ext_data.fee.parse().expect("Invalid ext_fee");
+    let ext_data_fee: u128 = ext_data.fee.u128();
     let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
 
     // Validation 1. Double check the number of roots.
@@ -629,25 +647,19 @@ fn validate_proof(
         .merkle_tree
         .is_known_root(proof_data.roots[0], deps.storage)
     {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Root is not known".to_string(),
-        }));
+        return Err(ContractError::UnknownRoot);
     }
 
     // Validation 3. Check if the roots are valid in linkable tree.
     let linkable_tree = vanchor.linkable_tree;
     if !linkable_tree.is_valid_neighbor_roots(&proof_data.roots[1..], deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Neighbor roots are not valid".to_string(),
-        }));
+        return Err(ContractError::InvaidMerkleRoots);
     }
 
     // Check nullifier and add or return `InvalidNullifier`
     for nullifier in &proof_data.input_nullifiers {
         if is_known_nullifier(deps.storage, *nullifier) {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: "Nullifier is known".to_string(),
-            }));
+            return Err(ContractError::AlreadyRevealedNullfier);
         }
     }
 
@@ -668,23 +680,17 @@ fn validate_proof(
     let computed_ext_data_hash =
         Keccak256::hash(&ext_data_args).map_err(|_| ContractError::HashError)?;
     if computed_ext_data_hash != proof_data.ext_data_hash {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid ext data".to_string(),
-        }));
+        return Err(ContractError::InvalidExtData);
     }
 
     let abs_ext_amt = ext_amt.unsigned_abs();
     // Making sure that public amount and fee are correct
     if Uint128::from(ext_data_fee) > vanchor.max_fee {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid fee amount".to_string(),
-        }));
+        return Err(ContractError::InvalidFeeAmount);
     }
 
     if Uint128::from(abs_ext_amt) > vanchor.max_ext_amt {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid ext amount".to_string(),
-        }));
+        return Err(ContractError::InvalidExtAmount);
     }
 
     // Public amounnt can also be negative, in which
@@ -694,9 +700,7 @@ fn validate_proof(
     let calc_public_amt_bytes =
         element_encoder(&ArkworksIntoFieldBn254::into_field(calc_public_amt));
     if calc_public_amt_bytes != proof_data.public_amount {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid public amount".to_string(),
-        }));
+        return Err(ContractError::InvalidPublicAmount);
     }
 
     // Construct public inputs
@@ -730,9 +734,7 @@ fn validate_proof(
     };
 
     if !result {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid transaction proof".to_string(),
-        }));
+        return Err(ContractError::InvalidTxProof);
     }
 
     // Flag nullifiers as used
@@ -749,7 +751,7 @@ fn execute_insertions(deps: DepsMut, proof_data: ProofData) -> Result<(), Contra
     // Insert output commitments into the tree
     let mut merkle_tree = vanchor.merkle_tree;
     for comm in &proof_data.output_commitments {
-        let poseidon: Poseidon = POSEIDON.load(deps.storage)?;
+        let poseidon: Poseidon = HASHER.load(deps.storage)?;
         merkle_tree.insert(poseidon, *comm, deps.storage)?;
     }
 
@@ -765,6 +767,8 @@ fn execute_insertions(deps: DepsMut, proof_data: ProofData) -> Result<(), Contra
             min_withdraw_amt: vanchor.min_withdraw_amt,
             max_fee: vanchor.max_fee,
             max_ext_amt: vanchor.max_ext_amt,
+            handler: vanchor.handler,
+            proposal_nonce: vanchor.proposal_nonce,
         },
     )?;
     Ok(())
@@ -775,10 +779,9 @@ fn wrap_native(
     deps: DepsMut,
     sender: String,
     recipient: String,
-    amount: String,
+    amount: Uint128,
     sent_funds: Vec<Coin>,
 ) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
     let vanchor = VANCHOR.load(deps.storage)?;
 
     // Validations
@@ -817,9 +820,8 @@ fn unwrap_native(
     deps: DepsMut,
     sender: String,
     recipient: String,
-    amount: String,
+    amount: Uint128,
 ) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
     let vanchor = VANCHOR.load(deps.storage)?;
 
     // Handle the "Unwrap"
@@ -883,9 +885,8 @@ fn unwrap_into_token(
     sender: String,
     recipient: String,
     token_addr: String,
-    amount: String,
+    amount: Uint128,
 ) -> Result<Response, ContractError> {
-    let amount = parse_string_to_uint128(amount)?;
     let vanchor = VANCHOR.load(deps.storage)?;
 
     // Handle the "Unwrap"
@@ -910,38 +911,25 @@ fn unwrap_into_token(
 /// Add an edge to underlying linkable tree
 fn add_edge(
     deps: DepsMut,
-    info: MessageInfo,
     src_chain_id: u64,
     root: [u8; 32],
-    latest_leaf_index: u32,
+    latest_leaf_id: u32,
     target: [u8; 32],
 ) -> Result<Response, ContractError> {
-    // Validation 1. Check if any funds are sent with this message.
-    if !info.funds.is_empty() {
-        return Err(ContractError::UnnecessaryFunds {});
-    }
-
     let vanchor = VANCHOR.load(deps.storage)?;
     let linkable_tree = vanchor.linkable_tree;
-    if linkable_tree.has_edge(src_chain_id, deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Edge already exists".to_string(),
-        }));
-    }
 
     let curr_length = linkable_tree.get_latest_neighbor_edges(deps.storage).len();
     if curr_length > linkable_tree.max_edges as usize {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Too many edges".to_string(),
-        }));
+        return Err(ContractError::TooManyEdges);
     }
 
     // craft edge
     let edge: Edge = Edge {
         src_chain_id,
         root,
-        latest_leaf_index,
         target,
+        latest_leaf_index: latest_leaf_id,
     };
 
     // update historical neighbor list for this edge's root
@@ -963,30 +951,16 @@ fn add_edge(
 /// Update an edge for underlying linkable tree
 fn update_edge(
     deps: DepsMut,
-    info: MessageInfo,
     src_chain_id: u64,
     root: [u8; 32],
-    latest_leaf_index: u32,
+    latest_leaf_id: u32,
     target: [u8; 32],
 ) -> Result<Response, ContractError> {
-    // Validation 1. Check if any funds are sent with this message.
-    if !info.funds.is_empty() {
-        return Err(ContractError::UnnecessaryFunds {});
-    }
-
-    let vanchor = VANCHOR.load(deps.storage)?;
-    let linkable_tree = vanchor.linkable_tree;
-    if !linkable_tree.has_edge(src_chain_id, deps.storage) {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Edge does not exist".to_string(),
-        }));
-    }
-
     let edge: Edge = Edge {
         src_chain_id,
         root,
-        latest_leaf_index,
         target,
+        latest_leaf_index: latest_leaf_id,
     };
     let neighbor_root_idx =
         (read_curr_neighbor_root_index(deps.storage, src_chain_id)? + 1) % HISTORY_LENGTH;
@@ -996,6 +970,39 @@ fn update_edge(
     save_edge(deps.storage, src_chain_id, edge)?;
 
     Ok(Response::new().add_attributes(vec![attr("method", "udpate_edge")]))
+}
+
+/// Sets a new handler for the contract
+fn set_handler(
+    deps: DepsMut,
+    info: MessageInfo,
+    handler: String,
+    nonce: u32,
+) -> Result<Response, ContractError> {
+    let mut vanchor = VANCHOR.load(deps.storage)?;
+    let curr_handler = vanchor.handler;
+    let proposal_nonce = vanchor.proposal_nonce;
+
+    // Validations
+    if info.sender != curr_handler {
+        return Err(ContractError::Unauthorized {});
+    }
+    if nonce <= proposal_nonce || proposal_nonce + 1048 < nonce {
+        return Err(ContractError::InvalidNonce);
+    }
+
+    // Save a new "handler"
+    let new_handler = deps.api.addr_validate(&handler)?;
+    vanchor.handler = new_handler;
+    vanchor.proposal_nonce = nonce;
+
+    VANCHOR.save(deps.storage, &vanchor)?;
+
+    Ok(Response::new().add_attributes(vec![
+        attr("method", "set_handler"),
+        attr("handler", handler),
+        attr("nonce", nonce.to_string()),
+    ]))
 }
 
 // Check if the "nullifier" is already used or not.
@@ -1015,8 +1022,66 @@ fn verify(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        // TODO
+        QueryMsg::Config {} => to_binary(&get_config(deps)?),
+        QueryMsg::EdgeInfo { id } => to_binary(&get_edge_info(deps, id)?),
+        QueryMsg::NeighborRootInfo { chain_id, id } => {
+            to_binary(&get_neighbor_root_info(deps, chain_id, id)?)
+        }
+        QueryMsg::MerkleTreeInfo {} => to_binary(&get_merkle_tree_info(deps)?),
+        QueryMsg::MerkleRootInfo { id } => to_binary(&get_merkle_root(deps, id)?),
     }
+}
+
+pub fn get_config(deps: Deps) -> StdResult<ConfigResponse> {
+    let vanchor = VANCHOR.load(deps.storage)?;
+    Ok(ConfigResponse {
+        handler: vanchor.handler.to_string(),
+        proposal_nonce: vanchor.proposal_nonce,
+        chain_id: vanchor.chain_id,
+        tokenwrapper_addr: vanchor.tokenwrapper_addr.to_string(),
+        max_deposit_amt: vanchor.max_deposit_amt.to_string(),
+        min_withdraw_amt: vanchor.min_withdraw_amt.to_string(),
+        max_ext_amt: vanchor.max_ext_amt.to_string(),
+        max_fee: vanchor.max_fee.to_string(),
+    })
+}
+
+pub fn get_edge_info(deps: Deps, id: u64) -> StdResult<EdgeInfoResponse> {
+    let edge = read_edge(deps.storage, id)?;
+    Ok(EdgeInfoResponse {
+        src_chain_id: edge.src_chain_id,
+        root: edge.root,
+        latest_leaf_index: edge.latest_leaf_index,
+        target: edge.target,
+    })
+}
+
+pub fn get_neighbor_root_info(
+    deps: Deps,
+    chain_id: u64,
+    id: u32,
+) -> StdResult<NeighborRootInfoResponse> {
+    let neighbor_root = read_neighbor_roots(deps.storage, (chain_id, id))?;
+    Ok(NeighborRootInfoResponse { neighbor_root })
+}
+
+pub fn get_merkle_tree_info(deps: Deps) -> StdResult<MerkleTreeInfoResponse> {
+    let vanchor = VANCHOR.load(deps.storage)?;
+    Ok(MerkleTreeInfoResponse {
+        levels: vanchor.merkle_tree.levels,
+        curr_root_index: vanchor.merkle_tree.current_root_index,
+        next_index: vanchor.merkle_tree.next_index,
+    })
+}
+
+pub fn get_merkle_root(deps: Deps, id: u32) -> StdResult<MerkleRootInfoResponse> {
+    let root = read_root(deps.storage, id)?;
+    Ok(MerkleRootInfoResponse { root })
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    Ok(Response::default())
 }

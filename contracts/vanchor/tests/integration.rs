@@ -23,6 +23,7 @@ const MIN_WITHDRAW_AMT: u128 = 0;
 const MAX_EXT_AMT: u128 = 20;
 const MAX_FEE: u128 = 10;
 const CW20_ADDRESS: &str = "terra1340t6lqq6jxhm8d6gtz0hzz5jzcszvm27urkn2";
+const HANDLER: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 
 #[test]
 fn integration_test_instantiate_mixer() {
@@ -38,6 +39,7 @@ fn integration_test_instantiate_mixer() {
         max_ext_amt: Uint128::from(MAX_EXT_AMT),
         max_fee: Uint128::from(MAX_FEE),
         tokenwrapper_addr: CW20_ADDRESS.to_string(),
+        handler: HANDLER.to_string(),
     };
     let info = mock_info("creator", &[]);
     let response: Response = instantiate(&mut deps, mock_env(), info, msg).unwrap();
