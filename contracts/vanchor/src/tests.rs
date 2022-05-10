@@ -102,8 +102,6 @@ fn test_vanchor_update_config() {
 
     // Fail to update the config with "unauthorized" error.
     let update_config_msg = UpdateConfigMsg {
-        max_deposit_amt: Some(Uint128::from(1u128)),
-        min_withdraw_amt: Some(Uint128::from(1u128)),
         max_ext_amt: Some(Uint128::from(1u128)),
         max_fee: Some(Uint128::from(1u128)),
     };
@@ -121,8 +119,6 @@ fn test_vanchor_update_config() {
 
     // We can just call .unwrap() to assert "execute" was success
     let update_config_msg = UpdateConfigMsg {
-        max_deposit_amt: Some(Uint128::from(1u128)),
-        min_withdraw_amt: Some(Uint128::from(1u128)),
         max_ext_amt: Some(Uint128::from(1u128)),
         max_fee: Some(Uint128::from(1u128)),
     };

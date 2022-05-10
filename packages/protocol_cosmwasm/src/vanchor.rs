@@ -35,7 +35,10 @@ pub enum ExecuteMsg {
 
     /// Wraps the native token to "TokenWrapper" token
     /// Send the tokens back to `tx sender` or deposit to `this` contract
-    WrapNative { amount: Uint128, is_deposit: bool },
+    WrapNative {
+        amount: Uint128,
+        is_deposit: bool,
+    },
 
     /// Unwraps the "TokenWrapper" token to native token
     /// Send the tokens back to `tx sender` or `recipient`
@@ -70,22 +73,31 @@ pub enum ExecuteMsg {
         ext_data: ExtData,
     },
 
+    /// Sets a new handler for the contract
+    SetHandler {
+        handler: String,
+        nonce: u32,
+    },
+
     /// Update an edge for underlying tree
     UpdateEdge {
         src_chain_id: u64,
         root: [u8; 32],
-        latest_leaf_index: u32,
+        latest_leaf_id: u32,
         target: [u8; 32],
     },
 
-    /// Sets a new handler for the contract
-    SetHandler { handler: String, nonce: u32 },
+    ConfigureMinimalWithdrawalLimit {
+        minimal_withdrawal_amount: Uint128,
+    },
+
+    ConfigureMaximumDepositLimit {
+        maximum_deposit_amount: Uint128,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UpdateConfigMsg {
-    pub max_deposit_amt: Option<Uint128>,
-    pub min_withdraw_amt: Option<Uint128>,
     pub max_ext_amt: Option<Uint128>,
     pub max_fee: Option<Uint128>,
 }

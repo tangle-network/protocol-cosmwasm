@@ -188,17 +188,59 @@ pub fn execute(
         ExecuteMsg::UpdateEdge {
             src_chain_id,
             root,
-            latest_leaf_index,
+            latest_leaf_id,
             target,
         } => {
             let linkable_tree = VANCHOR.load(deps.storage)?.linkable_tree;
             if linkable_tree.has_edge(src_chain_id, deps.storage) {
-                update_edge(deps, src_chain_id, root, latest_leaf_index, target)
+                update_edge(deps, src_chain_id, root, latest_leaf_id, target)
             } else {
-                add_edge(deps, src_chain_id, root, latest_leaf_index, target)
+                add_edge(deps, src_chain_id, root, latest_leaf_id, target)
             }
         }
+
+        ExecuteMsg::ConfigureMaximumDepositLimit {
+            maximum_deposit_amount,
+        } => config_max_deposit_limit(deps, info, maximum_deposit_amount),
+
+        ExecuteMsg::ConfigureMinimalWithdrawalLimit {
+            minimal_withdrawal_amount,
+        } => config_min_withdraw_limit(deps, info, minimal_withdrawal_amount),
     }
+}
+
+fn config_max_deposit_limit(
+    deps: DepsMut,
+    info: MessageInfo,
+    maximum_deposit_amount: Uint128,
+) -> Result<Response, ContractError> {
+    let mut vanchor = VANCHOR.load(deps.storage)?;
+
+    if info.sender != vanchor.handler {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    vanchor.max_deposit_amt = maximum_deposit_amount;
+    VANCHOR.save(deps.storage, &vanchor)?;
+
+    Ok(Response::new().add_attributes(vec![attr("method", "config_max_deposit_amount")]))
+}
+
+fn config_min_withdraw_limit(
+    deps: DepsMut,
+    info: MessageInfo,
+    minimal_withdrawal_amount: Uint128,
+) -> Result<Response, ContractError> {
+    let mut vanchor = VANCHOR.load(deps.storage)?;
+
+    if info.sender != vanchor.handler {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    vanchor.min_withdraw_amt = minimal_withdrawal_amount;
+    VANCHOR.save(deps.storage, &vanchor)?;
+
+    Ok(Response::new().add_attributes(vec![attr("method", "config_min_withdraw_amount")]))
 }
 
 fn update_vanchor_config(
@@ -218,14 +260,6 @@ fn update_vanchor_config(
     }
 
     // Update the vanchor config.
-    if let Some(max_deposit_amt) = msg.max_deposit_amt {
-        vanchor.max_deposit_amt = max_deposit_amt;
-    }
-
-    if let Some(min_withdraw_amt) = msg.min_withdraw_amt {
-        vanchor.min_withdraw_amt = min_withdraw_amt;
-    }
-
     if let Some(max_ext_amt) = msg.max_ext_amt {
         vanchor.max_ext_amt = max_ext_amt;
     }
@@ -874,7 +908,7 @@ fn add_edge(
     deps: DepsMut,
     src_chain_id: u64,
     root: [u8; 32],
-    latest_leaf_index: u32,
+    latest_leaf_id: u32,
     target: [u8; 32],
 ) -> Result<Response, ContractError> {
     let vanchor = VANCHOR.load(deps.storage)?;
@@ -889,8 +923,8 @@ fn add_edge(
     let edge: Edge = Edge {
         src_chain_id,
         root,
-        latest_leaf_index,
         target,
+        latest_leaf_index: latest_leaf_id,
     };
 
     // update historical neighbor list for this edge's root
@@ -914,14 +948,14 @@ fn update_edge(
     deps: DepsMut,
     src_chain_id: u64,
     root: [u8; 32],
-    latest_leaf_index: u32,
+    latest_leaf_id: u32,
     target: [u8; 32],
 ) -> Result<Response, ContractError> {
     let edge: Edge = Edge {
         src_chain_id,
         root,
-        latest_leaf_index,
         target,
+        latest_leaf_index: latest_leaf_id,
     };
     let neighbor_root_idx =
         (read_curr_neighbor_root_index(deps.storage, src_chain_id)? + 1) % HISTORY_LENGTH;
