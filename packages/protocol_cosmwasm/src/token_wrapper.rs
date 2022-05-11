@@ -50,7 +50,7 @@ pub enum ExecuteMsg {
 
     /* ----------------------------------- */
 
-    /* ---  Governance functionality  --- */ 
+    /* ---  Governance functionality  --- */
     /// Reset the config
     UpdateConfig(UpdateConfigMsg),
 
