@@ -125,7 +125,7 @@ fn test_handler_execute_proposal() {
 
     let set_handler_proposal = GovernedTokenWrapperExecMsg::UpdateConfig(UpdateConfigMsg {
         governor: Some("new-governor".to_string()),
-        is_native_allowed: Some(1),
+        is_native_allowed: Some(true),
         wrapping_limit: None,
         fee_percentage: None,
         fee_recipient: None,

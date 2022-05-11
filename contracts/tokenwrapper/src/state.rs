@@ -12,6 +12,7 @@ pub struct Supply {
 }
 
 /// Config
+/// Governance - related params
 #[derive(Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
 pub struct Config {
     pub governor: Addr,
@@ -23,7 +24,10 @@ pub struct Config {
     pub proposal_nonce: u64,
 }
 
+/// Normal Cw20 - related
 pub const TOTAL_SUPPLY: Item<Supply> = Item::new("total_supply");
+
+/// Governance - related
 pub const CONFIG: Item<Config> = Item::new("config");
 
 pub const TOKENS: Map<Addr, bool> = Map::new("tokens");

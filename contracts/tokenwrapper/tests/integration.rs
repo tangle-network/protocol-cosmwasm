@@ -21,7 +21,7 @@ const DECIMALS: u8 = 6;
 const FEE_RECIPIENT: &str = "terra1qca9hs2qk2w29gqduaq9k720k9293qt7q8nszl";
 const FEE_PERCENTAGE: &str = "1";
 const NATIVE_TOKEN_DENOM: &str = "uusd";
-const WRAPPING_LIMIT: &str = "5000000";
+const WRAPPING_LIMIT: u128 = 5000000;
 const IS_NATIVE_ALLOWED: u32 = 1;
 
 #[test]
@@ -37,7 +37,7 @@ fn integration_test_instantiate_tokenwrapper() {
         fee_percentage: FEE_PERCENTAGE.to_string(),
         native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
         is_native_allowed: IS_NATIVE_ALLOWED,
-        wrapping_limit: WRAPPING_LIMIT.to_string(),
+        wrapping_limit: Uint128::from(WRAPPING_LIMIT),
     };
 
     let info = mock_info("creator", &[]);
@@ -60,7 +60,7 @@ fn integration_test_tokenwrapper_wrap_native() {
         fee_percentage: FEE_PERCENTAGE.to_string(),
         native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
         is_native_allowed: IS_NATIVE_ALLOWED,
-        wrapping_limit: WRAPPING_LIMIT.to_string(),
+        wrapping_limit: Uint128::from(WRAPPING_LIMIT),
     };
 
     let info = mock_info("creator", &[]);
@@ -113,7 +113,7 @@ fn integration_test_tokenwrapper_unwrap_native() {
         fee_percentage: FEE_PERCENTAGE.to_string(),
         native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
         is_native_allowed: IS_NATIVE_ALLOWED,
-        wrapping_limit: WRAPPING_LIMIT.to_string(),
+        wrapping_limit: Uint128::from(WRAPPING_LIMIT),
     };
 
     let info = mock_info("creator", &[]);

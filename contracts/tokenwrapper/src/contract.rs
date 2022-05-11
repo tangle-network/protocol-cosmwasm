@@ -67,10 +67,6 @@ pub fn instantiate(
     };
     let fee_recipient = deps.api.addr_validate(msg.fee_recipient.as_str())?;
     let fee_percentage = calc_fee_perc_from_string(msg.fee_percentage)?;
-    let wrapping_limit = match parse_string_to_uint128(msg.wrapping_limit) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
     CONFIG.save(
         deps.storage,
         &Config {
@@ -79,7 +75,7 @@ pub fn instantiate(
             fee_percentage,
             native_token_denom: msg.native_token_denom,
             is_native_allowed: msg.is_native_allowed != 0,
-            wrapping_limit,
+            wrapping_limit: msg.wrapping_limit,
             proposal_nonce: 0_u64,
         },
     )?;
@@ -95,6 +91,7 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
+        /* -------  TokenWrapper functionality ------------ */
         // Used to wrap native tokens on behalf of a sender.
         ExecuteMsg::Wrap { sender, recipient } => wrap_native(deps, env, info, sender, recipient),
 
@@ -113,8 +110,9 @@ pub fn execute(
 
         // Used to wrap cw20 tokens on behalf of a sender.
         ExecuteMsg::Receive(msg) => wrap_cw20(deps, env, info, msg),
+        /* ------------------------------------- */
 
-        // // Governing functionality
+        /* -----  Governance functionality ----- */
         // Resets the config. Only the governor can execute this entry.
         ExecuteMsg::UpdateConfig(msg) => update_config(deps, info, msg),
 
@@ -125,7 +123,7 @@ pub fn execute(
         ExecuteMsg::RemoveCw20TokenAddr { token, nonce } => {
             remove_token_addr(deps, info, token, nonce)
         }
-
+        /* --------------------------------------- */
         // These all come from cw20-base to implement the cw20 standard
         ExecuteMsg::Transfer { recipient, amount } => {
             Ok(execute_transfer(deps, env, info, recipient, amount)?)
@@ -459,19 +457,11 @@ fn update_config(
     }
 
     if msg.is_native_allowed.is_some() {
-        config.is_native_allowed = msg.is_native_allowed.unwrap() != 0;
+        config.is_native_allowed = msg.is_native_allowed.unwrap();
     }
 
     if msg.wrapping_limit.is_some() {
-        let new_wrapping_limit = match msg.wrapping_limit.unwrap().parse::<u128>() {
-            Ok(v) => Uint128::from(v),
-            Err(e) => {
-                return Err(ContractError::Std(StdError::GenericErr {
-                    msg: e.to_string(),
-                }))
-            }
-        };
-        config.wrapping_limit = new_wrapping_limit;
+        config.wrapping_limit = msg.wrapping_limit.unwrap_or(config.wrapping_limit);
     }
 
     if msg.fee_percentage.is_some() {
@@ -479,9 +469,7 @@ fn update_config(
     }
 
     if msg.fee_recipient.is_some() {
-        config.fee_recipient = deps
-            .api
-            .addr_validate(msg.fee_recipient.unwrap().as_str())?;
+        config.fee_recipient = deps.api.addr_validate(&msg.fee_recipient.unwrap())?;
     }
 
     // Save the new config

@@ -11,6 +11,8 @@ pub struct InstantiateMsg {
     pub symbol: String,
     /// decimal places of the Wrapping target token (for UI)
     pub decimals: u8,
+
+    /* --- Governance - related params --- */
     /// addr of governor
     pub governor: Option<String>,
     /// addr of fee recipient
@@ -22,12 +24,13 @@ pub struct InstantiateMsg {
     /// flag of is_native_allowed
     pub is_native_allowed: u32,
     /// wrapping limit
-    pub wrapping_limit: String,
+    pub wrapping_limit: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
+    /* ---    TokenWrapper functionality  ---- */
     /// Wrap the native token for "sender" address/tx sender address.
     Wrap {
         sender: Option<String>,
@@ -45,11 +48,10 @@ pub enum ExecuteMsg {
     /// Wrap the Cw20 token
     Receive(Cw20ReceiveMsg),
 
-    /// Governing functionality
+    /* ----------------------------------- */
+
+    /* ---  Governance functionality  --- */
     /// Reset the config
-    /// "governor",       "is_native_allowed",
-    /// "wrapping_limit", "fee_percentage",
-    /// "fee_recipient".
     UpdateConfig(UpdateConfigMsg),
 
     /// Add cw20 token address to wrapping list
@@ -58,6 +60,9 @@ pub enum ExecuteMsg {
     /// Remove cw20 token address from wrapping list (disallow wrapping)
     RemoveCw20TokenAddr { token: String, nonce: u64 },
 
+    /* ---------------------------------- */
+
+    /* ---      Cw20 functions       --- */
     /// Implements CW20. Transfer is a base message to move tokens to another account without triggering actions
     Transfer { recipient: String, amount: Uint128 },
     /// Implements CW20. Burn is a base message to destroy tokens forever
@@ -138,8 +143,8 @@ pub enum Cw20HookMsg {
 #[serde(rename_all = "snake_case")]
 pub struct UpdateConfigMsg {
     pub governor: Option<String>,
-    pub is_native_allowed: Option<u32>,
-    pub wrapping_limit: Option<String>,
+    pub is_native_allowed: Option<bool>,
+    pub wrapping_limit: Option<Uint128>,
     pub fee_percentage: Option<String>,
     pub fee_recipient: Option<String>,
 }
