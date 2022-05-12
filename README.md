@@ -9,7 +9,7 @@
 <br />
 
 ## Introduction  
-This repository contains the Cosmwasm implementation of Webb Protocol, which would be used for Cosmos SDK blockchains   
+This repository contains the Cosmwasm implementation of **Webb Protocol**, which would be used for *Cosmos SDK* blockchains.   
 
 ## Contracts layout  
 ```
@@ -26,9 +26,8 @@ contracts/
 ## Building the contracts(wasm)
 
 ### Prerequisites
-#### Install Rust
+#### Install Rust & dependency
 Install the latest version of Rust by following the instructions [here](https://www.rust-lang.org/tools/install).  
-#### Dependencies
 Add the compilation target.
 ```
 rustup default stable  
@@ -40,9 +39,9 @@ To build the contract, run the following command.
 ```
 cargo wasm
 ```
-You can see the output wasm file in the "target/wasm32-unknown-unknown/release" dir.
+You can see the output wasm file in the **target/wasm32-unknown-unknown/release** directory.
 
-For the optimization, run the following command.
+For the optimization, run the following command.  
 **Important**: You will need [docker](https://www.docker.com/) installed to run this command.  
 ```
 docker run --rm -v "$(pwd)":/code \
@@ -50,7 +49,7 @@ docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
   cosmwasm/workspace-optimizer:0.12.5
 ```
-Then, you can see the output wasm file in the "artifacts" directory.
+Then, you can see the output wasm file in the **artifacts** directory.
 
 ## Testing 
 Run the following command to run the unit tests.  
