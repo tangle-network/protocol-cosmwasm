@@ -14,13 +14,13 @@ This repository contains the Cosmwasm implementation of **Webb Protocol**, which
 ## Contracts layout  
 ```
 contracts/
-    |___anchor/              
-    |___anchor-handler/
-    |___mixer/   
-    |___signature-bridge/   
-    |___tokenwrapper/   
-    |___tokenwrapper-handler/   
-    |___vanchor/   
+    |___anchor/                    # Anchor(FixedDepositAnchor) contract
+    |___anchor-handler/            # Contract for executing the creation & modification of anchor  
+    |___mixer/                     # Mixer contract  
+    |___signature-bridge/          # Contract for managing voting, resource, and maintainer composition through signature verification    
+    |___tokenwrapper/              # Contract for wrapping pooled assets and minting pool share tokens  
+    |___tokenwrapper-handler/      # Contract for executing the creation & modification of token-wrapper  
+    |___vanchor/                   # Variable Anchor contract  
 ```  
 
 ## Building the contracts(wasm)
