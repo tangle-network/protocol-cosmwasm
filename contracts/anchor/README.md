@@ -2,7 +2,6 @@
 
 This is the cosmwasm implementation of "anchor" contract.
 
-## Brief introduction
 The **FixedDepositAnchor** system is an interoperable shielded pool supporting   
 fixed denomination deposits of CW20 tokens.  
 
