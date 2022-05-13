@@ -2,8 +2,13 @@
 
 This is the cosmwasm implementation of "GovernedTokenWrapper" contract.
 
-- A governed TokenWrapper system using an external `governor` address  
+Basically, this contract is a CW20 token that allows other CW20s to wrap into and mint it.
 
-- Governs allowable CW20s to deposit using a governable wrapping limit and
-  sets fees for wrapping into itself. This contract is intended to be used with
-  TokenHandler contract.
+This contract is intended to be used with **TokenHandler** contract.
+
+This contract also has a **governance** functionality.
+
+- **Governed TokenWrapper** system using an external `governor` address  
+
+- Governs allowable CW20s to deposit using a *governable wrapping limit* and
+  sets *fee*s for wrapping into itself.
