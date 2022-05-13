@@ -1,6 +1,5 @@
 use ark_bn254::Bn254;
-use arkworks_native_gadgets::poseidon::Poseidon;
-use arkworks_setups::common::{setup_params, Leaf, MixerProof};
+use arkworks_setups::common::Leaf;
 use arkworks_setups::r1cs::mixer::MixerR1CSProver;
 use arkworks_setups::Curve;
 use arkworks_setups::MixerProver;
