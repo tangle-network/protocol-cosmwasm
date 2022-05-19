@@ -1,6 +1,7 @@
 //! This integration test tries to run and call the generated wasm.
 
 use cosmwasm_std::{attr, to_binary, Response, Uint128};
+use cosmwasm_vm::testing::mock_instance;
 use cosmwasm_vm::testing::{
     execute, instantiate, mock_env, mock_info, mock_instance_with_gas_limit, query,
 };
@@ -35,7 +36,7 @@ const HANDLER: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 #[test]
 fn integration_test_instantiate_anchor() {
     // "Gas_limit" should be set high manually, since the low value can cause "GasDepletion" error.
-    let mut deps = mock_instance_with_gas_limit(WASM, 100_000_000);
+    let mut deps = mock_instance_with_gas_limit(WASM, u64::MAX);
 
     let msg = InstantiateMsg {
         max_edges: MAX_EDGES,
@@ -57,7 +58,7 @@ fn integration_test_instantiate_anchor() {
 
 #[test]
 fn test_deposit_cw20() {
-    let mut deps = mock_instance_with_gas_limit(WASM, 200_000_000);
+    let mut deps = mock_instance_with_gas_limit(WASM, u64::MAX);
 
     // Initialize the contract
     let env = mock_env();

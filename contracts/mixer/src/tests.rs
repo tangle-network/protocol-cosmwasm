@@ -35,7 +35,7 @@ pub enum MixerType {
 }
 
 fn create_mixer(ty: MixerType) -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
 
     // Initialize the contract
     let env = mock_env();
@@ -110,7 +110,7 @@ fn prepare_zk_circuit(
 
 #[test]
 fn test_mixer_proper_initialization() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
 
     let env = mock_env();
     let info = mock_info("anyone", &[]);

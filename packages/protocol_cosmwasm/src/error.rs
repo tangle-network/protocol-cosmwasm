@@ -114,7 +114,8 @@ impl From<cw20_base::ContractError> for ContractError {
             | cw20_base::ContractError::CannotExceedCap {}
             | cw20_base::ContractError::LogoTooBig {}
             | cw20_base::ContractError::InvalidPngHeader {}
-            | cw20_base::ContractError::InvalidXmlPreamble {} => {
+            | cw20_base::ContractError::InvalidXmlPreamble {}
+            | cw20_base::ContractError::DuplicateInitialBalanceAddresses {} => {
                 ContractError::Std(StdError::generic_err(err.to_string()))
             }
         }

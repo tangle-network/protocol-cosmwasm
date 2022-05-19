@@ -30,11 +30,11 @@ optimize = """docker run --rm -v "$(pwd)":/code \
 """
 
 [dependencies]
-cosmwasm-std = { version = "0.16.2" }
-cosmwasm-storage = { version = "0.16.0" }
-cw-storage-plus = "0.8.0"
-cw2 = "0.8.1"
-cw20 = "0.8.1"
+cosmwasm-std = { version = "1.0.0" }
+cosmwasm-storage = { version = "1.0.0" }
+cw-storage-plus = "0.13.2"
+cw2 = "0.13.2"
+cw20 = "0.13.2"
 schemars = "0.8.3"
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.26" }
@@ -55,8 +55,8 @@ ark-serialize = { version = "^0.3.0", default-features = false }
 protocol-cosmwasm = { version = "0.1.0", path = "../../packages/protocol_cosmwasm"}
 
 [dev-dependencies]
-cosmwasm-schema = { version = "0.16.0" }
-cosmwasm-vm = { version = "0.16.5" }
+cosmwasm-schema = { version = "1.0.0" }
+cosmwasm-vm = { version = "1.0.0" }
 
 [target.'cfg(not(target_arch="wasm32"))'.dependencies]
 wasm-utils = { version = "0.1.3" }

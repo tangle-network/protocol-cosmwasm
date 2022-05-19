@@ -38,7 +38,7 @@ pub fn get_fee_from_amount(amount_to_wrap: Uint128, fee_perc: u128) -> Uint128 {
 pub fn get_amount_to_wrap(target_amount: Uint128, fee_perc: u128) -> Uint128 {
     target_amount.multiply_ratio(
         Decimal::MAX.denominator(),
-        Decimal::MAX.denominator() - fee_perc,
+        Decimal::MAX.denominator().u128() - fee_perc,
     )
 }
 

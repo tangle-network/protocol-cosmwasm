@@ -199,7 +199,8 @@ fn wrap_native(
     }
 
     // Calculate the "fee" & "amount_to_wrap".
-    let cost_to_wrap = get_fee_from_amount(wrapping_amount, config.fee_percentage.numerator());
+    let cost_to_wrap =
+        get_fee_from_amount(wrapping_amount, config.fee_percentage.numerator().u128());
     let left_over = wrapping_amount - cost_to_wrap;
 
     // Save the wrapped token amount.
@@ -384,7 +385,8 @@ fn wrap_cw20(
 
     // Calculate the "fee" & "amount_to_wrap".
     let config = CONFIG.load(deps.storage)?;
-    let cost_to_wrap = get_fee_from_amount(cw20_msg.amount, config.fee_percentage.numerator());
+    let cost_to_wrap =
+        get_fee_from_amount(cw20_msg.amount, config.fee_percentage.numerator().u128());
     let left_over = cw20_msg.amount - cost_to_wrap;
 
     match from_binary(&cw20_msg.msg) {
@@ -603,7 +605,7 @@ fn query_fee_from_amount(deps: Deps, amount_to_wrap: String) -> StdResult<FeeFro
     let config = CONFIG.load(deps.storage)?;
     let amount_to_wrap = parse_string_to_uint128(amount_to_wrap)?;
     let fee_perc = config.fee_percentage.numerator();
-    let fee_amt = get_fee_from_amount(amount_to_wrap, fee_perc);
+    let fee_amt = get_fee_from_amount(amount_to_wrap, fee_perc.u128());
     Ok(FeeFromAmountResponse {
         amount_to_wrap: amount_to_wrap.to_string(),
         fee_amt: fee_amt.to_string(),
@@ -614,7 +616,7 @@ fn query_amount_to_wrap(deps: Deps, target_amount: String) -> StdResult<GetAmoun
     let config = CONFIG.load(deps.storage)?;
     let target_amount = parse_string_to_uint128(target_amount)?;
     let fee_perc = config.fee_percentage.numerator();
-    let amount_to_wrap = get_amount_to_wrap(target_amount, fee_perc);
+    let amount_to_wrap = get_amount_to_wrap(target_amount, fee_perc.u128());
     Ok(GetAmountToWrapResponse {
         target_amount: target_amount.to_string(),
         amount_to_wrap: amount_to_wrap.to_string(),

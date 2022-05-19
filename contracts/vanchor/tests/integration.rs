@@ -28,7 +28,7 @@ const HANDLER: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 #[test]
 fn integration_test_instantiate_mixer() {
     // "Gas_limit" should be set high manually, since the low value can cause "GasDepletion" error.
-    let mut deps = mock_instance_with_gas_limit(WASM, 100_000_000);
+    let mut deps = mock_instance_with_gas_limit(WASM, u64::MAX);
 
     let msg = InstantiateMsg {
         chain_id: CHAIN_ID,
