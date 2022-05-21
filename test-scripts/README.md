@@ -71,9 +71,9 @@ nano ./src/config/localjunoConstants.ts
 
 ```bash
 yarn
-yarn test:localjuno-setup-station
+yarn test:localjuno-setup-contracts
 yarn test:localjuno-tests
 ```
 
-**NOTE:** After each of the setup commands, you may see key contract addresses or wasm codes that will need to updated in your `localjunoConstatns.ts` file before proceeding to run the next command. These commands build upon on another.  
+**NOTE:** After each of the setup commands, you may see key contract addresses or wasm codes that will need to updated in your `localjunoConstants.ts` file before proceeding to run the next command. These commands build upon on another.  
 Also, after one command, the terminal does not automatically get back. So, you should do it manually by `Ctrl + C`.
