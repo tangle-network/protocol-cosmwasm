@@ -12,3 +12,6 @@ Cargo.lock
 /artifacts
 
 node_modules
+
+test-scripts/src/config/localjunoConstants.ts
+test-scripts/src/config/wasmPaths.ts
