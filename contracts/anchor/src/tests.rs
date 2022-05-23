@@ -59,7 +59,7 @@ fn create_anchor() -> OwnedDeps<MockStorage, MockApi, crate::mock_querier::WasmM
 
 #[test]
 fn test_anchor_proper_initialization() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
     let env = mock_env();
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {

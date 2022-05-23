@@ -1,5 +1,6 @@
 use cosmwasm_std::testing::{
-    mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
+    mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info, MockApi, MockQuerier,
+    MockStorage,
 };
 use cosmwasm_std::{attr, coins, from_binary, to_binary, Addr, Coin, OwnedDeps, Uint128};
 use cw20::{BalanceResponse, Cw20ReceiveMsg, TokenInfoResponse};
@@ -22,7 +23,7 @@ const WRAPPING_LIMIT: u128 = 5000000;
 const IS_NATIVE_ALLOWED: u32 = 1;
 
 fn init_tokenwrapper(coins: Vec<Coin>) -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
-    let mut deps = mock_dependencies(&coins);
+    let mut deps = mock_dependencies_with_balance(&coins);
 
     let info = mock_info("creator", &[]);
     let instantiate_msg = InstantiateMsg {
@@ -44,7 +45,7 @@ fn init_tokenwrapper(coins: Vec<Coin>) -> OwnedDeps<MockStorage, MockApi, MockQu
 
 #[test]
 fn proper_initialization() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
 
     let info = mock_info("creator", &[]);
     let instantiate_msg = InstantiateMsg {

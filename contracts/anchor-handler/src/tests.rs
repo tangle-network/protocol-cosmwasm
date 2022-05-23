@@ -16,7 +16,7 @@ const ANCHOR_CONTRACT: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 const NEW_HANDLER: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
 
 fn instantiate_anchor_handler() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
 
     // Instantiate the "anchor-handler".
     let msg = InstantiateMsg {
@@ -41,7 +41,7 @@ fn proposal_to_exec_data(resource_id: [u8; 32], proposal: LinkableAnchorExecMsg)
 
 #[test]
 fn proper_initialization() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
 
     let msg = InstantiateMsg {
         bridge_addr: BRIDGE_ADDR.to_string(),

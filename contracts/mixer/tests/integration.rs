@@ -33,7 +33,7 @@ const NATIVE_TOKEN_DENOM: &str = "uusd";
 #[test]
 fn integration_test_instantiate_mixer() {
     // "Gas_limit" should be set high manually, since the low value can cause "GasDepletion" error.
-    let mut deps = mock_instance_with_gas_limit(WASM, 100_000_000);
+    let mut deps = mock_instance_with_gas_limit(WASM, u64::MAX);
 
     let msg = InstantiateMsg {
         merkletree_levels: MERKLE_TREE_LEVELS,
@@ -53,7 +53,7 @@ fn integration_test_instantiate_mixer() {
 
 #[test]
 fn integration_test_mixer_deposit_native_token() {
-    let mut deps = mock_instance_with_gas_limit(WASM, 200_000_000);
+    let mut deps = mock_instance_with_gas_limit(WASM, u64::MAX);
 
     // Initialize the contract
     let env = mock_env();
@@ -92,7 +92,7 @@ fn integration_test_mixer_deposit_native_token() {
 
 #[test]
 fn integration_test_mixer_deposit_cw20_token() {
-    let mut deps = mock_instance_with_gas_limit(WASM, 200_000_000);
+    let mut deps = mock_instance_with_gas_limit(WASM, u64::MAX);
 
     // Initialize the contract
     let env = mock_env();

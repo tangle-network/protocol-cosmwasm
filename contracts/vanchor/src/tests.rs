@@ -76,7 +76,7 @@ fn hash_ext_data(ext_data: ExtData, ext_amount: i128, fee: u128) -> [u8; 32] {
 
 #[test]
 fn test_vanchor_proper_initialization() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
 
     let msg = InstantiateMsg {
         chain_id: TEST_CHAIN_ID,

@@ -16,7 +16,7 @@ const RESOURCE_ID: [u8; 32] = [1u8; 32];
 const CONTRACT_ADDRESS: &str = "terra1jrj2vh6cstqwk3pg8nkmdf0r9z0n3q3f3jk5xn";
 
 fn instantiate_tokenwrapper_handler() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
 
     // Instantiate the "tokenwrapper-handler".
     let msg = InstantiateMsg {
@@ -41,7 +41,7 @@ fn proposal_to_exec_data(resource_id: [u8; 32], proposal: GovernedTokenWrapperEx
 
 #[test]
 fn proper_initialization() {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
 
     let msg = InstantiateMsg {
         bridge_addr: BRIDGE_ADDR.to_string(),
