@@ -257,6 +257,7 @@ fn unwrap_native(
     amount: Uint128,
     recipient: Option<String>,
 ) -> Result<Response, ContractError> {
+    let sender = sender.unwrap_or_else(|| info.sender.to_string());
     let config = CONFIG.load(deps.storage)?;
     // Validate the "is_native_allowed"
     if !config.is_native_allowed {
@@ -266,9 +267,9 @@ fn unwrap_native(
     }
 
     // Validate the "amount"
-    if !is_valid_unwrap_amount(deps.branch(), info.clone(), amount) {
+    if !is_valid_unwrap_amount(deps.branch(), &sender, amount) {
         return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Insufficient native token balance".to_string(),
+            msg: format!("Insufficient native token balance for sender({})", &sender),
         }));
     }
 
@@ -278,7 +279,6 @@ fn unwrap_native(
     TOTAL_SUPPLY.save(deps.storage, &Supply { issued: remainder })?;
 
     // burn from the "sender"
-    let sender = sender.unwrap_or_else(|| info.sender.to_string());
     let sub_info = MessageInfo {
         sender: deps.api.addr_validate(sender.as_str())?,
         funds: vec![],
@@ -311,6 +311,8 @@ fn unwrap_cw20(
     amount: Uint128,
     recipient: Option<String>,
 ) -> Result<Response, ContractError> {
+    let sender = sender.unwrap_or_else(|| info.sender.to_string());
+
     // Validate the "token" address
     let is_valid_unwrap_address = HISTORICAL_TOKENS.has(deps.storage, token.clone());
     if !is_valid_unwrap_address {
@@ -320,7 +322,7 @@ fn unwrap_cw20(
     }
 
     // Validate the "token" amount
-    if !is_valid_unwrap_amount(deps.branch(), info.clone(), amount) {
+    if !is_valid_unwrap_amount(deps.branch(), &sender, amount) {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Insufficient cw20 token amount".to_string(),
         }));
@@ -332,7 +334,6 @@ fn unwrap_cw20(
     TOTAL_SUPPLY.save(deps.storage, &Supply { issued: remainder })?;
 
     // burn from the "sender"
-    let sender = sender.unwrap_or_else(|| info.sender.to_string());
     let sub_info = MessageInfo {
         sender: deps.api.addr_validate(sender.as_str())?,
         funds: vec![],

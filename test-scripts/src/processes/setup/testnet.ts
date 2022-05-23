@@ -44,8 +44,9 @@ export async function setupContracts(
     wallet2 = wallets.wallet2;
     wallet3 = wallets.wallet3;
 
-    await junod.sendTokens(localjuno.addresses.wallet1, localjuno.addresses.wallet2, [coin("10000000", "ucosm"), coin("10000000", "ujunox")], "auto");
-    await junod.sendTokens(localjuno.addresses.wallet1, localjuno.addresses.wallet2, [coin("10000000", "ucosm"), coin("10000000", "ujunox")], "auto");
+    // Send some test tokens to test wallets
+    await junod.sendTokens(localjuno.addresses.wallet1, localjuno.addresses.wallet2, [coin("100000000", "ucosm"), coin("10000000", "ujunox")], "auto");
+    await junod.sendTokens(localjuno.addresses.wallet1, localjuno.addresses.wallet3, [coin("100000000", "ucosm"), coin("10000000", "ujunox")], "auto");
 
     await setup(junod, wallet1);
 
@@ -142,6 +143,14 @@ async function setup(
             "initial_balances": [
                 {
                     "address": localjuno.addresses.wallet1,
+                    "amount": "10000000000"
+                },
+                {
+                    "address": localjuno.addresses.wallet2,
+                    "amount": "10000000000"
+                },
+                {
+                    "address": localjuno.addresses.wallet3,
                     "amount": "10000000000"
                 }
             ]   

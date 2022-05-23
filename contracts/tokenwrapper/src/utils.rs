@@ -20,8 +20,8 @@ pub fn is_valid_wrap_amount(deps: DepsMut, amount: Uint128) -> bool {
 }
 
 // Check if the "unwrap_amount" is valid.
-pub fn is_valid_unwrap_amount(deps: DepsMut, info: MessageInfo, amount: Uint128) -> bool {
-    let sender_token_balance = query_balance(deps.as_ref(), info.sender.to_string())
+pub fn is_valid_unwrap_amount(deps: DepsMut, sender: &str, amount: Uint128) -> bool {
+    let sender_token_balance = query_balance(deps.as_ref(), sender.to_string())
         .unwrap_or(BalanceResponse {
             balance: Uint128::zero(),
         })
