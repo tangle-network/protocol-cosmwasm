@@ -63,7 +63,7 @@ async function setup(
     const cw20CodeId = await storeCode(
         junod,
         wallet1, 
-        `${wasm_path.station}/cw_erc20.wasm`
+        `${wasm_path.station}/cw20_base.wasm`
     );
     console.log(chalk.green(" Done!"), `${chalk.blue("codeId")} = ${cw20CodeId}`);
    
@@ -197,6 +197,15 @@ async function setup(
         }
       );
     tokenWrapper = tokenWrapperResult.contractAddress;
+
+    // Register Cw20(AUTO) token in "TokenWrapper"
+    await junod.execute(localjuno.addresses.wallet1, tokenWrapper, {
+        add_cw20_token_addr: {
+            token: cw20,
+            nonce: 1,
+        }
+    }, "auto", undefined, []);
+    
     console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${tokenWrapper}`);
 
 

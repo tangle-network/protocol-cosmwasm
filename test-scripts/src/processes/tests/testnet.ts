@@ -29,22 +29,24 @@ export async function testExecute(
   // SignatureBridge
 
   // TokenWrapper
-  await testTokenWrapperInitialize(junod, tokenWrapper);
+  // await testTokenWrapperInitialize(junod, tokenWrapper);
 
   // TokenWrapperHandler
 
   // AnchorHandler
 
   // Anchor
-  await testAnchorInitialize(junod, anchor);
+  // await testAnchorInitialize(junod, anchor);
   // await testAnchorDepositWithdraw(junod, anchor, wallet1, wallet2, wallet3, "1000000");
-  await testAnchorWrapNative(junod, anchor, wallet3, "100000");
-  await testAnchorUnwrapNative(junod, anchor, wallet3, "100");
+  // await testAnchorWrapNative(junod, anchor, wallet3, "100000");
+  // await testAnchorUnwrapNative(junod, anchor, wallet3, "100");
+  await testAnchorWrapCw20(junod, anchor, tokenWrapper, cw20, wallet3, "10000");
+  await testAnchorUnwrapCw20(junod, anchor, tokenWrapper, cw20, wallet3, "100");
 
   // VAnchor
 
   // // Mixer
-  await testMixerInitialize(junod, mixer);
+  // await testMixerInitialize(junod, mixer);
   // await testMixerDepositNativeToken(junod, mixer, wallet3, "100");
   // await testMixerWithdrawNativeToken(junod, mixer, wallet1, wallet2, wallet3, "100");
   
@@ -419,6 +421,112 @@ async function testAnchorUnwrapNative(
   const afterUcosm = afterBalance.amount;
 
   expect(parseInt(beforeUcosm) + parseInt(wtw_amount) == parseInt(afterUcosm));
+
+  console.log(chalk.green(" Passed!"));
+}
+
+// -----------------------------------------------
+//  TEST: Anchor
+//  
+//  SCENARIO: 
+//   1. Wallet3 "wrap"s some CW20 token(AUTO) in anchor
+// ------------------------------------------------
+async function testAnchorWrapCw20(
+  junod: SigningCosmWasmClient,
+  anchor: string,
+  tokenWrapper: string,
+  auto: string,
+  wallet3: DirectSecp256k1HdWallet,
+  auto_amount: string,
+): Promise<void> {
+  process.stdout.write(`Test - Wallet3 wrap ${auto_amount} AUTO in anchor`);
+
+  let wallet3_client = await SigningCosmWasmClient.connectWithSigner(
+    localjuno.networkInfo.url, 
+    wallet3, 
+    { gasPrice: GasPrice.fromString("0.1ujunox") },
+  );
+
+  const beforeBalance: any = await junod.queryContractSmart(localjuno.contracts.tokenWrapper, {
+    balance: {
+      address: localjuno.addresses.wallet3,
+    }
+  });
+  const beforeWTW = beforeBalance.balance;
+
+  const wrapCw20Msg = toEncodedBinary({
+    wrap_token: {},
+  });
+
+  const result = await wallet3_client.execute(localjuno.addresses.wallet3, auto, {
+      send: {
+        contract: anchor,
+        amount: auto_amount, 
+        msg: wrapCw20Msg,
+      },
+    },
+    "auto", undefined, []
+  );
+
+  
+  const afterBalance: any = await junod.queryContractSmart(localjuno.contracts.tokenWrapper, {
+    balance: {
+      address: localjuno.addresses.wallet3,
+    }
+  });
+  const afterWTW = afterBalance.balance;
+
+  // Here, we knows that the "fee_percentage" is "0.1".
+  expect(parseInt(beforeWTW) + parseInt(auto_amount) * 0.9 == parseInt(afterWTW));
+
+  console.log(chalk.green(" Passed!"));
+}
+
+// -----------------------------------------------
+//  TEST: Anchor
+//  
+//  SCENARIO: 
+//   1. Wallet3 "unwrap"s some WTW to Cw20 token(AUTO) in anchor
+// ------------------------------------------------
+async function testAnchorUnwrapCw20(
+  junod: SigningCosmWasmClient,
+  anchor: string,
+  tokenWrapper: string,
+  auto: string,
+  wallet3: DirectSecp256k1HdWallet,
+  wtw_amount: string,
+): Promise<void> {
+  process.stdout.write(`Test - Wallet3 unwrap ${wtw_amount} WTW in anchor`);
+
+  let wallet3_client = await SigningCosmWasmClient.connectWithSigner(
+    localjuno.networkInfo.url, 
+    wallet3, 
+    { gasPrice: GasPrice.fromString("0.1ujunox") },
+  );
+
+  const beforeBalance: any = await junod.queryContractSmart(auto, {
+    balance: {
+      address: localjuno.addresses.wallet3 
+    }
+  });
+  const beforeAUTO = beforeBalance.balance;
+
+  const result = await wallet3_client.execute(localjuno.addresses.wallet3, anchor, {
+      unwrap_into_token: {
+        token_addr: auto,
+        amount: wtw_amount, 
+      },
+    },
+    "auto", undefined, []
+  );
+  
+  const afterBalance: any =  await junod.queryContractSmart(auto, {
+    balance: {
+      address: localjuno.addresses.wallet3 
+    }
+  });
+  const afterAUTO = beforeBalance.balance;
+  expect(parseInt(beforeAUTO) + parseInt(wtw_amount) == parseInt(afterAUTO));
 
   console.log(chalk.green(" Passed!"));
 }
