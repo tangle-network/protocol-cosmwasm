@@ -17,11 +17,12 @@
   "dependencies": {
     "@cosmjs/cosmwasm-stargate": "^0.28.4",
     "@cosmjs/proto-signing": "^0.28.4",
-    "@cosmjs/sdk38": "^0.21.1",
     "@cosmjs/stargate": "^0.28.4",
     "@polkadot/api": "^8.5.1",
+    "@polkadot/util": "^9.2.1",
     "@types/crypto-js": "^4.0.2",
     "@webb-tools/api": "^0.1.4-61",
+    "@webb-tools/wasm-utils": "^0.1.2-54",
     "bn.js": "^5.2.0",
     "chai": "^4.3.4",
     "chai-as-promised": "^7.1.1",
