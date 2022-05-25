@@ -56,7 +56,7 @@ pub fn save_neighbor_roots(
 }
 
 // LinkableMerkleTree
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct LinkableMerkleTree {
     pub max_edges: u32,
     pub chain_id_list: Vec<ChainId>,
@@ -177,7 +177,7 @@ impl LinkableMerkleTree {
 }
 
 // VAnchor: (TODO: Add the description)
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct VAnchor {
     pub chain_id: u64,
     pub creator: Addr,
@@ -207,7 +207,7 @@ pub const VERIFIER_2_2: Item<VAnchorVerifier> = Item::new("vanchor_verifier_2_2"
 pub const VERIFIER_16_2: Item<VAnchorVerifier> = Item::new("vanchor_verifier_16_2");
 
 // MerkleTree
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct MerkleTree {
     pub levels: u32,
     pub current_root_index: u32,

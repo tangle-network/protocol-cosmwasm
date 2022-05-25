@@ -11,7 +11,7 @@ use protocol_cosmwasm::structs::ROOT_HISTORY_SIZE;
 use protocol_cosmwasm::zeroes;
 
 // Mixer
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Mixer {
     pub deposit_size: Uint128,
     pub cw20_address: Option<Addr>,
@@ -20,7 +20,7 @@ pub struct Mixer {
 }
 
 // MerkleTree
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct MerkleTree {
     pub levels: u32,
     pub current_root_index: u32,

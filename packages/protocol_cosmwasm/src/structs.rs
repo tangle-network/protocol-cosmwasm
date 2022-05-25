@@ -15,7 +15,7 @@ pub type Element = [u8; 32];
 pub type LatestLeafIndex = u32;
 
 // Edge: Directed connection or link between two anchors.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default, Copy)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema, Default, Copy)]
 pub struct Edge {
     /// chain id
     pub src_chain_id: ChainId,
@@ -28,7 +28,7 @@ pub struct Edge {
 }
 
 /* ------     Anchor/Vanchor-common responses  -------- */
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct EdgeInfoResponse {
     pub src_chain_id: u64,
     pub root: [u8; 32],
@@ -36,40 +36,40 @@ pub struct EdgeInfoResponse {
     pub target: [u8; 32],
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct NeighborRootInfoResponse {
     pub neighbor_root: [u8; 32],
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct MerkleTreeInfoResponse {
     pub levels: u32,
     pub curr_root_index: u32,
     pub next_index: u32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct MerkleRootInfoResponse {
     pub root: [u8; 32],
 }
 
 /* ------    Handler-common responses     ------ */
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct BridgeAddrResponse {
     pub bridge_addr: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct ContractAddrResponse {
     pub contract_addr: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct ResourceIdResponse {
     pub resource_id: [u8; 32],
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct WhitelistCheckResponse {
     pub contract_addr: String,
     pub is_whitelisted: bool,

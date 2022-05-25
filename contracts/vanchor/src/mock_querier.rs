@@ -14,7 +14,7 @@ use protocol_cosmwasm::token_wrapper::{
     ConfigResponse as TokenWrapperConfigResponse, GetAmountToWrapResponse,
 };
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     Config {},
