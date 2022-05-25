@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Decimal, DepsMut, Fraction, MessageInfo, StdError, Uint128};
+use cosmwasm_std::{Addr, Decimal, DepsMut, Fraction, StdError, Uint128};
 use cw20::BalanceResponse;
 use cw20_base::contract::query_balance;
 use protocol_cosmwasm::error::ContractError;
