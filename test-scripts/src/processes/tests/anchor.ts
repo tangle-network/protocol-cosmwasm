@@ -84,7 +84,6 @@ export async function testAnchorInitialize(
         amount: ucosm_amount,
       }
     }, "auto", undefined, [coin(ucosm_to_send, "ucosm")])
-    // console.log(result);
       
     console.log(chalk.green(" Passed!\n"));
   

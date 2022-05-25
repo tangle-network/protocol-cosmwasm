@@ -26,7 +26,6 @@ export async function testTokenWrapperInitialize(
     const result: any = await junod.queryContractSmart(tokenWrapper, {
       config: {},
     });
-    // console.log(result);
   
     expect(result.governor == localjuno.addresses.wallet1).to.be.ok;
     expect(result.native_token_denom == localjuno.contractsConsts.nativeTokenDenom).to.be.ok;

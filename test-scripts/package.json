@@ -7,10 +7,6 @@
     "test": "ts-node ./src/index.ts",
     "test:localjuno-tests": "npm run test --mode=localjuno_tests",
     "test:localjuno-setup-contracts": "npm run test --mode=localjuno_setup_contracts",
-    "test:localjuno-migrate-contracts": "npm run test --mode=localjuno_migrate_contracts",
-    "test:testnet-tests": "npm run test --mode=testnet_tests",
-    "test:testnet-setup-contracts": "npm run test --mode=testnet_setup_contracts",
-    "test:testnet-migrate-contracts": "npm run test --mode=testnet_migrate_contracts",
     "lint": "./node_modules/.bin/eslint .",
     "lint:fix": "npm run lint --fix"
   },

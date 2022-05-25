@@ -72,7 +72,6 @@ export async function testMixerInitialize(
         commitment: [60, 193, 57, 161, 207, 107, 11, 192, 51, 187, 64, 70, 168, 216, 155, 216, 187, 112, 123, 6, 14, 101, 174, 89, 250, 120, 41, 24, 101, 151, 110, 24], 
       }
     }, "auto", undefined, [coin(ucosm_amount, "ucosm")]);
-    // console.log(result);
   
     console.log(chalk.green(" Passed!"));
   }

@@ -31,8 +31,6 @@ export async function storeCode(
   filepath: string
 ): Promise<number> {
   const code = fs.readFileSync(filepath);
-  // const [account] = await deployer.getAccounts();
-  
   const result = await junod.upload(localjuno.addresses.wallet1, code, "auto", );
   return result.codeId;
 }
@@ -48,7 +46,6 @@ export async function instantiateContract(
   codeId: number,
   instantiateMsg: Record<string, unknown>
 ) {
-  // const [account] = await deployer.getAccounts();
   const result = await junod.instantiate(localjuno.addresses.wallet1, codeId, instantiateMsg, "instantiate", "auto");
   return result;
 }
@@ -65,7 +62,6 @@ export async function migrateContract(
   new_code_id: number,
   migrateMsg: Record<string, unknown>
 ) {
-  // const [account] = await sender.getAccounts();
   const result = await junod.migrate(localjuno.addresses.wallet1, contract, new_code_id, migrateMsg, "auto");
   return result;
 }

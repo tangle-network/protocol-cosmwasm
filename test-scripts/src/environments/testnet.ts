@@ -1,7 +1,10 @@
 // -------------------------------------------------------------------------------------
-// TestNet(Bombay-12) test-suite
+// TestNet test-suite
 // -------------------------------------------------------------------------------------
 import chalk from "chalk";
+import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
+import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
+
 import { testnet as config } from "../config/constants";
 import { datetimeStringToUTC } from "../utils/helpers";
 
@@ -10,9 +13,6 @@ import { migrateContracts } from "../processes/migrate/testnet";
 import { setupContracts } from "../processes/setup/testnet";
 
 import { testExecute } from "../processes/tests/testnet";
-import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
-import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
-
 
 // -------------------------------------------------------------------------------------
 // Variables
@@ -49,7 +49,6 @@ async function initialize() {
     console.log(`Use ${chalk.cyan(account1.address)} as Wallet 1`);
     console.log(`Use ${chalk.cyan(account2.address)} as Wallet 2`);
     console.log(`Use ${chalk.cyan(account3.address)} as Wallet 3`);
-    // console.log(`Use ${chalk.cyan(wallet4.key.accAddress)} as Wallet 4`);
 
     cw20 = config.contracts.cw20;
     signatureBridge = config.contracts.signatureBridge;

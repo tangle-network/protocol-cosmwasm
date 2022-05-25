@@ -1,8 +1,7 @@
 import * as LocalNet from "./environments/localjuno";
-import * as TestNet from "./environments/testnet";
 
 //----------------------------------------------------------------------------------------
-// Test-suite for LocalJuno, TestNet, and MainNet
+// Test-suite for LocalJuno
 //----------------------------------------------------------------------------------------
 (async () => {
 	const mode = process.env.npm_config_mode || "";
@@ -12,20 +11,6 @@ import * as TestNet from "./environments/testnet";
 			break;
 		case "localjuno_setup_contracts":
 			await LocalNet.startSetupContracts();
-			break;
-		case "localjuno_migrate_contracts":
-			// await LocalNet.startMigrateContracts();
-			break;
-
-
-		case "testnet_tests":
-			await TestNet.startTests();
-			break;
-		case "testnet_setup_contracts":
-			await TestNet.startSetupContracts();
-			break;
-		case "testnet_migrate_contracts":
-			// await TestNet.startMigrateContracts();
 			break;
 		default:
 			console.log("Invalid command");
