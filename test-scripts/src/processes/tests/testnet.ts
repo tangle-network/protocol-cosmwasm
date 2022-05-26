@@ -72,7 +72,7 @@ export async function testExecute(
 
   // VAnchor
   await testVAnchorInitialize(junod, vanchor);
-  // await testVAnchorDepositWithdraw(junod, vanchor, wallet1, wallet2, wallet3, "1000000");
+  await testVAnchorDepositWithdraw(junod, vanchor, cw20, wallet1, wallet2, wallet3, "10", "10", "0", "-7", "-5", "2");
   await testVAnchorWrapNative(junod, vanchor, wallet3, "100000");
   await testVAnchorUnwrapNative(junod, vanchor, wallet3, "100");
   await testVAnchorWrapCw20(junod, vanchor, tokenWrapper, cw20, wallet3, "10000");
