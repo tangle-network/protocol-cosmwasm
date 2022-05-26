@@ -24,6 +24,15 @@ import {
 } from './anchor';
 
 import {
+  testVAnchorInitialize,
+  testVAnchorDepositWithdraw,
+  testVAnchorWrapNative,
+  testVAnchorUnwrapNative,
+  testVAnchorWrapCw20,
+  testVAnchorUnwrapCw20,
+} from './vanchor';
+
+import {
   testMixerInitialize,
   testMixerDepositNativeToken,
   testMixerWithdrawNativeToken,
@@ -62,6 +71,12 @@ export async function testExecute(
   await testAnchorUnwrapCw20(junod, anchor, tokenWrapper, cw20, wallet3, "100");
 
   // VAnchor
+  await testVAnchorInitialize(junod, vanchor);
+  // await testVAnchorDepositWithdraw(junod, vanchor, wallet1, wallet2, wallet3, "1000000");
+  await testVAnchorWrapNative(junod, vanchor, wallet3, "100000");
+  await testVAnchorUnwrapNative(junod, vanchor, wallet3, "100");
+  await testVAnchorWrapCw20(junod, vanchor, tokenWrapper, cw20, wallet3, "10000");
+  await testVAnchorUnwrapCw20(junod, vanchor, tokenWrapper, cw20, wallet3, "100");
 
   // Mixer
   await testMixerInitialize(junod, mixer);
