@@ -560,7 +560,12 @@ fn wrap_and_deposit_cw20(
     let anchor = ANCHOR.load(deps.storage)?;
     let tokenwrapper = anchor.tokenwrapper_addr.as_str();
 
-    // Validations
+    // Only non-"TokenWrapper" Cw20 token contract can execute this message.
+    if anchor.tokenwrapper_addr == deps.api.addr_validate(recv_token_addr.as_str())? {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // Check if the "recv_token_amt" == "ext_amt" + "wrapping_fee"
     let amt_to_wrap_query: GetAmountToWrapResponse = deps.querier.query_wasm_smart(
         tokenwrapper.to_string(),
         &TokenWrapperQueryMsg::GetAmountToWrap {
