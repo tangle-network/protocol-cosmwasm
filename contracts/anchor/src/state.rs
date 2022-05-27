@@ -28,7 +28,7 @@ pub const NULLIFIERS: Map<Vec<u8>, bool> = Map::new("used_nullifers");
 // NOTE: The `chain_id` field is just for temporary development purpose.
 //       In the future, it should be removed & the contract should use the
 //       `chain_id`(blockchain-unique ID) obtained inside the contract.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Anchor {
     pub chain_id: u64,           // ChainID of underlying blockchain(Temporary field)
     pub handler: Addr,           // Address of "anchor-handler", which add/updte the `edge` info
@@ -78,7 +78,7 @@ pub fn save_neighbor_roots(
 }
 
 // LinkableMerkleTree
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct LinkableMerkleTree {
     pub max_edges: u32,
     pub chain_id_list: Vec<ChainId>,
@@ -199,7 +199,7 @@ impl LinkableMerkleTree {
 }
 
 // MerkleTree
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct MerkleTree {
     pub levels: u32,
     pub current_root_index: u32,

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 // @dev {initial_resource_ids} and {initial_contract_addresses} must have the same length (one resourceID for every address).
 // Also, these arrays must be ordered in the way that {initial_resource_ids}[0] is the intended resourceID for {initial_contract_addresses}[0].
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct InstantiateMsg {
     // Contract address of previously deployed Bridge.
     pub bridge_addr: String,
@@ -15,7 +15,7 @@ pub struct InstantiateMsg {
     pub initial_contract_addresses: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     /* ---  Handler common utils --- */
@@ -37,7 +37,7 @@ pub enum ExecuteMsg {
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /* ---  Handler common queries --- */
@@ -61,7 +61,7 @@ pub enum QueryMsg {
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct UpdateRecordResponse {
     pub tokenwrapper_addr: String,
     pub exec_chain_id: u64,

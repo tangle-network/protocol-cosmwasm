@@ -1,9 +1,9 @@
-use cosmwasm_std::{Addr, Decimal, DepsMut, Fraction, MessageInfo, StdError, Uint128};
+use cosmwasm_std::{Addr, Decimal, DepsMut, Fraction, StdError, Uint128};
 use cw20::BalanceResponse;
-use cw20_base::contract::query_balance;
+use cw20_base::contract::{query_balance, query_token_info};
 use protocol_cosmwasm::error::ContractError;
 
-use crate::state::{CONFIG, TOKENS, TOTAL_SUPPLY};
+use crate::state::{CONFIG, TOKENS};
 
 // Check if the cw20 token address is valid in "TOKENS".
 pub fn is_valid_address(deps: DepsMut, token_address: Addr) -> bool {
@@ -12,7 +12,7 @@ pub fn is_valid_address(deps: DepsMut, token_address: Addr) -> bool {
 
 // Check if the "wrap_amount" is valid.
 pub fn is_valid_wrap_amount(deps: DepsMut, amount: Uint128) -> bool {
-    let total_supply = TOTAL_SUPPLY.load(deps.storage).unwrap().issued;
+    let total_supply = query_token_info(deps.as_ref()).unwrap().total_supply;
     let config = CONFIG.load(deps.storage).unwrap();
     amount
         .saturating_add(total_supply)
@@ -20,8 +20,8 @@ pub fn is_valid_wrap_amount(deps: DepsMut, amount: Uint128) -> bool {
 }
 
 // Check if the "unwrap_amount" is valid.
-pub fn is_valid_unwrap_amount(deps: DepsMut, info: MessageInfo, amount: Uint128) -> bool {
-    let sender_token_balance = query_balance(deps.as_ref(), info.sender.to_string())
+pub fn is_valid_unwrap_amount(deps: DepsMut, sender: &str, amount: Uint128) -> bool {
+    let sender_token_balance = query_balance(deps.as_ref(), sender.to_string())
         .unwrap_or(BalanceResponse {
             balance: Uint128::zero(),
         })

@@ -23,7 +23,7 @@ use protocol_cosmwasm::token_wrapper::{
     InstantiateMsg, QueryMsg, UpdateConfigMsg,
 };
 
-use crate::state::{Config, Supply, CONFIG, HISTORICAL_TOKENS, TOKENS, TOTAL_SUPPLY};
+use crate::state::{Config, CONFIG, HISTORICAL_TOKENS, TOKENS};
 use crate::utils::{
     calc_fee_perc_from_string, get_amount_to_wrap, get_fee_from_amount, is_valid_address,
     is_valid_unwrap_amount, is_valid_wrap_amount, parse_string_to_uint128,
@@ -55,10 +55,6 @@ pub fn instantiate(
         }),
     };
     TOKEN_INFO.save(deps.storage, &data)?;
-
-    // set supply to 0
-    let supply = Supply::default();
-    TOTAL_SUPPLY.save(deps.storage, &supply)?;
 
     // set config
     let governor = match msg.governor {
@@ -203,11 +199,6 @@ fn wrap_native(
         get_fee_from_amount(wrapping_amount, config.fee_percentage.numerator().u128());
     let left_over = wrapping_amount - cost_to_wrap;
 
-    // Save the wrapped token amount.
-    let mut supply = TOTAL_SUPPLY.load(deps.storage)?;
-    supply.issued += left_over;
-    TOTAL_SUPPLY.save(deps.storage, &supply)?;
-
     // call into cw20-base to mint the token, call as self as no one else is allowed
     let sub_info = MessageInfo {
         sender: env.contract.address.clone(),
@@ -257,6 +248,7 @@ fn unwrap_native(
     amount: Uint128,
     recipient: Option<String>,
 ) -> Result<Response, ContractError> {
+    let sender = sender.unwrap_or_else(|| info.sender.to_string());
     let config = CONFIG.load(deps.storage)?;
     // Validate the "is_native_allowed"
     if !config.is_native_allowed {
@@ -266,19 +258,13 @@ fn unwrap_native(
     }
 
     // Validate the "amount"
-    if !is_valid_unwrap_amount(deps.branch(), info.clone(), amount) {
+    if !is_valid_unwrap_amount(deps.branch(), &sender, amount) {
         return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Insufficient native token balance".to_string(),
+            msg: format!("Insufficient native token balance for sender({})", &sender),
         }));
     }
 
-    // Calculate the remainder
-    let total_supply = TOTAL_SUPPLY.load(deps.storage)?;
-    let remainder = total_supply.issued - amount;
-    TOTAL_SUPPLY.save(deps.storage, &Supply { issued: remainder })?;
-
     // burn from the "sender"
-    let sender = sender.unwrap_or_else(|| info.sender.to_string());
     let sub_info = MessageInfo {
         sender: deps.api.addr_validate(sender.as_str())?,
         funds: vec![],
@@ -311,6 +297,8 @@ fn unwrap_cw20(
     amount: Uint128,
     recipient: Option<String>,
 ) -> Result<Response, ContractError> {
+    let sender = sender.unwrap_or_else(|| info.sender.to_string());
+
     // Validate the "token" address
     let is_valid_unwrap_address = HISTORICAL_TOKENS.has(deps.storage, token.clone());
     if !is_valid_unwrap_address {
@@ -320,19 +308,13 @@ fn unwrap_cw20(
     }
 
     // Validate the "token" amount
-    if !is_valid_unwrap_amount(deps.branch(), info.clone(), amount) {
+    if !is_valid_unwrap_amount(deps.branch(), &sender, amount) {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Insufficient cw20 token amount".to_string(),
         }));
     }
 
-    // Calculate the remainder
-    let total_supply = TOTAL_SUPPLY.load(deps.storage)?;
-    let remainder = total_supply.issued - amount;
-    TOTAL_SUPPLY.save(deps.storage, &Supply { issued: remainder })?;
-
     // burn from the "sender"
-    let sender = sender.unwrap_or_else(|| info.sender.to_string());
     let sub_info = MessageInfo {
         sender: deps.api.addr_validate(sender.as_str())?,
         funds: vec![],
@@ -391,11 +373,6 @@ fn wrap_cw20(
 
     match from_binary(&cw20_msg.msg) {
         Ok(Cw20HookMsg::Wrap { sender, recipient }) => {
-            // Save the wrapping number
-            let mut supply = TOTAL_SUPPLY.load(deps.storage)?;
-            supply.issued += left_over;
-            TOTAL_SUPPLY.save(deps.storage, &supply)?;
-
             // call into cw20-base to mint the token, call as self as no one else is allowed
             let sub_info = MessageInfo {
                 sender: env.contract.address.clone(),
