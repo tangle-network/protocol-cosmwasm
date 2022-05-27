@@ -131,7 +131,7 @@ export async function testVAnchorInitialize(
       {
         send: {
           contract: vanchor,
-          amount: in_auto_public_amount, 
+          amount: auto_to_send, 
           msg: transactDepositWrapMsg,
         },
       }, 

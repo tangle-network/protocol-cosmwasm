@@ -17,9 +17,9 @@ use protocol_cosmwasm::structs::{
 };
 use protocol_cosmwasm::token_wrapper::{
     ConfigResponse as TokenWrapperConfigResp, Cw20HookMsg as TokenWrapperHookMsg,
-    ExecuteMsg as TokenWrapperExecuteMsg, QueryMsg as TokenWrapperQueryMsg,
+    ExecuteMsg as TokenWrapperExecuteMsg, QueryMsg as TokenWrapperQueryMsg, GetAmountToWrapResponse,
 };
-use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder};
+use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder, parse_string_to_uint128};
 use protocol_cosmwasm::vanchor::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, MigrateMsg, ProofData,
     QueryMsg, UpdateConfigMsg,
@@ -378,6 +378,10 @@ fn transact_deposit_wrap_native(
     proof_data: ProofData,
     ext_data: ExtData,
 ) -> Result<Response, ContractError> {
+    let ext_data_fee: u128 = ext_data.fee.u128();
+    let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
+    let abs_ext_amt = ext_amt.unsigned_abs();
+
     let vanchor: VAnchor = VANCHOR.load(deps.storage)?;
 
     // Validations
@@ -392,11 +396,21 @@ fn transact_deposit_wrap_native(
         None => return Err(ContractError::InsufficientFunds {}),
     };
 
-    validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
+    // Check if the "recv_token_amt" == "ext_amt" + "wrapping_fee"
+    let amt_to_wrap_query: GetAmountToWrapResponse = deps.querier.query_wasm_smart(
+        vanchor.tokenwrapper_addr.to_string(),
+        &TokenWrapperQueryMsg::GetAmountToWrap {
+            target_amount: abs_ext_amt.to_string(),
+        },
+    )?;
+    let amt_to_wrap = parse_string_to_uint128(amt_to_wrap_query.amount_to_wrap)?;
 
-    let ext_data_fee: u128 = ext_data.fee.u128();
-    let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
-    let abs_ext_amt = ext_amt.unsigned_abs();
+    if recv_token_amt != amt_to_wrap {
+        return Err(ContractError::InsufficientFunds {});
+    }
+
+    // Validate the "proof_data" & "ext_data"
+    validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
 
     // Deposit
     let mut msgs: Vec<CosmosMsg> = vec![];
@@ -407,9 +421,6 @@ fn transact_deposit_wrap_native(
     } else {
         if Uint128::from(abs_ext_amt) > vanchor.max_deposit_amt {
             return Err(ContractError::InvalidDepositAmount);
-        };
-        if abs_ext_amt != recv_token_amt.u128() {
-            return Err(ContractError::InsufficientFunds {});
         };
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: vanchor.tokenwrapper_addr.to_string(),
@@ -452,17 +463,31 @@ fn transact_deposit_wrap_cw20(
     recv_token_addr: String,
     recv_token_amt: Uint128,
 ) -> Result<Response, ContractError> {
+    let ext_data_fee: u128 = ext_data.fee.u128();
+    let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
+    let abs_ext_amt = ext_amt.unsigned_abs();
+
     // Only non-"TokenWrapper" Cw20 token contract can execute this message.
     let vanchor: VAnchor = VANCHOR.load(deps.storage)?;
     if vanchor.tokenwrapper_addr == deps.api.addr_validate(recv_token_addr.as_str())? {
         return Err(ContractError::Unauthorized {});
     }
 
-    validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
+    // Check if the "recv_token_amt" == "ext_amt" + "wrapping_fee"
+    let amt_to_wrap_query: GetAmountToWrapResponse = deps.querier.query_wasm_smart(
+        vanchor.tokenwrapper_addr.to_string(),
+        &TokenWrapperQueryMsg::GetAmountToWrap {
+            target_amount: abs_ext_amt.to_string(),
+        },
+    )?;
+    let amt_to_wrap = parse_string_to_uint128(amt_to_wrap_query.amount_to_wrap)?;
 
-    let ext_data_fee: u128 = ext_data.fee.u128();
-    let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
-    let abs_ext_amt = ext_amt.unsigned_abs();
+    if recv_token_amt != amt_to_wrap {
+        return Err(ContractError::InsufficientFunds {});
+    }
+
+    // Validate the "proof_data" & "ext_data"
+    validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
 
     // Deposit
     let mut msgs: Vec<CosmosMsg> = vec![];
@@ -472,9 +497,6 @@ fn transact_deposit_wrap_cw20(
     } else {
         if Uint128::from(abs_ext_amt) > vanchor.max_deposit_amt {
             return Err(ContractError::InvalidDepositAmount);
-        };
-        if abs_ext_amt != recv_token_amt.u128() {
-            return Err(ContractError::InsufficientFunds {});
         };
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: recv_token_addr,

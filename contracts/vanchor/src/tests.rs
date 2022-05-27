@@ -1411,7 +1411,7 @@ fn test_vanchor_wrap_and_deposit_cw20() {
     let info = mock_info("any-cw20", &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: TRANSACTOR.to_string(),
-        amount: Uint128::from(10_u128),
+        amount: Uint128::from(11_u128), // Assume that "fee_percentage" is 10% & wrap_amt is "10"
         msg: to_binary(&Cw20HookMsg::TransactDepositWrap {
             proof_data: proof_data,
             ext_data: ext_data,
