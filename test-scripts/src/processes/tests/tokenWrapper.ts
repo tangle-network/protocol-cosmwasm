@@ -33,7 +33,7 @@ export async function testTokenWrapperInitialize(
     expect(result.fee_percentage == (parseInt(localjuno.contractsConsts.feePercentage) / 100).toString()).to.be.ok;
     expect(result.is_native_allowed == (localjuno.contractsConsts.isNativeAllowed == 1).toString()).to.be.ok;
     expect(result.wrapping_limit == localjuno.contractsConsts.tokenWrapperWrappingLimit).to.be.ok;
-    expect(result.proposal_nonce == "0").to.be.ok;
+    expect(result.proposal_nonce == "1").to.be.ok;
     
     console.log(chalk.green(" Passed!"));
   }

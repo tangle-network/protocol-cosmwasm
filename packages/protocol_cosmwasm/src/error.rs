@@ -68,7 +68,7 @@ pub enum ContractError {
     #[error("Too many edges")]
     TooManyEdges,
 
-    #[error("Invalid nonce")]
+    #[error("Nonce must be greater than current nonce. Nonce must not increment more than 1048")]
     InvalidNonce,
 
     /*  ------ VAnchor errors ------ */

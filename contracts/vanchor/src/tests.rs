@@ -25,9 +25,9 @@ const MAX_EXT_AMT: u128 = 200;
 const MAX_FEE: u128 = 100;
 
 const CW20_ADDRESS: &str = "terra1340t6lqq6jxhm8d6gtz0hzz5jzcszvm27urkn2";
-const TRANSACTOR: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
-const RECIPIENT: &str = "terra1kejftqzx05y9rv00lw5m76csfmx7lf9se02dz4";
-const RELAYER: &str = "terra1jrj2vh6cstqwk3pg8nkmdf0r9z0n3q3f3jk5xn";
+const TRANSACTOR: &str = "juno1yq0azfkky8aqq4kvzdawrs7tm3rmpl8xs6vcx2";
+const RECIPIENT: &str = "juno16e3t7td2wu0wmggnxa3xnyu5whljyed69ptvkp";
+const RELAYER: &str = "juno16g2rahf5846rxzp3fwlswy08fz8ccuwk03k57y";
 const HANDLER: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 
 fn element_encoder(v: &[u8]) -> [u8; 32] {
@@ -1411,7 +1411,7 @@ fn test_vanchor_wrap_and_deposit_cw20() {
     let info = mock_info("any-cw20", &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: TRANSACTOR.to_string(),
-        amount: Uint128::from(10_u128),
+        amount: Uint128::from(11_u128), // Assume that "fee_percentage" is 10% & wrap_amt is "10"
         msg: to_binary(&Cw20HookMsg::TransactDepositWrap {
             proof_data: proof_data,
             ext_data: ext_data,
@@ -1497,6 +1497,9 @@ fn test_vanchor_withdraw_and_unwrap_native() {
         ext_data_hash.0,
     );
 
+    println!("proof_data:{:?}\n", proof_data);
+    println!("ext_data:{:?}", ext_data);
+
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
@@ -1569,6 +1572,9 @@ fn test_vanchor_withdraw_and_unwrap_native() {
         commitments,
         ext_data_hash.0,
     );
+
+    println!("proof_data:{:?}\n", proof_data);
+    println!("ext_data:{:?}", ext_data);
 
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);

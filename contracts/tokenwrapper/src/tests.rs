@@ -354,14 +354,15 @@ fn test_add_token_addr() {
     let info = mock_info("creator", &[]);
     let add_token_msg = ExecuteMsg::AddCw20TokenAddr {
         token: "new_cw20_token".to_string(),
-        nonce: 2,
+        nonce: 1049,
     };
 
     // Failure since the invalid nonce value
     let err = execute(deps.as_mut(), mock_env(), info, add_token_msg).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "Generic error: Nonce must increment by 1".to_string()
+        "Nonce must be greater than current nonce. Nonce must not increment more than 1048"
+            .to_string()
     );
 
     // Success
