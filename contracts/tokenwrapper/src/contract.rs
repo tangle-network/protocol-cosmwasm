@@ -477,7 +477,7 @@ fn add_token_addr(
     }
 
     // Validate the "nonce" value
-    if nonce != config.proposal_nonce + 1048 {
+    if nonce <= config.proposal_nonce || config.proposal_nonce + 1048 < nonce {
         return Err(ContractError::InvalidNonce);
     }
 
@@ -519,7 +519,7 @@ fn remove_token_addr(
     }
 
     // Validate the "nonce" value
-    if nonce != config.proposal_nonce + 1048 {
+    if nonce <= config.proposal_nonce || config.proposal_nonce + 1048 < nonce {
         return Err(ContractError::InvalidNonce);
     }
 
