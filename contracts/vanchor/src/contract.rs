@@ -17,7 +17,8 @@ use protocol_cosmwasm::structs::{
 };
 use protocol_cosmwasm::token_wrapper::{
     ConfigResponse as TokenWrapperConfigResp, Cw20HookMsg as TokenWrapperHookMsg,
-    ExecuteMsg as TokenWrapperExecuteMsg, QueryMsg as TokenWrapperQueryMsg, GetAmountToWrapResponse,
+    ExecuteMsg as TokenWrapperExecuteMsg, GetAmountToWrapResponse,
+    QueryMsg as TokenWrapperQueryMsg,
 };
 use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder, parse_string_to_uint128};
 use protocol_cosmwasm::vanchor::{
