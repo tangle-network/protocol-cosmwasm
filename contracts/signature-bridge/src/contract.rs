@@ -92,10 +92,8 @@ fn admin_set_resource_with_signature(
         }));
     }
 
-    if msg.nonce != state.proposal_nonce + 1 {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid nonce".to_string(),
-        }));
+    if msg.nonce != state.proposal_nonce + 1048 {
+        return Err(ContractError::InvalidNonce);
     }
 
     let func_sig = Keccak256::hash(

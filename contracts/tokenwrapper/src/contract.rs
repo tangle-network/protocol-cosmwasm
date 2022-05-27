@@ -477,10 +477,8 @@ fn add_token_addr(
     }
 
     // Validate the "nonce" value
-    if nonce != config.proposal_nonce + 1 {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Nonce must increment by 1".to_string(),
-        }));
+    if nonce != config.proposal_nonce + 1048 {
+        return Err(ContractError::InvalidNonce);
     }
 
     // Add the "token" to wrapping list
@@ -521,10 +519,8 @@ fn remove_token_addr(
     }
 
     // Validate the "nonce" value
-    if nonce != config.proposal_nonce + 1 {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Nonce must increment by 1".to_string(),
-        }));
+    if nonce != config.proposal_nonce + 1048 {
+        return Err(ContractError::InvalidNonce);
     }
 
     // Remove the "token" from wrapping list
