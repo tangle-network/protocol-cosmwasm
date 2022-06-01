@@ -81,7 +81,7 @@ fn admin_set_resource_with_signature(
     let mut data: Vec<u8> = Vec::new();
     data.extend_from_slice(&msg.resource_id);
     data.extend_from_slice(&msg.function_sig);
-    data.extend_from_slice(&element_encoder(&msg.nonce.to_le_bytes()));
+    data.extend_from_slice(&msg.nonce.to_be_bytes());
     data.extend_from_slice(&msg.new_resource_id);
     data.extend_from_slice(msg.handler_addr.as_bytes());
     data.extend_from_slice(msg.execution_context_addr.as_bytes());
@@ -121,7 +121,7 @@ fn admin_set_resource_with_signature(
         contract_addr: msg.handler_addr,
         funds: vec![],
         msg: to_binary(&ExecutorExecMsg::SetResource {
-            resource_id: msg.resource_id,
+            resource_id: msg.new_resource_id,
             contract_addr: msg.execution_context_addr,
         })
         .unwrap(),
