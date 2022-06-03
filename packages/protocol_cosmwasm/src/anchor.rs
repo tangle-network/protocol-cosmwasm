@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct InstantiateMsg {
     pub max_edges: u32,
-    pub chain_id: u64,
     pub levels: u32,
     pub deposit_size: Uint128,
     pub tokenwrapper_addr: String,

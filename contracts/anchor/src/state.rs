@@ -30,10 +30,9 @@ pub const NULLIFIERS: Map<Vec<u8>, bool> = Map::new("used_nullifers");
 //       `chain_id`(blockchain-unique ID) obtained inside the contract.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Anchor {
-    pub chain_id: u64,           // ChainID of underlying blockchain(Temporary field)
-    pub handler: Addr,           // Address of "anchor-handler", which add/updte the `edge` info
-    pub proposal_nonce: u32,     // Proposal nonce
-    pub deposit_size: Uint128,   // Minimum `deposit` amount for tx
+    pub handler: Addr, // Address of "anchor-handler", which add/updte the `edge` info
+    pub proposal_nonce: u32, // Proposal nonce
+    pub deposit_size: Uint128, // Minimum `deposit` amount for tx
     pub merkle_tree: MerkleTree, // Tree data structure to hold the `deposit` info
     pub linkable_tree: LinkableMerkleTree, // Tree data structure to hold the `edge` info
     pub tokenwrapper_addr: Addr, // Cw20 token address used for wrapping native & any cw20 token

@@ -27,7 +27,7 @@ use arkworks_setups::Curve;
 static WASM: &[u8] = include_bytes!("./cosmwasm_anchor.wasm");
 
 const MAX_EDGES: u32 = 2;
-const CHAIN_ID: u64 = 1;
+const CHAIN_ID: u64 = 3620629146; // chain_id: "cosmos-testnet-14002"
 const LEVELS: u32 = 30;
 const CW20_ADDRESS: &str = "terra1fex9f78reuwhfsnc8sun6mz8rl9zwqh03fhwf3";
 const DEPOSIT_SIZE: u128 = 1_000_000;
@@ -40,7 +40,6 @@ fn integration_test_instantiate_anchor() {
 
     let msg = InstantiateMsg {
         max_edges: MAX_EDGES,
-        chain_id: CHAIN_ID,
         levels: LEVELS,
         deposit_size: Uint128::from(DEPOSIT_SIZE),
         tokenwrapper_addr: CW20_ADDRESS.to_string(),
@@ -65,7 +64,6 @@ fn test_deposit_cw20() {
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
         max_edges: MAX_EDGES,
-        chain_id: CHAIN_ID,
         levels: LEVELS,
         deposit_size: Uint128::from(DEPOSIT_SIZE),
         tokenwrapper_addr: CW20_ADDRESS.to_string(),

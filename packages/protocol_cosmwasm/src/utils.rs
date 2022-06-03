@@ -1,3 +1,4 @@
+use crate::keccak::Keccak256;
 use cosmwasm_std::{StdError, Uint128};
 
 // Slice the length of the bytes array into 32bytes
@@ -26,6 +27,23 @@ pub fn compute_chain_id_type(chain_id: u64, chain_type: &[u8]) -> u64 {
     buf[2..4].copy_from_slice(&chain_type);
     buf[4..8].copy_from_slice(&chain_id_value.to_le_bytes());
     u64::from_be_bytes(buf)
+}
+
+// Computes the numeric "chain_id" from string one.
+// This is only needed for Cosmos SDK blockchains since
+// their "chain_id"s are string(eg: "juno-1")
+// Rule:
+//   1. Hash the "chain_id" to get 32-length bytes array
+//       eg: keccak256("juno-1") => 4c22bf61f15534242ee9dba16dceb4c976851b1788680fb5ee2a7b568a294d21
+//   2. Slice the last 4 bytes & convert it to `u32` numeric value
+//       eg: 8a294d21(hex) -> 2317962529(decimal)
+pub fn compute_chain_id(chain_id_str: &str) -> u32 {
+    let hash_value = Keccak256::hash(chain_id_str.as_bytes()).expect("chain-id hashing error");
+    let last_4_bytes = &hash_value[28..];
+
+    let mut buf = [0u8; 4];
+    buf[0..4].copy_from_slice(last_4_bytes);
+    u32::from_be_bytes(buf)
 }
 
 // Truncate and pad 256 bit slice
