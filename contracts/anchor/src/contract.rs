@@ -844,9 +844,9 @@ fn update_edge(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&get_config(deps, env)?),
+        QueryMsg::Config {} => to_binary(&get_config(deps)?),
         QueryMsg::EdgeInfo { id } => to_binary(&get_edge_info(deps, id)?),
         QueryMsg::NeighborRootInfo { chain_id, id } => {
             to_binary(&get_neighbor_root_info(deps, chain_id, id)?)
@@ -856,13 +856,11 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-pub fn get_config(deps: Deps, env: Env) -> StdResult<ConfigResponse> {
-    let chain_id = compute_chain_id(&env.block.chain_id);
+pub fn get_config(deps: Deps) -> StdResult<ConfigResponse> {
     let anchor = ANCHOR.load(deps.storage)?;
     Ok(ConfigResponse {
         handler: anchor.handler.to_string(),
         proposal_nonce: anchor.proposal_nonce,
-        chain_id: chain_id.into(),
         tokenwrapper_addr: anchor.tokenwrapper_addr.to_string(),
         deposit_size: anchor.deposit_size.to_string(),
     })
