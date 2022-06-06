@@ -9,7 +9,7 @@ use protocol_cosmwasm::structs::{ChainId, Edge, ROOT_HISTORY_SIZE};
 use protocol_cosmwasm::vanchor_verifier::VAnchorVerifier;
 use protocol_cosmwasm::zeroes;
 
-// Chain_ID -> Edge (String(u64) -> Edge)
+/// Chain_ID -> Edge (String(u64) -> Edge)
 pub const EDGES: Map<String, Edge> = Map::new("edges");
 
 pub fn read_edge(store: &dyn Storage, k: ChainId) -> StdResult<Edge> {
@@ -24,7 +24,7 @@ pub fn has_edge(store: &dyn Storage, k: ChainId) -> bool {
     EDGES.has(store, k.to_string())
 }
 
-// Chain_ID -> root_idx (String(u64) -> u32)
+/// Chain_ID -> root_idx (String(u64) -> u32)
 pub const CURR_NEIGHBOR_ROOT_INDEX: Map<String, u32> = Map::new("curr_neighbor_root_index");
 
 pub fn read_curr_neighbor_root_index(store: &dyn Storage, k: ChainId) -> StdResult<u32> {
@@ -55,7 +55,7 @@ pub fn save_neighbor_roots(
     NEIGHBOR_ROOTS.save(store, (id.to_string(), num.to_string()), &data)
 }
 
-// LinkableMerkleTree
+/// LinkableMerkleTree
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct LinkableMerkleTree {
     pub max_edges: u32,
@@ -176,10 +176,23 @@ impl LinkableMerkleTree {
     }
 }
 
-// VAnchor: (TODO: Add the description)
+/// "VAnchor"(Variable Anchor)
+///    The Variable Anchor is a variable-denominated shielded pool system
+///    derived from Tornado Nova (tornado-pool). This system extends the shielded
+///    pool system into a bridged system and allows for join/split transactions.
+///
+///    "creator"             Address of creating this "vanchor" contract
+///    "merkle_tree"         Tree data structure to hold the `transact` info
+///    "linkable_tree"       Tree data structure to hold the `edge` info
+///    "tokenwrapper_addr"   Cw20 token address used for wrapping native & any cw20 token
+///    "max_deposit_amt"     Maximum `transact(deposit)` amount in one transaction
+///    "min_withdraw_amt"    Minimum `transct(withdraw)` amount in one transcation
+///    "max_ext_amt"         Maximum `ext` amount in one transaction
+///    "max_fee"             Maximum `fee` amount in one transaction
+///    "proposal_nonce"      Nonce value to track the proposals
+///    "handler"             Address of `handler`(vanchor-handler), which updates the config of this contract(vanchor)
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct VAnchor {
-    pub chain_id: u64,
     pub creator: Addr,
     pub merkle_tree: MerkleTree,
     pub linkable_tree: LinkableMerkleTree,
@@ -194,19 +207,19 @@ pub struct VAnchor {
 
 pub const VANCHOR: Item<VAnchor> = Item::new("vanchor");
 
-// Struct to save the use of "nullifiers"
+/// Struct to save the use of "nullifiers"
 pub const NULLIFIERS: Map<Vec<u8>, bool> = Map::new("used_nullifers");
 
-// "Poseidon hasher"
+/// "Poseidon hasher"
 pub const HASHER: Item<Poseidon> = Item::new("poseidon");
 
-// "VAnchorVerifier (2 * 2)
+/// "VAnchorVerifier (2 * 2)
 pub const VERIFIER_2_2: Item<VAnchorVerifier> = Item::new("vanchor_verifier_2_2");
 
-// "VAnchorVerifier" (16 * 2)
+/// "VAnchorVerifier" (16 * 2)
 pub const VERIFIER_16_2: Item<VAnchorVerifier> = Item::new("vanchor_verifier_16_2");
 
-// MerkleTree
+/// MerkleTree
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct MerkleTree {
     pub levels: u32,
@@ -214,7 +227,7 @@ pub struct MerkleTree {
     pub next_index: u32,
 }
 
-// MerkleTree "filled_subtrees"
+/// MerkleTree "filled_subtrees"
 pub const FILLED_SUBTREES: Map<String, [u8; 32]> = Map::new("filled_subtrees");
 
 pub fn save_subtree(store: &mut dyn Storage, k: u32, data: &[u8; 32]) -> StdResult<()> {
@@ -225,7 +238,7 @@ pub fn read_subtree(store: &dyn Storage, k: u32) -> StdResult<[u8; 32]> {
     FILLED_SUBTREES.load(store, k.to_string())
 }
 
-// MerkleTree Roots
+/// MerkleTree Roots
 pub const MERKLEROOTS: Map<String, [u8; 32]> = Map::new("merkle_roots");
 
 pub fn save_root(store: &mut dyn Storage, k: u32, data: &[u8; 32]) -> StdResult<()> {

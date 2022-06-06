@@ -14,7 +14,9 @@ use protocol_cosmwasm::signature_bridge::{
     ExecProposalWithSigMsg, ExecuteMsg, InstantiateMsg, QueryMsg, SetResourceWithSigMsg,
     StateResponse,
 };
-use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder, get_chain_id_type};
+use protocol_cosmwasm::utils::{
+    compute_chain_id, compute_chain_id_type, element_encoder, get_chain_id_type,
+};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-signature-bridge";
@@ -22,8 +24,6 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // ChainType info
 pub const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
-
-pub const MOCK_CHAIN_ID: u64 = 1;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -58,7 +58,7 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
@@ -66,7 +66,7 @@ pub fn execute(
         ExecuteMsg::AdminSetResourceWithSig(msg) => {
             admin_set_resource_with_signature(deps, info, msg)
         }
-        ExecuteMsg::ExecProposalWithSig(msg) => exec_proposal_with_signature(deps, info, msg),
+        ExecuteMsg::ExecProposalWithSig(msg) => exec_proposal_with_signature(deps, env, msg),
     }
 }
 
@@ -134,7 +134,7 @@ fn admin_set_resource_with_signature(
 
 fn exec_proposal_with_signature(
     mut deps: DepsMut,
-    _info: MessageInfo,
+    env: Env,
     msg: ExecProposalWithSigMsg,
 ) -> Result<Response, ContractError> {
     let state = STATE.load(deps.storage)?;
@@ -154,17 +154,10 @@ fn exec_proposal_with_signature(
     let execution_chain_id_type: u64 = get_chain_id_type(&resource_id_bytes[26..32]);
 
     // Verify current chain matches chain ID from resource ID
-    //
-    // NOTE:
-    // This part is prone to future changes since the current implementation
-    // is based on assumption that the `chain_id` is number.
-    // In fact, the `chain_id` of Cosmos SDK blockchains is string, not number.
-    // For example, the `chain_id` of Terra blockchain(mainnet) is `columbus-5`.
-    // Eventually, it should replace the `MOCK_CHAIN_ID` with `chain_id` obtained
-    // inside contract(here).
-    if compute_chain_id_type(MOCK_CHAIN_ID, &COSMOS_CHAIN_TYPE) != execution_chain_id_type {
+    let chain_id = compute_chain_id(&env.block.chain_id);
+    if compute_chain_id_type(chain_id.into(), &COSMOS_CHAIN_TYPE) != execution_chain_id_type {
         return Err(ContractError::Std(StdError::GenericErr {
-            msg: "executing on wrong chain".to_string(),
+            msg: "Executing on wrong chain".to_string(),
         }));
     }
 

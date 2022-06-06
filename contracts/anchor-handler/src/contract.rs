@@ -23,11 +23,6 @@ use protocol_cosmwasm::structs::{
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-anchor-handler";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-// ChainType info
-pub const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
-
-pub const MOCK_CHAIN_ID: u64 = 1;
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,

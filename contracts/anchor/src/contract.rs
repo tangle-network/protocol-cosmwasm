@@ -30,7 +30,8 @@ use protocol_cosmwasm::token_wrapper::{
     QueryMsg as TokenWrapperQueryMsg,
 };
 use protocol_cosmwasm::utils::{
-    compute_chain_id_type, element_encoder, parse_string_to_uint128, truncate_and_pad,
+    compute_chain_id, compute_chain_id_type, element_encoder, parse_string_to_uint128,
+    truncate_and_pad,
 };
 use protocol_cosmwasm::zeroes::zeroes;
 
@@ -84,7 +85,6 @@ pub fn instantiate(
     // Initialize the Anchor
     let deposit_size = msg.deposit_size;
     let anchor = Anchor {
-        chain_id: msg.chain_id,
         linkable_tree: linkable_merkle_tree,
         proposal_nonce: 0_u32,
         deposit_size,
@@ -116,7 +116,7 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         // Withdraw the cw20 token with proof
-        ExecuteMsg::Withdraw(msg) => withdraw(deps, info, msg),
+        ExecuteMsg::Withdraw(msg) => withdraw(deps, env, info, msg),
         // Unwrap the "TokenWrapper" token
         ExecuteMsg::UnwrapIntoToken { token_addr, amount } => {
             unwrap_into_token(deps, info.sender.to_string(), token_addr, amount)
@@ -143,7 +143,7 @@ pub fn execute(
         ),
 
         // Withdraws the deposit & unwraps to valid token for `sender`
-        ExecuteMsg::WithdrawAndUnwrap(msg) => withdraw_and_unwrap(deps, info, msg),
+        ExecuteMsg::WithdrawAndUnwrap(msg) => withdraw_and_unwrap(deps, env, info, msg),
 
         // Sets a new handler for the contract
         ExecuteMsg::SetHandler { handler, nonce } => set_handler(deps, info, handler, nonce),
@@ -297,6 +297,7 @@ fn unwrap_into_token(
 /// Withdraw a deposit from the contract
 pub fn withdraw(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     msg: WithdrawMsg,
 ) -> Result<Response, ContractError> {
@@ -329,8 +330,9 @@ pub fn withdraw(
     }
 
     // Format the public input bytes
+    let chain_id = compute_chain_id(&env.block.chain_id);
     let chain_id_type_bytes =
-        element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
+        element_encoder(&compute_chain_id_type(chain_id.into(), &COSMOS_CHAIN_TYPE).to_le_bytes());
     let recipient_bytes = truncate_and_pad(recipient.as_bytes());
     let relayer_bytes = truncate_and_pad(relayer.as_bytes());
 
@@ -612,6 +614,7 @@ fn wrap_and_deposit_cw20(
 /// Withdraws the deposit & unwraps into valid token for `sender`
 fn withdraw_and_unwrap(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     msg: WithdrawMsg,
 ) -> Result<Response, ContractError> {
@@ -653,8 +656,9 @@ fn withdraw_and_unwrap(
     };
 
     // Format the public input bytes
+    let chain_id = compute_chain_id(&env.block.chain_id);
     let chain_id_type_bytes =
-        element_encoder(&compute_chain_id_type(anchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
+        element_encoder(&compute_chain_id_type(chain_id.into(), &COSMOS_CHAIN_TYPE).to_le_bytes());
     let recipient_bytes = truncate_and_pad(recipient.as_bytes());
     let relayer_bytes = truncate_and_pad(relayer.as_bytes());
 
@@ -857,7 +861,6 @@ pub fn get_config(deps: Deps) -> StdResult<ConfigResponse> {
     Ok(ConfigResponse {
         handler: anchor.handler.to_string(),
         proposal_nonce: anchor.proposal_nonce,
-        chain_id: anchor.chain_id,
         tokenwrapper_addr: anchor.tokenwrapper_addr.to_string(),
         deposit_size: anchor.deposit_size.to_string(),
     })
@@ -926,7 +929,6 @@ pub fn validate_and_store_commitment(
     ANCHOR.save(
         deps.storage,
         &Anchor {
-            chain_id: anchor.chain_id,
             deposit_size: anchor.deposit_size,
             linkable_tree: anchor.linkable_tree,
             tokenwrapper_addr: anchor.tokenwrapper_addr,

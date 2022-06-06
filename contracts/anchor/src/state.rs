@@ -20,23 +20,25 @@ pub const MERKLEROOTS: Map<String, [u8; 32]> = Map::new("merkle_roots");
 pub const FILLED_SUBTREES: Map<String, [u8; 32]> = Map::new("filled_subtrees");
 pub const NULLIFIERS: Map<Vec<u8>, bool> = Map::new("used_nullifers");
 
-// "Anchor"
-// Connected instances that contains an on-chain merkle tree and
-// tracks a set of connected _anchors_ across chains (through edges)
-// in its local storage.
-
-// NOTE: The `chain_id` field is just for temporary development purpose.
-//       In the future, it should be removed & the contract should use the
-//       `chain_id`(blockchain-unique ID) obtained inside the contract.
+/// "Anchor"
+/// Connected instances that contains an on-chain merkle tree and
+/// tracks a set of connected _anchors_ across chains (through edges)
+/// in its local storage.
+///
+///   "handler"           Address of "anchor-handler", which add/updte the `edge` info
+///   "proposal_nonce"    Nonce value to track the proposals
+///   "deposit_size"      Minimum `deposit` amount for tx
+///   "merkle_tree"       Tree data structure to hold the `deposit` info
+///   "linkable_tree"     Tree data structure to hold the `edge` info
+///   "tokenwrapper_addr" Cw20 token address used for wrapping native & any cw20 token
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Anchor {
-    pub chain_id: u64,           // ChainID of underlying blockchain(Temporary field)
-    pub handler: Addr,           // Address of "anchor-handler", which add/updte the `edge` info
-    pub proposal_nonce: u32,     // Proposal nonce
-    pub deposit_size: Uint128,   // Minimum `deposit` amount for tx
-    pub merkle_tree: MerkleTree, // Tree data structure to hold the `deposit` info
-    pub linkable_tree: LinkableMerkleTree, // Tree data structure to hold the `edge` info
-    pub tokenwrapper_addr: Addr, // Cw20 token address used for wrapping native & any cw20 token
+    pub handler: Addr,
+    pub proposal_nonce: u32,
+    pub deposit_size: Uint128,
+    pub merkle_tree: MerkleTree,
+    pub linkable_tree: LinkableMerkleTree,
+    pub tokenwrapper_addr: Addr,
 }
 
 pub fn read_edge(store: &dyn Storage, k: ChainId) -> StdResult<Edge> {
@@ -77,7 +79,7 @@ pub fn save_neighbor_roots(
     NEIGHBOR_ROOTS.save(store, (id.to_string(), num.to_string()), &data)
 }
 
-// LinkableMerkleTree
+/// LinkableMerkleTree
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct LinkableMerkleTree {
     pub max_edges: u32,
@@ -198,7 +200,7 @@ impl LinkableMerkleTree {
     }
 }
 
-// MerkleTree
+/// MerkleTree
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct MerkleTree {
     pub levels: u32,

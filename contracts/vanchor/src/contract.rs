@@ -20,7 +20,9 @@ use protocol_cosmwasm::token_wrapper::{
     ExecuteMsg as TokenWrapperExecuteMsg, GetAmountToWrapResponse,
     QueryMsg as TokenWrapperQueryMsg,
 };
-use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder, parse_string_to_uint128};
+use protocol_cosmwasm::utils::{
+    compute_chain_id, compute_chain_id_type, element_encoder, parse_string_to_uint128,
+};
 use protocol_cosmwasm::vanchor::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, MigrateMsg, ProofData,
     QueryMsg, UpdateConfigMsg,
@@ -91,7 +93,6 @@ pub fn instantiate(
 
     // Initialize the VAnchor
     let anchor = VAnchor {
-        chain_id: msg.chain_id,
         creator: deps.api.addr_validate(info.sender.as_str())?,
         max_deposit_amt: msg.max_deposit_amt,
         min_withdraw_amt: msg.min_withdraw_amt,
@@ -139,7 +140,7 @@ pub fn execute(
         ExecuteMsg::TransactWithdraw {
             proof_data,
             ext_data,
-        } => transact_withdraw(deps, proof_data, ext_data),
+        } => transact_withdraw(deps, env, proof_data, ext_data),
 
         // Wraps the native token to "TokenWrapper" token
         // Send the tokens back to `tx sender` or deposit to `this` contract
@@ -175,7 +176,7 @@ pub fn execute(
         ExecuteMsg::TransactDepositWrap {
             proof_data,
             ext_data,
-        } => transact_deposit_wrap_native(deps, info, proof_data, ext_data),
+        } => transact_deposit_wrap_native(deps, env, info, proof_data, ext_data),
 
         //  Executes a withdrawal or combination join/split transaction
         // including wrapping or unwrapping
@@ -185,7 +186,7 @@ pub fn execute(
             proof_data,
             ext_data,
             token_addr,
-        } => transact_withdraw_unwrap(deps, proof_data, ext_data, token_addr),
+        } => transact_withdraw_unwrap(deps, env, proof_data, ext_data, token_addr),
 
         // Sets a new handler for the contract
         ExecuteMsg::SetHandler { handler, nonce } => set_handler(deps, info, handler, nonce),
@@ -293,7 +294,14 @@ fn receive_cw20(
         Ok(Cw20HookMsg::TransactDeposit {
             proof_data,
             ext_data,
-        }) => transact_deposit(deps, proof_data, ext_data, recv_token_addr, recv_token_amt),
+        }) => transact_deposit(
+            deps,
+            env,
+            proof_data,
+            ext_data,
+            recv_token_addr,
+            recv_token_amt,
+        ),
         Ok(Cw20HookMsg::WrapToken { is_deposit }) => {
             let recipient = if is_deposit {
                 env.contract.address.to_string()
@@ -305,9 +313,14 @@ fn receive_cw20(
         Ok(Cw20HookMsg::TransactDepositWrap {
             proof_data,
             ext_data,
-        }) => {
-            transact_deposit_wrap_cw20(deps, proof_data, ext_data, recv_token_addr, recv_token_amt)
-        }
+        }) => transact_deposit_wrap_cw20(
+            deps,
+            env,
+            proof_data,
+            ext_data,
+            recv_token_addr,
+            recv_token_amt,
+        ),
         Err(_) => Err(ContractError::InvalidCw20HookMsg),
     }
 }
@@ -315,6 +328,7 @@ fn receive_cw20(
 // Executes a deposit or combination join/split transactions
 fn transact_deposit(
     mut deps: DepsMut,
+    env: Env,
     proof_data: ProofData,
     ext_data: ExtData,
     recv_token_addr: String,
@@ -326,7 +340,7 @@ fn transact_deposit(
         return Err(ContractError::Unauthorized {});
     }
 
-    validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
+    validate_proof(deps.branch(), env, proof_data.clone(), ext_data.clone())?;
 
     let ext_data_fee: u128 = ext_data.fee.u128();
     let ext_amt: i128 = ext_data.ext_amount.parse().expect("Invalid ext_amount");
@@ -375,6 +389,7 @@ fn transact_deposit(
 // including wrapping
 fn transact_deposit_wrap_native(
     mut deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     proof_data: ProofData,
     ext_data: ExtData,
@@ -411,7 +426,7 @@ fn transact_deposit_wrap_native(
     }
 
     // Validate the "proof_data" & "ext_data"
-    validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
+    validate_proof(deps.branch(), env, proof_data.clone(), ext_data.clone())?;
 
     // Deposit
     let mut msgs: Vec<CosmosMsg> = vec![];
@@ -459,6 +474,7 @@ fn transact_deposit_wrap_native(
 // including wrapping
 fn transact_deposit_wrap_cw20(
     mut deps: DepsMut,
+    env: Env,
     proof_data: ProofData,
     ext_data: ExtData,
     recv_token_addr: String,
@@ -488,7 +504,7 @@ fn transact_deposit_wrap_cw20(
     }
 
     // Validate the "proof_data" & "ext_data"
-    validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
+    validate_proof(deps.branch(), env, proof_data.clone(), ext_data.clone())?;
 
     // Deposit
     let mut msgs: Vec<CosmosMsg> = vec![];
@@ -538,10 +554,11 @@ fn transact_deposit_wrap_cw20(
 // Executes a deposit/withdrawal or combination join/split transaction
 fn transact_withdraw(
     mut deps: DepsMut,
+    env: Env,
     proof_data: ProofData,
     ext_data: ExtData,
 ) -> Result<Response, ContractError> {
-    validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
+    validate_proof(deps.branch(), env, proof_data.clone(), ext_data.clone())?;
 
     let vanchor = VANCHOR.load(deps.storage)?;
     let ext_data_fee: u128 = ext_data.fee.u128();
@@ -593,11 +610,12 @@ fn transact_withdraw(
 // including unwrapping
 fn transact_withdraw_unwrap(
     mut deps: DepsMut,
+    env: Env,
     proof_data: ProofData,
     ext_data: ExtData,
     token_addr: Option<String>,
 ) -> Result<Response, ContractError> {
-    validate_proof(deps.branch(), proof_data.clone(), ext_data.clone())?;
+    validate_proof(deps.branch(), env, proof_data.clone(), ext_data.clone())?;
 
     let vanchor = VANCHOR.load(deps.storage)?;
     let ext_data_fee: u128 = ext_data.fee.u128();
@@ -650,6 +668,7 @@ fn transact_withdraw_unwrap(
 // Check whether if the zkSNARK proof is valid
 fn validate_proof(
     deps: DepsMut,
+    env: Env,
     proof_data: ProofData,
     ext_data: ExtData,
 ) -> Result<(), ContractError> {
@@ -727,8 +746,9 @@ fn validate_proof(
     }
 
     // Construct public inputs
+    let chain_id = compute_chain_id(&env.block.chain_id);
     let chain_id_type_bytes =
-        element_encoder(&compute_chain_id_type(vanchor.chain_id, &COSMOS_CHAIN_TYPE).to_le_bytes());
+        element_encoder(&compute_chain_id_type(chain_id.into(), &COSMOS_CHAIN_TYPE).to_le_bytes());
 
     let mut bytes = Vec::new();
     bytes.extend_from_slice(&proof_data.public_amount);
@@ -782,7 +802,6 @@ fn execute_insertions(deps: DepsMut, proof_data: ProofData) -> Result<(), Contra
         deps.storage,
         &VAnchor {
             creator: vanchor.creator,
-            chain_id: vanchor.chain_id,
             merkle_tree,
             linkable_tree: vanchor.linkable_tree,
             tokenwrapper_addr: vanchor.tokenwrapper_addr,
@@ -1062,7 +1081,6 @@ pub fn get_config(deps: Deps) -> StdResult<ConfigResponse> {
     Ok(ConfigResponse {
         handler: vanchor.handler.to_string(),
         proposal_nonce: vanchor.proposal_nonce,
-        chain_id: vanchor.chain_id,
         tokenwrapper_addr: vanchor.tokenwrapper_addr.to_string(),
         max_deposit_amt: vanchor.max_deposit_amt.to_string(),
         min_withdraw_amt: vanchor.min_withdraw_amt.to_string(),

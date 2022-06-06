@@ -17,7 +17,6 @@ pub struct Config {
     pub proposal_nonce: u64,
 }
 
-/// Governance - related
 pub const CONFIG: Item<Config> = Item::new("config");
 
 pub const TOKENS: Map<Addr, bool> = Map::new("tokens");
