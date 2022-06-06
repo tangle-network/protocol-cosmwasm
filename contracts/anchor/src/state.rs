@@ -24,7 +24,7 @@ pub const NULLIFIERS: Map<Vec<u8>, bool> = Map::new("used_nullifers");
 /// Connected instances that contains an on-chain merkle tree and
 /// tracks a set of connected _anchors_ across chains (through edges)
 /// in its local storage.
-/// 
+///
 ///   "handler"           Address of "anchor-handler", which add/updte the `edge` info
 ///   "proposal_nonce"    Nonce value to track the proposals
 ///   "deposit_size"      Minimum `deposit` amount for tx
@@ -33,12 +33,12 @@ pub const NULLIFIERS: Map<Vec<u8>, bool> = Map::new("used_nullifers");
 ///   "tokenwrapper_addr" Cw20 token address used for wrapping native & any cw20 token
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Anchor {
-    pub handler: Addr, 
+    pub handler: Addr,
     pub proposal_nonce: u32,
-    pub deposit_size: Uint128, 
-    pub merkle_tree: MerkleTree, 
-    pub linkable_tree: LinkableMerkleTree, 
-    pub tokenwrapper_addr: Addr, 
+    pub deposit_size: Uint128,
+    pub merkle_tree: MerkleTree,
+    pub linkable_tree: LinkableMerkleTree,
+    pub tokenwrapper_addr: Addr,
 }
 
 pub fn read_edge(store: &dyn Storage, k: ChainId) -> StdResult<Edge> {

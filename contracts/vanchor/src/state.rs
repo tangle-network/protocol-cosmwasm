@@ -177,20 +177,20 @@ impl LinkableMerkleTree {
 }
 
 /// "VAnchor"(Variable Anchor)
-/// The Variable Anchor is a variable-denominated shielded pool system
-///	derived from Tornado Nova (tornado-pool). This system extends the shielded
-///	pool system into a bridged system and allows for join/split transactions.
-/// 
-///   "creator"             Address of creating this "vanchor" contract
-///   "merkle_tree"         Tree data structure to hold the `transact` info
-///   "linkable_tree"       Tree data structure to hold the `edge` info
-///   "tokenwrapper_addr"   Cw20 token address used for wrapping native & any cw20 token
-///   "max_deposit_amt"     Maximum `transact(deposit)` amount in one transaction
-///   "min_withdraw_amt"    Minimum `transct(withdraw)` amount in one transcation
-///   "max_ext_amt"         Maximum `ext` amount in one transaction
-///   "max_fee"             Maximum `fee` amount in one transaction
-///   "proposal_nonce"      Nonce value to track the proposals
-///   "handler"             Address of `handler`(vanchor-handler), which updates the config of this contract(vanchor)
+///    The Variable Anchor is a variable-denominated shielded pool system
+///    derived from Tornado Nova (tornado-pool). This system extends the shielded
+///    pool system into a bridged system and allows for join/split transactions.
+///
+///    "creator"             Address of creating this "vanchor" contract
+///    "merkle_tree"         Tree data structure to hold the `transact` info
+///    "linkable_tree"       Tree data structure to hold the `edge` info
+///    "tokenwrapper_addr"   Cw20 token address used for wrapping native & any cw20 token
+///    "max_deposit_amt"     Maximum `transact(deposit)` amount in one transaction
+///    "min_withdraw_amt"    Minimum `transct(withdraw)` amount in one transcation
+///    "max_ext_amt"         Maximum `ext` amount in one transaction
+///    "max_fee"             Maximum `fee` amount in one transaction
+///    "proposal_nonce"      Nonce value to track the proposals
+///    "handler"             Address of `handler`(vanchor-handler), which updates the config of this contract(vanchor)
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct VAnchor {
     pub creator: Addr,
