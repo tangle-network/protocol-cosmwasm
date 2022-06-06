@@ -10,7 +10,7 @@ use protocol_cosmwasm::poseidon::Poseidon;
 use protocol_cosmwasm::structs::ROOT_HISTORY_SIZE;
 use protocol_cosmwasm::zeroes;
 
-// Mixer
+/// Mixer
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Mixer {
     pub deposit_size: Uint128,
@@ -19,7 +19,7 @@ pub struct Mixer {
     pub merkle_tree: MerkleTree,
 }
 
-// MerkleTree
+/// MerkleTree
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct MerkleTree {
     pub levels: u32,
