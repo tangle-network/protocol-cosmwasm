@@ -9,12 +9,13 @@ use cw2::set_contract_version;
 use crate::state::{State, RESOURCEID2HANDLERADDR, STATE};
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::executor::ExecuteMsg as ExecutorExecMsg;
-use protocol_cosmwasm::keccak::Keccak256;
 use protocol_cosmwasm::signature_bridge::{
     ExecProposalWithSigMsg, ExecuteMsg, InstantiateMsg, QueryMsg, SetResourceWithSigMsg,
     StateResponse,
 };
 use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder, get_chain_id_type};
+// Essentially, this is from "tiny_keccak" crate.
+use arkworks_setups::common::keccak_256;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cosmwasm-signature-bridge";
@@ -24,6 +25,8 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const COSMOS_CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
 
 pub const MOCK_CHAIN_ID: u64 = 1;
+
+const PUBKEY_LEN: usize = 33;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -39,20 +42,22 @@ pub fn instantiate(
         return Err(ContractError::UnnecessaryFunds {});
     }
 
+    if msg.initial_governor.len() != PUBKEY_LEN {
+        return Err(ContractError::Std(StdError::generic_err(
+            "Pubkey length does not match.",
+        )));
+    }
+
     // Set "state"
-    let governor = deps.api.addr_validate(&msg.initial_governor)?;
     STATE.save(
         deps.storage,
         &State {
-            governor,
+            governor: msg.initial_governor,
             proposal_nonce: 0,
         },
     )?;
 
-    Ok(Response::new().add_attributes(vec![
-        attr("method", "instantiate"),
-        attr("governor", msg.initial_governor),
-    ]))
+    Ok(Response::new().add_attributes(vec![attr("method", "instantiate")]))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -86,20 +91,20 @@ fn admin_set_resource_with_signature(
     data.extend_from_slice(msg.handler_addr.as_bytes());
     data.extend_from_slice(msg.execution_context_addr.as_bytes());
 
-    if !signed_by_governor(deps.branch(), &data, &msg.sig, state.governor.as_str())? {
+    if !signed_by_governor(deps.branch(), &data, &msg.sig, &state.governor)? {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Invalid sig from governor".to_string(),
         }));
     }
 
-    if msg.nonce != state.proposal_nonce + 1048 {
+    if msg.nonce <= state.proposal_nonce || state.proposal_nonce + 1048 < msg.nonce {
         return Err(ContractError::InvalidNonce);
     }
 
-    let func_sig = Keccak256::hash(
+    let func_sig = keccak_256(
         b"adminSetResourceWithSignature(bytes32,bytes4,uint32,bytes32,address,address,bytes)",
-    )
-    .map_err(|_| ContractError::HashError)?;
+    );
+
     if msg.function_sig != func_sig[0..4] {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Invalid function signature".to_string(),
@@ -140,7 +145,7 @@ fn exec_proposal_with_signature(
     let state = STATE.load(deps.storage)?;
 
     // Validations
-    if !signed_by_governor(deps.branch(), &msg.data, &msg.sig, state.governor.as_str())? {
+    if !signed_by_governor(deps.branch(), &msg.data, &msg.sig, &state.governor)? {
         return Err(ContractError::Std(StdError::GenericErr {
             msg: "Invalid sig from governor".to_string(),
         }));
@@ -197,7 +202,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 fn get_state(deps: Deps) -> StdResult<StateResponse> {
     let state = STATE.load(deps.storage)?;
     Ok(StateResponse {
-        governor: state.governor.to_string(),
+        governor: state.governor,
         proposal_nonce: state.proposal_nonce,
     })
 }
@@ -207,12 +212,10 @@ fn signed_by_governor(
     deps: DepsMut,
     data: &[u8],
     sig: &[u8],
-    governor: &str,
+    governor: &[u8],
 ) -> Result<bool, ContractError> {
-    let hashed_data = Keccak256::hash(data).map_err(|_| ContractError::HashError)?;
-    let verify_result = deps
-        .api
-        .secp256k1_verify(&hashed_data, sig, governor.as_bytes());
+    let hashed_data = keccak_256(data);
+    let verify_result = deps.api.secp256k1_verify(&hashed_data, sig, governor);
 
     verify_result.map_err(|e| ContractError::Std(StdError::VerificationErr { source: e }))
 }

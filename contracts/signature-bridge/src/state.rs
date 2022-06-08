@@ -6,7 +6,7 @@ use cw_storage_plus::{Item, Map};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct State {
-    pub governor: Addr,
+    pub governor: Vec<u8>,
     pub proposal_nonce: u32,
 }
 

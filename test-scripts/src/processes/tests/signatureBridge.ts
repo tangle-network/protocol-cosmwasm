@@ -36,7 +36,6 @@ export async function testSignatureBridgeInitialize(
       get_state: {},
     });
   
-    expect(result.governor == localjuno.addresses.wallet1).to.be.ok;
     expect(result.proposal_nonce == 0).to.be.ok;
 
     console.log(chalk.green(" Passed!"));
@@ -60,33 +59,42 @@ export async function testSignatureBridgeAdminSetResWithSignature(
         get_state: {},
     });
     const before_nonce = stateQuery.proposal_nonce;
-    const nonce = before_nonce + 1;
+    const nonce: number = before_nonce + 1;
 
-    const chainIdType: number = getChainIdType(1);
-    const hashed_sigbridge_addr = keccak256(signatureBridge).buffer.slice(12);
-    const resource_id: string = toFixedHex(Buffer.from(hashed_sigbridge_addr), 26) + toHex(chainIdType, 6).substring(2);
+    const nonce_buf: Buffer = Buffer.allocUnsafe(4);
+    nonce_buf.writeUInt32BE(nonce);
+
+    const left_pad_buf: Buffer = Buffer.alloc(6);
+
+    const chainIdType: number = getChainIdType(parseInt(localjuno.contractsConsts.chain_id, 10));
+    const chainIdType_buf: Buffer = Buffer.allocUnsafe(6);
+    chainIdType_buf.writeUintBE(chainIdType, 0, 6);
     
-    const hashed_anchor_address = keccak256(localjuno.contracts.anchor).buffer.slice(12);
-    const new_resource_id: string = toFixedHex(Buffer.from(hashed_anchor_address), 26) + toHex(chainIdType, 6).substring(2);
+    // const resource_id: string = toFixedHex(Buffer.from(hashed_sigbridge_addr), 26) + toHex(chainIdType, 6).substring(2);
+    const hashed_sigbridge_addr_buf: Buffer = Buffer.from(keccak256(signatureBridge).buffer.slice(12))
+    const resource_id: Buffer = Buffer.concat([left_pad_buf, hashed_sigbridge_addr_buf, chainIdType_buf]);
+    
+    // const new_resource_id: string = toFixedHex(Buffer.from(hashed_anchor_address), 26) + toHex(chainIdType, 6).substring(2);
+    const hashed_anchor_addr_buf: Buffer = Buffer.from(keccak256(localjuno.contracts.anchor).buffer.slice(12))
+    const new_resource_id: Buffer = Buffer.concat([left_pad_buf, hashed_anchor_addr_buf, chainIdType_buf]);
 
-    const function_sig = toFixedHex(Buffer.from(keccak256(SET_RESOURCE_FUNCTION_NAME).buffer.slice(0, 4)), 4);
+    const function_sig = Buffer.from(keccak256(SET_RESOURCE_FUNCTION_NAME).buffer.slice(0, 4));
+
     const handler_addr = localjuno.contracts.anchorHandler;
     const execution_context_addr = localjuno.contracts.anchor;
 
-    const unsignedData = '0x' +
-        // A resource Id for the bridge contract
-        toHex(resource_id, 32).substring(2)
-        + toHex(function_sig, 4).substring(2)
-        + toHex(nonce, 4).substring(2)
-        // The resource ID mapping the resource Id to handler and 
-        // the handler to the execution contract (in the handler's storage)
-        + toHex(new_resource_id, 32).substring(2)
-        // // Setting the handler for the anchor to be the handler set in the bridge side class
-        + Buffer.from(handler_addr).toString('hex').substring(2)
-        + Buffer.from(execution_context_addr).toString('hex').substring(2);
+    const unsignedData = Buffer.concat([
+        resource_id,
+        function_sig,
+        nonce_buf,
+        new_resource_id,
+        Buffer.from(handler_addr),
+        Buffer.from(execution_context_addr),
+    ]); 
+
     const hashed_unsignedData = keccak256(unsignedData);
-    // console.log("unsigned_data:::", unsignedData, "\n");
-    // console.log("hashed_unsigned_data::::", hashed_unsignedData, "\n");
+    console.log("unsigned_data:::", unsignedData, "\n");
+    console.log("hashed_unsigned_data::::", hashed_unsignedData, "\n");
 
     const signed_data: DirectSignResponse = await wallet1.signDirect(
         localjuno.addresses.wallet1, 
@@ -110,10 +118,10 @@ export async function testSignatureBridgeAdminSetResWithSignature(
     // console.log("X::::", x, "\n");
     const result = await junod.execute(localjuno.addresses.wallet1, signatureBridge, {
         admin_set_resource_with_sig: {  
-            resource_id: Array.from(Buffer.from(resource_id.substring(2), 'hex')),
-            function_sig: Array.from(Buffer.from(function_sig.substring(2), 'hex')),
+            resource_id: Array.from(resource_id),
+            function_sig: Array.from(function_sig),
             nonce: nonce,
-            new_resource_id: Array.from(Buffer.from(new_resource_id.substring(2), 'hex')),
+            new_resource_id: Array.from(new_resource_id),
             handler_addr: handler_addr,
             execution_context_addr: execution_context_addr,
             sig: Array.from(Buffer.from(signed_data.signature.signature, 'base64')),
@@ -145,19 +153,28 @@ export async function testSignatureBridgeExecProposalWithSignature(
 ): Promise<void> {
     process.stdout.write("Test - SignatureBridge admin executes the proposal with signature");
 
-    const chainIdType: number = getChainIdType(1);
-    const hashed_anchor_address = keccak256(localjuno.contracts.anchor).buffer.slice(12);
-    const resource_id: string = toFixedHex(Buffer.from(hashed_anchor_address), 26) + toHex(chainIdType, 6);
+    
+    const left_pad_buf: Buffer = Buffer.alloc(6);
+
+    const chainIdType: number = getChainIdType(parseInt(localjuno.contractsConsts.chain_id, 10));
+    const chainIdType_buf: Buffer = Buffer.allocUnsafe(6);
+    chainIdType_buf.writeUintBE(chainIdType, 0, 6);
+
+    const hashed_anchor_addr_buf: Buffer = Buffer.from(keccak256(localjuno.contracts.anchor).buffer.slice(12))
+    const resource_id: Buffer = Buffer.concat([left_pad_buf, hashed_anchor_addr_buf, chainIdType_buf]);
 
     // proposal of `update_edge` with mock edge info
-    const data = resource_id + toEncodedBinary({
-        update_edge: {
-            src_chain_id: 100,
-            root: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            latest_leaf_index: 1,
-            target: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        }
-    });
+    const data = Buffer.concat([
+        resource_id,
+        Buffer.from(toEncodedBinary({
+            update_edge: {
+                src_chain_id: 100,
+                root: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                latest_leaf_index: 1,
+                target: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            }
+        })),
+    ]);
     // console.log("data::", data);
     const unsignedData = keccak256(data); // Currently, it is "0x..." + "(base64 string)".
     const signed_data: DirectSignResponse = await wallet1.signDirect(
@@ -181,7 +198,7 @@ export async function testSignatureBridgeExecProposalWithSignature(
 
     const result = await junod.execute(localjuno.addresses.wallet1, signatureBridge, {
       exec_proposal_with_sig: {
-        data: Array.from(Buffer.from(data)),
+        data: Array.from(data),
         sig: Array.from(Buffer.from(signed_data.signature.signature, 'base64')),
       }
     },

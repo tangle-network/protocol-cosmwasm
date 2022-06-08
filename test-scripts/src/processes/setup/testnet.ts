@@ -162,14 +162,14 @@ async function setup(
 
     // SignatureBridge
     process.stdout.write("Instantiating SignatureBridge contract");
-    
+    const [account] = await wallet1.getAccounts();
     const signatureBridgeResult = await instantiateContract(
         junod,
         wallet1,
         wallet1,
         signatureBridgeCodeId,
         {
-            "initial_governor": localjuno.addresses.wallet1,
+            "initial_governor": Array.from(account.pubkey),
         }
       );
     signatureBridge = signatureBridgeResult.contractAddress;
