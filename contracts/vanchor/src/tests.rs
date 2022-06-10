@@ -15,7 +15,7 @@ use protocol_cosmwasm::vanchor::{
 use protocol_cosmwasm::zeroes::zeroes;
 
 const CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
-const TEST_CHAIN_ID: u64 = 1;
+const CHAIN_ID: u64 = 2145598729; // chain_id: "cosmos-testnet-14002"
 
 const MAX_EDGES: u32 = 2;
 const LEVELS: u32 = 30;
@@ -40,7 +40,6 @@ fn create_vanchor() -> OwnedDeps<MockStorage, MockApi, crate::mock_querier::Wasm
     let mut deps = crate::mock_querier::mock_dependencies(&[]);
 
     let msg = InstantiateMsg {
-        chain_id: TEST_CHAIN_ID,
         max_edges: MAX_EDGES,
         levels: LEVELS,
         max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
@@ -79,7 +78,6 @@ fn test_vanchor_proper_initialization() {
     let mut deps = mock_dependencies();
 
     let msg = InstantiateMsg {
-        chain_id: TEST_CHAIN_ID,
         max_edges: MAX_EDGES,
         levels: LEVELS,
         max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
@@ -145,7 +143,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_deposit_cw20() {
     let public_amount = 10_i128;
 
     let chain_type = [4, 0];
-    let chain_id = compute_chain_id_type(1, &chain_type);
+    let chain_id = compute_chain_id_type(CHAIN_ID, &chain_type);
     let in_chain_ids = [chain_id; 2];
     let in_amounts = [0, 0];
     let in_indices = [0, 1];
@@ -231,7 +229,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
     let public_amount = 10_i128;
 
     let chain_type = [4, 0];
-    let chain_id = compute_chain_id_type(1, &chain_type);
+    let chain_id = compute_chain_id_type(CHAIN_ID, &chain_type);
     let in_chain_ids = [chain_id; 2];
     let in_amounts = [0, 0];
     let in_indices = [0, 1];
@@ -308,8 +306,8 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
 
     let public_amount = -7_i128;
 
-    let chain_id = compute_chain_id_type(TEST_CHAIN_ID, &CHAIN_TYPE);
-    let out_chain_ids = [TEST_CHAIN_ID; 2];
+    let chain_id = compute_chain_id_type(CHAIN_ID, &CHAIN_TYPE);
+    let out_chain_ids = [CHAIN_ID; 2];
     // After withdrawing -7
     let out_amounts = [1, 2];
 
@@ -386,7 +384,7 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
     let public_amount = 10_i128;
 
     let chain_type = [4, 0];
-    let chain_id = compute_chain_id_type(1, &chain_type);
+    let chain_id = compute_chain_id_type(CHAIN_ID, &chain_type);
     let in_chain_ids = [chain_id; 2];
     let in_amounts = [0, 0];
     let in_indices = [0, 1];
@@ -463,8 +461,8 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
 
     let public_amount = -7_i128;
 
-    let chain_id = compute_chain_id_type(TEST_CHAIN_ID, &CHAIN_TYPE);
-    let out_chain_ids = [TEST_CHAIN_ID; 2];
+    let chain_id = compute_chain_id_type(CHAIN_ID, &CHAIN_TYPE);
+    let out_chain_ids = [CHAIN_ID; 2];
     // After withdrawing -7
     let out_amounts = [1, 2];
 
@@ -547,7 +545,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
     let public_amount = 10_i128;
 
     let chain_type = [4, 0];
-    let chain_id = compute_chain_id_type(1, &chain_type);
+    let chain_id = compute_chain_id_type(CHAIN_ID, &chain_type);
     let in_chain_ids = [chain_id; 2];
     let in_amounts = [0, 0];
     let in_indices = [0, 1];
@@ -624,8 +622,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
 
     let public_amount = -7_i128;
 
-    let chain_id = compute_chain_id_type(TEST_CHAIN_ID, &CHAIN_TYPE);
-    let out_chain_ids = [TEST_CHAIN_ID; 2];
+    let chain_id = compute_chain_id_type(CHAIN_ID, &CHAIN_TYPE);
+    let out_chain_ids = [CHAIN_ID; 2];
     // After withdrawing -7
     let out_amounts = [100, 200];
 
@@ -698,7 +696,7 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
     let public_amount = 10_i128;
 
     let chain_type = [4, 0];
-    let chain_id = compute_chain_id_type(1, &chain_type);
+    let chain_id = compute_chain_id_type(CHAIN_ID, &chain_type);
     let in_chain_ids = [chain_id; 2];
     let in_amounts = [0, 0];
     let in_indices = [0, 1];
@@ -775,8 +773,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
 
     let public_amount = -7_i128;
 
-    let chain_id = compute_chain_id_type(TEST_CHAIN_ID, &CHAIN_TYPE);
-    let out_chain_ids = [TEST_CHAIN_ID; 2];
+    let chain_id = compute_chain_id_type(CHAIN_ID, &CHAIN_TYPE);
+    let out_chain_ids = [CHAIN_ID; 2];
     // Too small out amounts
     let out_amounts = [1, 0];
 
@@ -849,7 +847,7 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
     let public_amount = 10_i128;
 
     let chain_type = [4, 0];
-    let chain_id = compute_chain_id_type(1, &chain_type);
+    let chain_id = compute_chain_id_type(CHAIN_ID, &chain_type);
     let in_chain_ids = [chain_id; 2];
     let in_amounts = [0, 0];
     let in_indices = [0, 1];
@@ -926,8 +924,8 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
 
     let public_amount = -7_i128;
 
-    let chain_id = compute_chain_id_type(TEST_CHAIN_ID, &CHAIN_TYPE);
-    let out_chain_ids = [TEST_CHAIN_ID; 2];
+    let chain_id = compute_chain_id_type(CHAIN_ID, &CHAIN_TYPE);
+    let out_chain_ids = [CHAIN_ID; 2];
     // After withdraw -7
     let out_amounts = [1, 2];
 
@@ -1012,7 +1010,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_deposit_cw20() {
 
     let public_amount = 160_i128;
 
-    let chain_id = compute_chain_id_type(1, &CHAIN_TYPE);
+    let chain_id = compute_chain_id_type(CHAIN_ID, &CHAIN_TYPE);
     let in_chain_ids = [chain_id; 16];
     let in_amounts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     let in_indices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
@@ -1098,7 +1096,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
 
     let public_amount = 160_i128;
 
-    let chain_id = compute_chain_id_type(1, &CHAIN_TYPE);
+    let chain_id = compute_chain_id_type(CHAIN_ID, &CHAIN_TYPE);
     let in_chain_ids = [chain_id; 16];
     let in_amounts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     let in_indices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
@@ -1176,8 +1174,8 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
 
     let public_amount = -80_i128;
 
-    let chain_id = compute_chain_id_type(TEST_CHAIN_ID, &CHAIN_TYPE);
-    let out_chain_ids = [TEST_CHAIN_ID; 2];
+    let chain_id = compute_chain_id_type(CHAIN_ID, &CHAIN_TYPE);
+    let out_chain_ids = [CHAIN_ID; 2];
     // After withdrawing -7
     let out_amounts = [40, 40];
 
@@ -1353,7 +1351,7 @@ fn test_vanchor_wrap_and_deposit_cw20() {
     let public_amount = 10_i128;
 
     let chain_type = [4, 0];
-    let chain_id = compute_chain_id_type(1, &chain_type);
+    let chain_id = compute_chain_id_type(CHAIN_ID, &chain_type);
     let in_chain_ids = [chain_id; 2];
     let in_amounts = [0, 0];
     let in_indices = [0, 1];
@@ -1443,7 +1441,7 @@ fn test_vanchor_withdraw_and_unwrap_native() {
     let public_amount = 10_i128;
 
     let chain_type = [4, 0];
-    let chain_id = compute_chain_id_type(1, &chain_type);
+    let chain_id = compute_chain_id_type(CHAIN_ID, &chain_type);
     let in_chain_ids = [chain_id; 2];
     let in_amounts = [0, 0];
     let in_indices = [0, 1];
@@ -1523,8 +1521,8 @@ fn test_vanchor_withdraw_and_unwrap_native() {
 
     let public_amount = -7_i128;
 
-    let chain_id = compute_chain_id_type(TEST_CHAIN_ID, &CHAIN_TYPE);
-    let out_chain_ids = [TEST_CHAIN_ID; 2];
+    let chain_id = compute_chain_id_type(CHAIN_ID, &CHAIN_TYPE);
+    let out_chain_ids = [CHAIN_ID; 2];
     // After withdrawing -7
     let out_amounts = [1, 2];
 

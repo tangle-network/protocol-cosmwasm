@@ -25,7 +25,7 @@ use crate::contract::{execute, instantiate};
 use crate::test_util::Element;
 
 const MAX_EDGES: u32 = 2;
-const CHAIN_ID: u64 = 1;
+const CHAIN_ID: u64 = 2145598729; // chain_id: "cosmos-testnet-14002"
 const LEVELS: u32 = 30;
 const TOKENWRAPPER_ADDR: &str = "terra1340t6lqq6jxhm8d6gtz0hzz5jzcszvm27urkn2"; // Cw20 token
 const DEPOSIT_SIZE: u128 = 1_000_000;
@@ -44,7 +44,6 @@ fn create_anchor() -> OwnedDeps<MockStorage, MockApi, crate::mock_querier::WasmM
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
         max_edges: MAX_EDGES,
-        chain_id: CHAIN_ID,
         levels: LEVELS,
         deposit_size: Uint128::from(DEPOSIT_SIZE),
         tokenwrapper_addr: TOKENWRAPPER_ADDR.to_string(),
@@ -64,7 +63,6 @@ fn test_anchor_proper_initialization() {
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
         max_edges: MAX_EDGES,
-        chain_id: CHAIN_ID,
         levels: LEVELS,
         deposit_size: Uint128::from(DEPOSIT_SIZE),
         tokenwrapper_addr: TOKENWRAPPER_ADDR.to_string(),
@@ -113,7 +111,7 @@ fn test_anchor_should_be_able_to_deposit() {
 fn test_anchor_fail_when_any_byte_is_changed_in_proof() {
     let curve = Curve::Bn254;
     let (pk_bytes, _) = crate::test_util::setup_environment(curve);
-    let src_chain_id = compute_chain_id_type(1u64, &COSMOS_CHAIN_TYPE);
+    let src_chain_id = compute_chain_id_type(CHAIN_ID, &COSMOS_CHAIN_TYPE);
     let recipient_bytes = RECIPIENT.as_bytes();
     let relayer_bytes = RELAYER.as_bytes();
     let fee_value = 0;
@@ -194,7 +192,7 @@ fn test_anchor_fail_when_any_byte_is_changed_in_proof() {
 fn test_anchor_fail_when_invalid_merkle_roots() {
     let curve = Curve::Bn254;
     let (pk_bytes, _) = crate::test_util::setup_environment(curve);
-    let src_chain_id = compute_chain_id_type(1u64, &COSMOS_CHAIN_TYPE);
+    let src_chain_id = compute_chain_id_type(CHAIN_ID, &COSMOS_CHAIN_TYPE);
     let recipient_bytes = RECIPIENT.as_bytes();
     let relayer_bytes = RELAYER.as_bytes();
     let fee_value = 0;
@@ -271,7 +269,7 @@ fn test_anchor_fail_when_invalid_merkle_roots() {
 fn test_anchor_works_with_wasm_utils() {
     let curve = Curve::Bn254;
     let (pk_bytes, _) = crate::test_util::setup_environment(curve);
-    let src_chain_id = compute_chain_id_type(1u64, &COSMOS_CHAIN_TYPE);
+    let src_chain_id = compute_chain_id_type(CHAIN_ID, &COSMOS_CHAIN_TYPE);
     let recipient_bytes = RECIPIENT.as_bytes();
     let relayer_bytes = RELAYER.as_bytes();
     let fee_value = 0;
@@ -363,7 +361,7 @@ fn test_anchor_works() {
     let relayer_bytes = RELAYER.as_bytes();
     let fee_value = 0;
     let refund_value = 0;
-    let src_chain_id = compute_chain_id_type(1, &COSMOS_CHAIN_TYPE);
+    let src_chain_id = compute_chain_id_type(CHAIN_ID, &COSMOS_CHAIN_TYPE);
     let commitment_bytes = vec![0u8; 32];
     let commitment_element = Element::from_bytes(&commitment_bytes);
 
@@ -450,7 +448,7 @@ fn test_anchor_fail_when_relayer_is_diff_from_that_in_proof_generation() {
     let relayer_bytes = RELAYER.as_bytes();
     let fee_value = 0;
     let refund_value = 0;
-    let src_chain_id = compute_chain_id_type(1, &COSMOS_CHAIN_TYPE);
+    let src_chain_id = compute_chain_id_type(CHAIN_ID, &COSMOS_CHAIN_TYPE);
     let commitment_bytes = vec![0u8; 32];
     let commitment_element = Element::from_bytes(&commitment_bytes);
 
@@ -526,7 +524,7 @@ fn test_anchor_fail_when_fee_submitted_is_changed() {
     let relayer_bytes = RELAYER.as_bytes();
     let fee_value = 0;
     let refund_value = 0;
-    let src_chain_id = compute_chain_id_type(1, &COSMOS_CHAIN_TYPE);
+    let src_chain_id = compute_chain_id_type(CHAIN_ID, &COSMOS_CHAIN_TYPE);
     let commitment_bytes = vec![0u8; 32];
     let commitment_element = Element::from_bytes(&commitment_bytes);
 
@@ -760,7 +758,7 @@ fn test_anchor_withdraw_and_unwrap_native() {
     let relayer_bytes = RELAYER.as_bytes();
     let fee_value = 0;
     let refund_value = 0;
-    let src_chain_id = compute_chain_id_type(1, &COSMOS_CHAIN_TYPE);
+    let src_chain_id = compute_chain_id_type(CHAIN_ID, &COSMOS_CHAIN_TYPE);
     let commitment_bytes = vec![0u8; 32];
     let commitment_element = Element::from_bytes(&commitment_bytes);
 

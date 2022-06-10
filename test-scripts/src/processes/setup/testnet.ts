@@ -255,7 +255,6 @@ async function setup(
         anchorCodeId,
         {
             "max_edges": localjuno.contractsConsts.maxEdges,
-            "chain_id": localjuno.contractsConsts.chainId,
             "levels": localjuno.contractsConsts.levels,
             "deposit_size": localjuno.contractsConsts.depositSize,
             "tokenwrapper_addr": tokenWrapper,
@@ -276,7 +275,6 @@ async function setup(
         vanchorCodeId,
         {
             "max_edges": localjuno.contractsConsts.maxEdges,
-            "chain_id": localjuno.contractsConsts.chainId,
             "levels": localjuno.contractsConsts.levels,
             "max_deposit_amt": localjuno.contractsConsts.maxDepositAmt,
             "min_withdraw_amt": localjuno.contractsConsts.minWithdrawAmt,

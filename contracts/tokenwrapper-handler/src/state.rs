@@ -21,13 +21,13 @@ pub struct State {
 pub const STATE: Item<State> = Item::new("state");
 
 /* -----  Handlers common ----- */
-// resourceID => token contract address
+/// resourceID => token contract address
 pub const RESOURCEID2CONTRACTADDRESS: Map<&[u8], Addr> = Map::new("resourceIDToContractAddress");
 
-// Execution contract address => resourceID
+/// Execution contract address => resourceID
 pub const CONTRACTADDRESS2RESOURCEID: Map<Addr, [u8; 32]> = Map::new("contractAddressToResourceID");
 
-// Execution contract address => is whitelisted
+/// Execution contract address => is whitelisted
 pub const CONTRACTWHITELIST: Map<Addr, bool> = Map::new("contract_whitelist");
 
 pub fn set_resource(
@@ -54,11 +54,11 @@ pub fn read_whitelist(store: &dyn Storage, contract_addr: Addr) -> StdResult<boo
 /* --------------------------- */
 
 /* ---------- TokenWrapper-Handler specific DS ----------  */
-// sourceChainID => nonce => Update Record
-// (src_chain_id, nonce) -> UpdateRecord
+/// sourceChainID => nonce => Update Record
+/// (src_chain_id, nonce) -> UpdateRecord
 pub const UPDATE_RECORDS: Map<(String, String), UpdateRecord> = Map::new("update_records");
 
-// source chain ID => number of updates
+/// source chain ID => number of updates
 pub const COUNTS: Map<u64, u64> = Map::new("counts");
 
 pub fn read_update_record(

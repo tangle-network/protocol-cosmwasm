@@ -12,8 +12,8 @@ pub struct State {
 
 pub const STATE: Item<State> = Item::new("state");
 
-// destinationChainID => number of deposits
+/// destinationChainID => number of deposits
 pub const COUNTS: Map<&[u8], [u8; 32]> = Map::new("counts");
 
-// resourceID => handler address
+/// resourceID => handler address
 pub const RESOURCEID2HANDLERADDR: Map<&[u8], Addr> = Map::new("resourceIDToHandlerAddress");

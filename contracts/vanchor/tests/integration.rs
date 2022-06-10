@@ -15,7 +15,6 @@ use protocol_cosmwasm::vanchor::InstantiateMsg;
 // For the github CI, we copy the wasm file manually & import here.
 static WASM: &[u8] = include_bytes!("./cosmwasm_vanchor.wasm");
 
-const CHAIN_ID: u64 = 1;
 const MAX_EDGES: u32 = 2;
 const LEVELS: u32 = 30;
 const MAX_DEPOSIT_AMT: u128 = 40;
@@ -31,7 +30,6 @@ fn integration_test_instantiate_mixer() {
     let mut deps = mock_instance_with_gas_limit(WASM, u64::MAX);
 
     let msg = InstantiateMsg {
-        chain_id: CHAIN_ID,
         max_edges: MAX_EDGES,
         levels: LEVELS,
         max_deposit_amt: Uint128::from(MAX_DEPOSIT_AMT),
