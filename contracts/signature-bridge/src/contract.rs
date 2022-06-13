@@ -115,11 +115,7 @@ fn admin_set_resource_with_signature(
     }
 
     // Save the info of "resource_id -> handler(contract)" in this contract.
-    RESOURCEID2HANDLERADDR.save(
-        deps.storage,
-        &msg.new_resource_id,
-        &deps.api.addr_validate(&msg.handler_addr)?,
-    )?;
+    RESOURCEID2HANDLERADDR.save(deps.storage, &msg.new_resource_id, &msg.handler_addr)?;
 
     state.proposal_nonce = msg.nonce;
     STATE.save(deps.storage, &state)?;
@@ -170,9 +166,7 @@ fn exec_proposal_with_signature(
     }
 
     // Execute the "proposal" in "handler" contract
-    let handler_addr = RESOURCEID2HANDLERADDR
-        .load(deps.storage, &resource_id)?
-        .to_string();
+    let handler_addr = RESOURCEID2HANDLERADDR.load(deps.storage, &resource_id)?;
     let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: handler_addr,
         funds: vec![],
@@ -211,12 +205,6 @@ fn signed_by_governor(
     governor: &[u8],
 ) -> Result<bool, ContractError> {
     let hashed_data = keccak_256(data);
-    // println!("hashed_data::{:?}", hashed_data);
-    // let pubkey = deps
-    //     .api
-    //     .secp256k1_recover_pubkey(&hashed_data, sig, 1)
-    //     .unwrap();
-    // println!("recovered Pubkey: {:?}", pubkey);
     let verify_result = deps.api.secp256k1_verify(&hashed_data, sig, governor);
 
     verify_result.map_err(|e| ContractError::Std(StdError::VerificationErr { source: e }))
