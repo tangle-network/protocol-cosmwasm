@@ -1,4 +1,4 @@
-import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
+import { CosmWasmClient, SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { Coin, coin, DirectSecp256k1HdWallet, DirectSignResponse, makeAuthInfoBytes, makeSignDoc } from "@cosmjs/proto-signing";
 import { GasPrice } from "@cosmjs/stargate";
 
@@ -18,7 +18,6 @@ const { expect } = chai;
 const ec = new EC.ec('secp256k1');
 
 const SET_RESOURCE_FUNCTION_NAME ="adminSetResourceWithSignature(bytes32,bytes4,uint32,bytes32,address,address,bytes)";
-
 
 // -----------------------------------------------
 //  TEST: signatureBridge
@@ -54,7 +53,7 @@ export async function testSignatureBridgeAdminSetResWithSignature(
     signatureBridge: string,
 ): Promise<void> {
     process.stdout.write("Test - SignatureBridge admin sets the resource with signature");
-    
+
     const stateQuery: any = await junod.queryContractSmart(signatureBridge, {
         get_state: {},
     });
@@ -92,28 +91,44 @@ export async function testSignatureBridgeAdminSetResWithSignature(
         Buffer.from(execution_context_addr),
     ]); 
 
-    const hashed_unsignedData = keccak256(unsignedData);
-    console.log("unsigned_data:::", unsignedData, "\n");
-    console.log("hashed_unsigned_data::::", hashed_unsignedData, "\n");
+    const privkey = localjuno.contractsConsts.testPrivKey;
 
-    const signed_data: DirectSignResponse = await wallet1.signDirect(
-        localjuno.addresses.wallet1, 
-        makeSignDoc(
-            hashed_unsignedData, 
-            makeAuthInfoBytes([], [], 1.3),
-            localjuno.networkInfo.chainId, 
-            1
-        )
-    );
-    // console.log("signature:::", signed_data.signature.signature, "\n");
+    // const hashed_unsignedData = keccak256(unsignedData);
+    // console.log("hashed_unsigned_data::::", Array.from(hashed_unsignedData), "\n");
+    // const [account1, account2] = await wallet1.getAccounts();
+    // const accountNumber = await (await junod.getAccount(account1.address))?.accountNumber;
+    // const sequence = await (await junod.getAccount(account1.address))?.sequence!;
+    // const signed_data: DirectSignResponse = await wallet1.signDirect(
+    //     localjuno.addresses.wallet1, 
+    //     makeSignDoc(
+    //         hashed_unsignedData, 
+    //         makeAuthInfoBytes(
+    //             [{
+    //                 pubkey: account1.pubkey as any,
+    //                 sequence: sequence,
+    //             }], 
+    //             [], 
+    //             1.3, 
+    //             2,
+    //         ),
+    //         localjuno.networkInfo.chainId, 
+    //         accountNumber!,
+    //     )
+    // );
+
+    const sig = signMessage(privkey, Array.from(unsignedData));
+    console.log(sig);
+
+    // console.log("account1.pubkey:", account1.pubkey);
+    // console.log("signature:::", Array.from(Buffer.from(signed_data.signature.signature, 'base64')), "\n");
     // const x = {  
-    //     resource_id: Array.from(Buffer.from(resource_id.substring(2), 'hex')),
-    //     function_sig: Array.from(Buffer.from(function_sig.substring(2), 'hex')),
+    //     resource_id: Array.from(resource_id),
+    //     function_sig: Array.from(function_sig),
     //     nonce: nonce,
-    //     new_resource_id: Array.from(Buffer.from(new_resource_id.substring(2), 'hex')),
+    //     new_resource_id: Array.from(new_resource_id),
     //     handler_addr: handler_addr,
     //     execution_context_addr: execution_context_addr,
-    //     sig: Array.from(Buffer.from(signed_data.signature.signature, 'base64')),
+    //     sig: Array.from(Buffer.from(sig.substring(2), 'hex')),
     // }
     // console.log("X::::", x, "\n");
     const result = await junod.execute(localjuno.addresses.wallet1, signatureBridge, {
@@ -124,14 +139,14 @@ export async function testSignatureBridgeAdminSetResWithSignature(
             new_resource_id: Array.from(new_resource_id),
             handler_addr: handler_addr,
             execution_context_addr: execution_context_addr,
-            sig: Array.from(Buffer.from(signed_data.signature.signature, 'base64')),
+            sig: Array.from(Buffer.from(sig.substring(2), 'hex')),
         },
     },
     "auto", undefined, []);
 
     // Check the result
     const contractAddrQuery: any = await junod.queryContractSmart(localjuno.contracts.anchorHandler, {
-        resource_id: new_resource_id,
+        get_resource_id: new_resource_id,
     });
     const contract_addr = contractAddrQuery.contract_addr;
 
@@ -175,17 +190,19 @@ export async function testSignatureBridgeExecProposalWithSignature(
             }
         })),
     ]);
-    // console.log("data::", data);
-    const unsignedData = keccak256(data); // Currently, it is "0x..." + "(base64 string)".
-    const signed_data: DirectSignResponse = await wallet1.signDirect(
-        localjuno.addresses.wallet1, 
-        makeSignDoc(
-            Buffer.from(unsignedData), 
-            makeAuthInfoBytes([], [], 1.3),
-            localjuno.networkInfo.chainId, 
-            1
-        )
-    );
+    // const unsignedData = keccak256(data); // Currently, it is "0x..." + "(base64 string)".
+    // const signed_data: DirectSignResponse = await wallet1.signDirect(
+    //     localjuno.addresses.wallet1, 
+    //     makeSignDoc(
+    //         Buffer.from(unsignedData), 
+    //         makeAuthInfoBytes([], [], 1.3),
+    //         localjuno.networkInfo.chainId, 
+    //         1
+    //     )
+    // );
+
+    const privKey = localjuno.contractsConsts.testPrivKey;
+    const sig = signMessage(privKey, data);
     // console.log("unsigned_data:::", unsignedData);
     // console.log("signed-data:::", signed_data);
     // const x = {
@@ -199,7 +216,8 @@ export async function testSignatureBridgeExecProposalWithSignature(
     const result = await junod.execute(localjuno.addresses.wallet1, signatureBridge, {
       exec_proposal_with_sig: {
         data: Array.from(data),
-        sig: Array.from(Buffer.from(signed_data.signature.signature, 'base64')),
+        // sig: Array.from(Buffer.from(signed_data.signature.signature, 'base64')),
+        sig: Array.from(Buffer.from(sig)),
       }
     },
     "auto", undefined, []);
@@ -244,26 +262,26 @@ export const toHex = (covertThis: ethers.utils.BytesLike | number | bigint, padd
     return ethers.utils.hexZeroPad(ethers.utils.hexlify(covertThis), padding);
 };
 
-// export const signMessage = (wallet, data) => {
-//     const key = ec.keyFromPrivate(wallet.privateKey.slice(2), 'hex');
-//     const hash = ethers.utils.keccak256(data);
-//     const hashedData = ethers.utils.arrayify(hash); 
-//     let signature = key.sign(hashedData)!;
-//     let expandedSig = {
-//       r: '0x' + signature.r.toString('hex'),
-//       s: '0x' + signature.s.toString('hex'),
-//       v: signature.recoveryParam! + 27,
-//     }
-//     let sig;
-//     // Transaction malleability fix if s is too large (Bitcoin allows it, Ethereum rejects it)
-//     try {
-//       sig = ethers.utils.joinSignature(expandedSig)
-//     } catch (e) {
-//       expandedSig.s = '0x' + (new BN(ec.curve.n).sub(signature.s)).toString('hex');
-//       expandedSig.v = (expandedSig.v === 27) ? 28 : 27;
-//       sig = ethers.utils.joinSignature(expandedSig)
-//     }
+export const signMessage = (privKey: string, data: any) => {
+    const key = ec.keyFromPrivate(privKey.slice(2), 'hex');
+    const hash = ethers.utils.keccak256(data);
+    const hashedData = ethers.utils.arrayify(hash); 
+    let signature = key.sign(hashedData)!;
+    let expandedSig = {
+      r: '0x' + signature.r.toString('hex'),
+      s: '0x' + signature.s.toString('hex'),
+      v: signature.recoveryParam! + 27,
+    }
+    let sig;
+    // Transaction malleability fix if s is too large (Bitcoin allows it, Ethereum rejects it)
+    try {
+      sig = ethers.utils.joinSignature(expandedSig)
+    } catch (e) {
+      expandedSig.s = '0x' + (new BN(ec.curve.n).sub(signature.s)).toString('hex');
+      expandedSig.v = (expandedSig.v === 27) ? 28 : 27;
+      sig = ethers.utils.joinSignature(expandedSig)
+    }
   
-//     return sig;
-//   };
+    return sig;
+  };
 

@@ -13,7 +13,9 @@ use protocol_cosmwasm::signature_bridge::{
     ExecProposalWithSigMsg, ExecuteMsg, InstantiateMsg, QueryMsg, SetResourceWithSigMsg,
     StateResponse,
 };
-use protocol_cosmwasm::utils::{compute_chain_id_type, element_encoder, get_chain_id_type, compute_chain_id};
+use protocol_cosmwasm::utils::{
+    compute_chain_id, compute_chain_id_type, element_encoder, get_chain_id_type,
+};
 // Essentially, this is from "tiny_keccak" crate.
 use arkworks_setups::common::keccak_256;
 
@@ -41,7 +43,9 @@ pub fn instantiate(
         return Err(ContractError::UnnecessaryFunds {});
     }
 
-    if msg.initial_governor.len() != COMPRESSED_PUBKEY_LEN{
+    if msg.initial_governor.len() != COMPRESSED_PUBKEY_LEN
+        && msg.initial_governor.len() != UNCOMPRESSED_PUBKEY_LEN
+    {
         return Err(ContractError::Std(StdError::generic_err(
             "Pubkey length does not match.",
         )));
@@ -207,6 +211,12 @@ fn signed_by_governor(
     governor: &[u8],
 ) -> Result<bool, ContractError> {
     let hashed_data = keccak_256(data);
+    // println!("hashed_data::{:?}", hashed_data);
+    // let pubkey = deps
+    //     .api
+    //     .secp256k1_recover_pubkey(&hashed_data, sig, 1)
+    //     .unwrap();
+    // println!("recovered Pubkey: {:?}", pubkey);
     let verify_result = deps.api.secp256k1_verify(&hashed_data, sig, governor);
 
     verify_result.map_err(|e| ContractError::Std(StdError::VerificationErr { source: e }))

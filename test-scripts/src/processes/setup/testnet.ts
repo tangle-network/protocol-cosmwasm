@@ -9,6 +9,9 @@ import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { coin, DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 
 import { localjuno } from '../../config/localjunoConstants';
+import BN from 'bn.js';
+import EC from 'elliptic';
+const ec = new EC.ec('secp256k1');
 
 // -------------------------------------------------------------------------------------
 // Variables
@@ -162,148 +165,152 @@ async function setup(
 
     // SignatureBridge
     process.stdout.write("Instantiating SignatureBridge contract");
-    const [account] = await wallet1.getAccounts();
+    let keypair = ec.genKeyPair();
+    const pubkey = keypair.getPublic('array');
+    const privkey = keypair.getPrivate('hex');
     const signatureBridgeResult = await instantiateContract(
         junod,
         wallet1,
         wallet1,
         signatureBridgeCodeId,
         {
-            "initial_governor": Array.from(account.pubkey),
+            "initial_governor": Array.from(pubkey),
         }
       );
     signatureBridge = signatureBridgeResult.contractAddress;
+    console.log("test wallet pub key: ", pubkey, "\n");
+    console.log("test wallet priv key: ", privkey, "\n");
     console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${signatureBridge}`);
 
 
-    // TokenWrapper
-    process.stdout.write("Instantiating tokenWrapper contract");
+    // // TokenWrapper
+    // process.stdout.write("Instantiating tokenWrapper contract");
     
-    const tokenWrapperResult = await instantiateContract(
-        junod,
-        wallet1,
-        wallet1,
-        tokenWrapperCodeId,
-        {
-            "name": localjuno.contractsConsts.tokenWrapperTokenName,
-            "symbol": localjuno.contractsConsts.tokenWrapperTokenSymbol,
-            "decimals": localjuno.contractsConsts.decimals,
-            "governor": undefined,
-            "fee_recipient": localjuno.addresses.wallet2,
-            "fee_percentage": localjuno.contractsConsts.feePercentage,
-            "native_token_denom": localjuno.contractsConsts.nativeTokenDenom,
-            "is_native_allowed": localjuno.contractsConsts.isNativeAllowed,
-            "wrapping_limit": localjuno.contractsConsts.tokenWrapperWrappingLimit,
-        }
-      );
-    tokenWrapper = tokenWrapperResult.contractAddress;
+    // const tokenWrapperResult = await instantiateContract(
+    //     junod,
+    //     wallet1,
+    //     wallet1,
+    //     tokenWrapperCodeId,
+    //     {
+    //         "name": localjuno.contractsConsts.tokenWrapperTokenName,
+    //         "symbol": localjuno.contractsConsts.tokenWrapperTokenSymbol,
+    //         "decimals": localjuno.contractsConsts.decimals,
+    //         "governor": undefined,
+    //         "fee_recipient": localjuno.addresses.wallet2,
+    //         "fee_percentage": localjuno.contractsConsts.feePercentage,
+    //         "native_token_denom": localjuno.contractsConsts.nativeTokenDenom,
+    //         "is_native_allowed": localjuno.contractsConsts.isNativeAllowed,
+    //         "wrapping_limit": localjuno.contractsConsts.tokenWrapperWrappingLimit,
+    //     }
+    //   );
+    // tokenWrapper = tokenWrapperResult.contractAddress;
 
-    // Register Cw20(AUTO) token in "TokenWrapper"
-    await junod.execute(localjuno.addresses.wallet1, tokenWrapper, {
-        add_cw20_token_addr: {
-            token: cw20,
-            nonce: 1,
-        }
-    }, "auto", undefined, []);
+    // // Register Cw20(AUTO) token in "TokenWrapper"
+    // await junod.execute(localjuno.addresses.wallet1, tokenWrapper, {
+    //     add_cw20_token_addr: {
+    //         token: cw20,
+    //         nonce: 1,
+    //     }
+    // }, "auto", undefined, []);
     
-    console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${tokenWrapper}`);
+    // console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${tokenWrapper}`);
 
 
-    // TokenWrapperHandler
-    process.stdout.write("Instantiating TokenWrapperHandler contract");
+    // // TokenWrapperHandler
+    // process.stdout.write("Instantiating TokenWrapperHandler contract");
     
-    const tokenWrapperHandlerResult = await instantiateContract(
-        junod,
-        wallet1,
-        wallet1,
-        tokenWrapperHandlerCodeId,
-        {
-            "bridge_addr": signatureBridge,
-            "initial_resource_ids": [],
-            "initial_contract_addresses": [],
-        }
-      );
-    tokenWrapperHandler = tokenWrapperHandlerResult.contractAddress;
-    console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${tokenWrapperHandler}`);
+    // const tokenWrapperHandlerResult = await instantiateContract(
+    //     junod,
+    //     wallet1,
+    //     wallet1,
+    //     tokenWrapperHandlerCodeId,
+    //     {
+    //         "bridge_addr": signatureBridge,
+    //         "initial_resource_ids": [],
+    //         "initial_contract_addresses": [],
+    //     }
+    //   );
+    // tokenWrapperHandler = tokenWrapperHandlerResult.contractAddress;
+    // console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${tokenWrapperHandler}`);
 
 
-    // AnchorHandler
-    process.stdout.write("Instantiating AnchorHandler contract");
+    // // AnchorHandler
+    // process.stdout.write("Instantiating AnchorHandler contract");
     
-    const anchorHandlerResult = await instantiateContract(
-        junod,
-        wallet1,
-        wallet1,
-        anchorHandlerCodeId,
-        {
-            "bridge_addr": signatureBridge,
-            "initial_resource_ids": [],
-            "initial_contract_addresses": [],
-        }
-      );
-    anchorHandler = anchorHandlerResult.contractAddress;
-    console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${anchorHandler}`);
+    // const anchorHandlerResult = await instantiateContract(
+    //     junod,
+    //     wallet1,
+    //     wallet1,
+    //     anchorHandlerCodeId,
+    //     {
+    //         "bridge_addr": signatureBridge,
+    //         "initial_resource_ids": [],
+    //         "initial_contract_addresses": [],
+    //     }
+    //   );
+    // anchorHandler = anchorHandlerResult.contractAddress;
+    // console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${anchorHandler}`);
 
 
-    // Anchor
-    process.stdout.write("Instantiating Anchor contract");
+    // // Anchor
+    // process.stdout.write("Instantiating Anchor contract");
     
-    const anchorResult = await instantiateContract(
-        junod,
-        wallet1,
-        wallet1,
-        anchorCodeId,
-        {
-            "max_edges": localjuno.contractsConsts.maxEdges,
-            "levels": localjuno.contractsConsts.levels,
-            "deposit_size": localjuno.contractsConsts.depositSize,
-            "tokenwrapper_addr": tokenWrapper,
-            "handler": anchorHandler,
-        }
-      );
-    anchor = anchorResult.contractAddress;
-    console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${anchor}`);
+    // const anchorResult = await instantiateContract(
+    //     junod,
+    //     wallet1,
+    //     wallet1,
+    //     anchorCodeId,
+    //     {
+    //         "max_edges": localjuno.contractsConsts.maxEdges,
+    //         "levels": localjuno.contractsConsts.levels,
+    //         "deposit_size": localjuno.contractsConsts.depositSize,
+    //         "tokenwrapper_addr": tokenWrapper,
+    //         "handler": anchorHandler,
+    //     }
+    //   );
+    // anchor = anchorResult.contractAddress;
+    // console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${anchor}`);
 
    
-    // VAnchor
-    process.stdout.write("Instantiating VAnchor contract");
+    // // VAnchor
+    // process.stdout.write("Instantiating VAnchor contract");
     
-    const vanchorResult = await instantiateContract(
-        junod,
-        wallet1,
-        wallet1,
-        vanchorCodeId,
-        {
-            "max_edges": localjuno.contractsConsts.maxEdges,
-            "levels": localjuno.contractsConsts.levels,
-            "max_deposit_amt": localjuno.contractsConsts.maxDepositAmt,
-            "min_withdraw_amt": localjuno.contractsConsts.minWithdrawAmt,
-            "max_ext_amt": localjuno.contractsConsts.maxExtAmt,
-            "max_fee": localjuno.contractsConsts.maxFee,
-            "tokenwrapper_addr": tokenWrapper,
-            "handler": anchorHandler,
-        }
-      );
-    vanchor = vanchorResult.contractAddress;
-    console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${vanchor}`);     
+    // const vanchorResult = await instantiateContract(
+    //     junod,
+    //     wallet1,
+    //     wallet1,
+    //     vanchorCodeId,
+    //     {
+    //         "max_edges": localjuno.contractsConsts.maxEdges,
+    //         "levels": localjuno.contractsConsts.levels,
+    //         "max_deposit_amt": localjuno.contractsConsts.maxDepositAmt,
+    //         "min_withdraw_amt": localjuno.contractsConsts.minWithdrawAmt,
+    //         "max_ext_amt": localjuno.contractsConsts.maxExtAmt,
+    //         "max_fee": localjuno.contractsConsts.maxFee,
+    //         "tokenwrapper_addr": tokenWrapper,
+    //         "handler": anchorHandler,
+    //     }
+    //   );
+    // vanchor = vanchorResult.contractAddress;
+    // console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${vanchor}`);     
 
-    // Mixer
-    process.stdout.write("Instantiating Mixer contract");
+    // // Mixer
+    // process.stdout.write("Instantiating Mixer contract");
     
-    const mixerResult = await instantiateContract(
-        junod,
-        wallet1,
-        wallet1,
-        mixerCodeId,
-        {
-            "merkletree_levels": localjuno.contractsConsts.levels, 
-            "deposit_size": localjuno.contractsConsts.depositSize,
-            "native_token_denom": localjuno.contractsConsts.nativeTokenDenom,
-            "cw20_address": undefined,
-        }
-      );
-    mixer = mixerResult.contractAddress;
-    console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${mixer}`);
+    // const mixerResult = await instantiateContract(
+    //     junod,
+    //     wallet1,
+    //     wallet1,
+    //     mixerCodeId,
+    //     {
+    //         "merkletree_levels": localjuno.contractsConsts.levels, 
+    //         "deposit_size": localjuno.contractsConsts.depositSize,
+    //         "native_token_denom": localjuno.contractsConsts.nativeTokenDenom,
+    //         "cw20_address": undefined,
+    //     }
+    //   );
+    // mixer = mixerResult.contractAddress;
+    // console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${mixer}`);
 
     process.exit();
 }
