@@ -58,25 +58,15 @@ export async function testSignatureBridgeAdminSetResWithSignature(
         get_state: {},
     });
     const before_nonce = stateQuery.proposal_nonce;
-    const nonce: number = before_nonce + 1;
 
+
+    const nonce: number = before_nonce + 1;
     const nonce_buf: Buffer = Buffer.allocUnsafe(4);
     nonce_buf.writeUInt32BE(nonce);
 
-    const left_pad_buf: Buffer = Buffer.alloc(6);
-
-    const chainIdType: number = getChainIdType(parseInt(localjuno.contractsConsts.chain_id, 10));
-    const chainIdType_buf: Buffer = Buffer.allocUnsafe(6);
-    chainIdType_buf.writeUintBE(chainIdType, 0, 6);
-    
-    const hashed_sigbridge_addr_buf: Buffer = Buffer.from(keccak256(signatureBridge).buffer.slice(12))
-    const resource_id: Buffer = Buffer.concat([left_pad_buf, hashed_sigbridge_addr_buf, chainIdType_buf]);
-    
-    const hashed_anchor_addr_buf: Buffer = Buffer.from(keccak256(localjuno.contracts.anchor).buffer.slice(12))
-    const new_resource_id: Buffer = Buffer.concat([left_pad_buf, hashed_anchor_addr_buf, chainIdType_buf]);
-
+    const resource_id: Buffer = genResourceId(signatureBridge);
     const function_sig = Buffer.from(keccak256(SET_RESOURCE_FUNCTION_NAME).buffer.slice(0, 4));
-
+    const new_resource_id: Buffer = genResourceId(localjuno.contracts.anchor)
     const handler_addr = localjuno.contracts.anchorHandler;
     const execution_context_addr = localjuno.contracts.anchor;
 
@@ -132,28 +122,23 @@ export async function testSignatureBridgeExecProposalWithSignature(
 ): Promise<void> {
     process.stdout.write("Test - SignatureBridge admin executes the proposal with signature");
 
-    
-    const left_pad_buf: Buffer = Buffer.alloc(6);
+    // Save the before-state
+    let configQuery = await junod.queryContractSmart(localjuno.contracts.anchor, {
+      config: {},
+    });
+    const beforeNonce: number = configQuery.proposal_nonce;
 
-    const chainIdType: number = getChainIdType(parseInt(localjuno.contractsConsts.chain_id, 10));
-    const chainIdType_buf: Buffer = Buffer.allocUnsafe(6);
-    chainIdType_buf.writeUintBE(chainIdType, 0, 6);
-
-    const hashed_anchor_addr_buf: Buffer = Buffer.from(keccak256(localjuno.contracts.anchor).buffer.slice(12))
-    const resource_id: Buffer = Buffer.concat([left_pad_buf, hashed_anchor_addr_buf, chainIdType_buf]);
-
-    // proposal of `update_edge` with mock edge info
+    // proposal of `set_handler`
+    const resource_id: Buffer = genResourceId(localjuno.contracts.anchor);
     const data = Buffer.concat([
         resource_id,
         Buffer.from(toEncodedBinary({
-            update_edge: {
-                src_chain_id: parseInt(localjuno.contractsConsts.chain_id),
-                root: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                latest_leaf_index: 1,
-                target: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            }
-        })),
-    ]);
+          set_handler: {
+            handler: localjuno.contracts.anchorHandler,
+            nonce: beforeNonce + 3,
+          }
+        }), 'base64'),
+      ]);
 
     const privKey = localjuno.contractsConsts.testPrivKey;
     const sig = signMessage(privKey, data);
@@ -168,12 +153,11 @@ export async function testSignatureBridgeExecProposalWithSignature(
     "auto", undefined, []);
 
     // Check the result
-    const edgeInfoQuery: any = await junod.queryContractSmart(localjuno.contracts.anchor, {
-        edge_info: {
-            id: parseInt(localjuno.contractsConsts.chain_id),
-        },
+    configQuery = await junod.queryContractSmart(localjuno.contracts.anchor, {
+      config: {},
     });
-    expect(edgeInfoQuery.latest_leaf_index == 1).to.be.ok;
+    const afterNonce: number = configQuery.proposal_nonce;
+    expect(afterNonce == beforeNonce + 3).to.be.ok;
 
     console.log(chalk.green(" Passed!"));
 }
@@ -229,4 +213,19 @@ export const signMessage = (privKey: string, data: any) => {
   
     return sig;
   };
+
+const genResourceId = (address: string): Buffer => {
+    const leftPadBuf: Buffer = Buffer.alloc(6);
+
+    const hashedAddrBuf: Buffer = Buffer.from(keccak256(address).buffer.slice(12))
+
+    const chainIdType: number = getChainIdType(parseInt(localjuno.contractsConsts.chain_id, 10));
+    const chainIdType_buf: Buffer = Buffer.allocUnsafe(6);
+    chainIdType_buf.writeUintBE(chainIdType, 0, 6);
+    
+    const resource_id: Buffer = Buffer.concat([leftPadBuf, hashedAddrBuf, chainIdType_buf]);
+
+    return resource_id;
+}
+
 
