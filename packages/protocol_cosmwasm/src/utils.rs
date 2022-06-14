@@ -25,7 +25,7 @@ pub fn compute_chain_id_type(chain_id: u64, chain_type: &[u8]) -> u64 {
     let mut buf = [0u8; 8];
     #[allow(clippy::needless_borrow)]
     buf[2..4].copy_from_slice(&chain_type);
-    buf[4..8].copy_from_slice(&chain_id_value.to_le_bytes());
+    buf[4..8].copy_from_slice(&chain_id_value.to_be_bytes());
     u64::from_be_bytes(buf)
 }
 
