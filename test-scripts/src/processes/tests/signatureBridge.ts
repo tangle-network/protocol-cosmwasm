@@ -1,6 +1,5 @@
-import { CosmWasmClient, SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
-import { Coin, coin, DirectSecp256k1HdWallet, DirectSignResponse, makeAuthInfoBytes, makeSignDoc } from "@cosmjs/proto-signing";
-import { GasPrice } from "@cosmjs/stargate";
+import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
+import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 
 import * as chai from "chai";
 import chaiAsPromised from "chai-as-promised";
@@ -11,16 +10,14 @@ import BN from 'bn.js';
 import EC from 'elliptic';
 
 import { localjuno } from "../../config/localjunoConstants";
-import { datetimeStringToUTC,toEncodedBinary } from "../../utils/helpers";
+import { toEncodedBinary } from "../../utils/helpers";
 
 chai.use(chaiAsPromised);
 const { expect } = chai;
 const ec = new EC.ec('secp256k1');
 
-const SET_RESOURCE_FUNCTION_NAME ="adminSetResourceWithSignature(bytes32,bytes4,uint32,bytes32,address,address,bytes)";
-
 // -----------------------------------------------
-//  TEST: signatureBridge
+//  TEST: SignatureBridge
 //  
 //  SCENARIO: 
 //   1. Initialize the "SignatureBridge" contract (already done in "setup")
@@ -65,7 +62,7 @@ export async function testSignatureBridgeAdminSetResWithSignature(
     nonce_buf.writeUInt32BE(nonce);
 
     const resource_id: Buffer = genResourceId(signatureBridge);
-    const function_sig = Buffer.from(keccak256(SET_RESOURCE_FUNCTION_NAME).buffer.slice(0, 4));
+    const function_sig = Buffer.alloc(4);
     const new_resource_id: Buffer = genResourceId(localjuno.contracts.anchor)
     const handler_addr = localjuno.contracts.anchorHandler;
     const execution_context_addr = localjuno.contracts.anchor;
