@@ -104,16 +104,6 @@ fn admin_set_resource_with_signature(
         return Err(ContractError::InvalidNonce);
     }
 
-    let func_sig = keccak_256(
-        b"adminSetResourceWithSignature(bytes32,bytes4,uint32,bytes32,address,address,bytes)",
-    );
-
-    if msg.function_sig != func_sig[0..4] {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: "Invalid function signature".to_string(),
-        }));
-    }
-
     // Save the info of "resource_id -> handler(contract)" in this contract.
     RESOURCEID2HANDLERADDR.save(deps.storage, &msg.new_resource_id, &msg.handler_addr)?;
 
