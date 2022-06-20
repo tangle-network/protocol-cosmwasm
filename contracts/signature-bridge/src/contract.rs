@@ -104,6 +104,10 @@ fn admin_set_resource_with_signature(
         return Err(ContractError::InvalidNonce);
     }
 
+    if msg.function_sig != [0u8; 4] {
+        return Err(ContractError::InvalidArbitraryData);
+    }
+
     // Save the info of "resource_id -> handler(contract)" in this contract.
     RESOURCEID2HANDLERADDR.save(deps.storage, &msg.new_resource_id, &msg.handler_addr)?;
 
