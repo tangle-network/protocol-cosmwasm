@@ -9,6 +9,9 @@ import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { coin, DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 
 import { localjuno } from '../../config/localjunoConstants';
+import BN from 'bn.js';
+import EC from 'elliptic';
+const ec = new EC.ec('secp256k1');
 
 // -------------------------------------------------------------------------------------
 // Variables
@@ -162,17 +165,21 @@ async function setup(
 
     // SignatureBridge
     process.stdout.write("Instantiating SignatureBridge contract");
-    
+    let keypair = ec.genKeyPair();
+    const pubkey = keypair.getPublic('array');
+    const privkey = keypair.getPrivate('hex');
     const signatureBridgeResult = await instantiateContract(
         junod,
         wallet1,
         wallet1,
         signatureBridgeCodeId,
         {
-            "initial_governor": localjuno.addresses.wallet1,
+            "initial_governor": Array.from(pubkey),
         }
       );
     signatureBridge = signatureBridgeResult.contractAddress;
+    console.log("\nTest wallet public key: ", pubkey,);
+    console.log("\nTest wallet private key: ", privkey, "\n");
     console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${signatureBridge}`);
 
 

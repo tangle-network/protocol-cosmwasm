@@ -841,6 +841,7 @@ dependencies = [
 name = "cosmwasm-signature-bridge"
 version = "0.1.0"
 dependencies = [
+ "arkworks-setups 0.5.3",
  "cosmwasm-schema",
  "cosmwasm-std 1.0.0",
  "cosmwasm-storage",
