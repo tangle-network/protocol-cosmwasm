@@ -372,7 +372,7 @@ pub fn withdraw(
         .add_messages(msgs)
         .add_event(Event::new("mixer-withdraw").add_attributes(vec![
             attr("action", "withdraw"),
-            attr("recipient", recipient.to_string()),
+            attr("recipient", recipient),
             attr("root", format!("{:?}", msg.root)),
             attr("nullifier_hash", format!("{:?}", msg.nullifier_hash)),
         ])))

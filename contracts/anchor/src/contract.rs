@@ -1,5 +1,3 @@
-use std::str::from_utf8;
-
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -548,7 +546,7 @@ fn wrap_and_deposit_native(
         let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: tokenwrapper.to_string(),
             msg: to_binary(&TokenWrapperExecuteMsg::Wrap {
-                sender: Some(sender.clone()),
+                sender: Some(sender),
                 recipient: Some(recipient),
             })?,
             funds: sent_funds,
@@ -570,6 +568,7 @@ fn wrap_and_deposit_native(
 }
 
 /// Wrap the cw20 token & deposit it into the contract
+#[allow(clippy::too_many_arguments)]
 fn wrap_and_deposit_cw20(
     mut deps: DepsMut,
     env: Env,
@@ -613,7 +612,7 @@ fn wrap_and_deposit_cw20(
                 contract: tokenwrapper.to_string(),
                 amount: amt_to_wrap,
                 msg: to_binary(&TokenWrapperHookMsg::Wrap {
-                    sender: Some(sender.clone()),
+                    sender: Some(sender),
                     recipient: Some(recipient),
                 })?,
             })?,
