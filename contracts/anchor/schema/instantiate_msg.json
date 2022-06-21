@@ -3,23 +3,18 @@
   "title": "InstantiateMsg",
   "type": "object",
   "required": [
-    "chain_id",
-    "cw20_address",
     "deposit_size",
+    "handler",
     "levels",
-    "max_edges"
+    "max_edges",
+    "tokenwrapper_addr"
   ],
   "properties": {
-    "chain_id": {
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
-    },
-    "cw20_address": {
-      "type": "string"
-    },
     "deposit_size": {
       "$ref": "#/definitions/Uint128"
+    },
+    "handler": {
+      "type": "string"
     },
     "levels": {
       "type": "integer",
@@ -30,6 +25,9 @@
       "type": "integer",
       "format": "uint32",
       "minimum": 0.0
+    },
+    "tokenwrapper_addr": {
+      "type": "string"
     }
   },
   "definitions": {

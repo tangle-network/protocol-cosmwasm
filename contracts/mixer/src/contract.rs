@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, from_binary, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, Event,
-    MessageInfo, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
+    MessageInfo, Response, StdError, StdResult, Storage, WasmMsg,
 };
 use cw2::set_contract_version;
 
@@ -66,10 +66,7 @@ pub fn instantiate(
                 .to_string(),
         }));
     }
-    let deposit_size = match parse_string_to_uint128(msg.deposit_size) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
+    let deposit_size = msg.deposit_size;
 
     let mixer: Mixer = Mixer {
         cw20_address,
@@ -233,14 +230,8 @@ pub fn withdraw(
 ) -> Result<Response, ContractError> {
     let recipient = deps.api.addr_validate(msg.recipient.as_str())?.to_string();
     let relayer = deps.api.addr_validate(msg.relayer.as_str())?.to_string();
-    let fee = match parse_string_to_uint128(msg.fee) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
-    let refund = match parse_string_to_uint128(msg.refund) {
-        Ok(v) => v,
-        Err(e) => return Err(ContractError::Std(e)),
-    };
+    let fee = msg.fee;
+    let refund = msg.refund;
 
     let mixer = MIXER.load(deps.storage)?;
 
@@ -431,12 +422,4 @@ fn get_merkle_tree_info(deps: Deps) -> StdResult<MerkleTreeInfoResponse> {
 fn get_merkle_root(deps: Deps, id: u32) -> StdResult<MerkleRootResponse> {
     let root = read_root(deps.storage, id)?;
     Ok(MerkleRootResponse { root })
-}
-
-pub fn parse_string_to_uint128(v: String) -> Result<Uint128, StdError> {
-    let res = match v.parse::<u128>() {
-        Ok(v) => Uint128::from(v),
-        Err(e) => return Err(StdError::GenericErr { msg: e.to_string() }),
-    };
-    Ok(res)
 }

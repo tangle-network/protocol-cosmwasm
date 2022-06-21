@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -30,8 +32,7 @@ use protocol_cosmwasm::token_wrapper::{
     QueryMsg as TokenWrapperQueryMsg,
 };
 use protocol_cosmwasm::utils::{
-    compute_chain_id, compute_chain_id_type, element_encoder, parse_string_to_uint128,
-    truncate_and_pad,
+    compute_chain_id, compute_chain_id_type, element_encoder, truncate_and_pad,
 };
 use protocol_cosmwasm::zeroes::zeroes;
 
@@ -528,7 +529,7 @@ fn wrap_and_deposit_native(
             target_amount: amount.to_string(),
         },
     )?;
-    let amt_to_wrap = parse_string_to_uint128(amt_to_wrap_query.amount_to_wrap)?;
+    let amt_to_wrap = Uint128::from_str(&amt_to_wrap_query.amount_to_wrap)?;
 
     let is_sent_enough_token = sent_funds
         .iter()
@@ -594,7 +595,7 @@ fn wrap_and_deposit_cw20(
             target_amount: amount.to_string(),
         },
     )?;
-    let amt_to_wrap = parse_string_to_uint128(amt_to_wrap_query.amount_to_wrap)?;
+    let amt_to_wrap = Uint128::from_str(&amt_to_wrap_query.amount_to_wrap)?;
 
     if recv_token_amt != amt_to_wrap {
         return Err(ContractError::InsufficientFunds {});

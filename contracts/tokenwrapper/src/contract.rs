@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -26,7 +28,7 @@ use protocol_cosmwasm::token_wrapper::{
 use crate::state::{Config, CONFIG, HISTORICAL_TOKENS, TOKENS};
 use crate::utils::{
     calc_fee_perc_from_string, get_amount_to_wrap, get_fee_from_amount, is_valid_address,
-    is_valid_unwrap_amount, is_valid_wrap_amount, parse_string_to_uint128,
+    is_valid_unwrap_amount, is_valid_wrap_amount,
 };
 
 // version info for migration info
@@ -576,7 +578,7 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 
 fn query_fee_from_amount(deps: Deps, amount_to_wrap: String) -> StdResult<FeeFromAmountResponse> {
     let config = CONFIG.load(deps.storage)?;
-    let amount_to_wrap = parse_string_to_uint128(amount_to_wrap)?;
+    let amount_to_wrap = Uint128::from_str(&amount_to_wrap)?;
     let fee_perc = config.fee_percentage.numerator();
     let fee_amt = get_fee_from_amount(amount_to_wrap, fee_perc.u128());
     Ok(FeeFromAmountResponse {
@@ -587,7 +589,7 @@ fn query_fee_from_amount(deps: Deps, amount_to_wrap: String) -> StdResult<FeeFro
 
 fn query_amount_to_wrap(deps: Deps, target_amount: String) -> StdResult<GetAmountToWrapResponse> {
     let config = CONFIG.load(deps.storage)?;
-    let target_amount = parse_string_to_uint128(target_amount)?;
+    let target_amount = Uint128::from_str(&target_amount)?;
     let fee_perc = config.fee_percentage.numerator();
     let amount_to_wrap = get_amount_to_wrap(target_amount, fee_perc.u128());
     Ok(GetAmountToWrapResponse {

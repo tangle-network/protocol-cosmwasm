@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use protocol_cosmwasm::signature_bridge::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use protocol_cosmwasm::tokenwrapper_handler::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();

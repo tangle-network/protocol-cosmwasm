@@ -7,6 +7,12 @@
     "merkletree_levels"
   ],
   "properties": {
+    "cw20_address": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "deposit_size": {
       "$ref": "#/definitions/Uint128"
     },
@@ -14,6 +20,12 @@
       "type": "integer",
       "format": "uint32",
       "minimum": 0.0
+    },
+    "native_token_denom": {
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "definitions": {

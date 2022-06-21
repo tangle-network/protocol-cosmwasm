@@ -3,22 +3,17 @@
   "title": "InstantiateMsg",
   "type": "object",
   "required": [
-    "chain_id",
-    "cw20_address",
+    "handler",
     "levels",
     "max_deposit_amt",
     "max_edges",
     "max_ext_amt",
     "max_fee",
-    "min_withdraw_amt"
+    "min_withdraw_amt",
+    "tokenwrapper_addr"
   ],
   "properties": {
-    "chain_id": {
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
-    },
-    "cw20_address": {
+    "handler": {
       "type": "string"
     },
     "levels": {
@@ -27,7 +22,7 @@
       "minimum": 0.0
     },
     "max_deposit_amt": {
-      "$ref": "#/definitions/Uint256"
+      "$ref": "#/definitions/Uint128"
     },
     "max_edges": {
       "type": "integer",
@@ -35,18 +30,21 @@
       "minimum": 0.0
     },
     "max_ext_amt": {
-      "$ref": "#/definitions/Uint256"
+      "$ref": "#/definitions/Uint128"
     },
     "max_fee": {
-      "$ref": "#/definitions/Uint256"
+      "$ref": "#/definitions/Uint128"
     },
     "min_withdraw_amt": {
-      "$ref": "#/definitions/Uint256"
+      "$ref": "#/definitions/Uint128"
+    },
+    "tokenwrapper_addr": {
+      "type": "string"
     }
   },
   "definitions": {
-    "Uint256": {
-      "description": "An implementation of u256 that is using strings for JSON encoding/decoding, such that the full u256 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances out of primitive uint types or `new` to provide big endian bytes:\n\n``` # use cosmwasm_std::Uint256; let a = Uint256::from(258u128); let b = Uint256::new([ 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 1u8, 2u8, ]); assert_eq!(a, b); ```",
+    "Uint128": {
+      "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
       "type": "string"
     }
   }

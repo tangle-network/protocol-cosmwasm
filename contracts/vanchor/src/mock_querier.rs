@@ -1,13 +1,13 @@
 // Contains mock functionality to test multi-contract scenarios
 
 use std::marker::PhantomData;
+use std::str::FromStr;
 
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage, MOCK_CONTRACT_ADDR};
 use cosmwasm_std::{
     from_binary, from_slice, to_binary, Coin, ContractResult, Empty, OwnedDeps, Querier,
     QuerierResult, QueryRequest, SystemError, SystemResult, Uint128, WasmQuery,
 };
-use protocol_cosmwasm::utils::parse_string_to_uint128;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -82,7 +82,7 @@ impl WasmMockQuerier {
                     .unwrap(),
                 )),
                 QueryMsg::GetAmountToWrap { target_amount } => {
-                    let targ_amt = parse_string_to_uint128(target_amount).unwrap();
+                    let targ_amt = Uint128::from_str(&target_amount).unwrap();
                     // Assumes that the "fee_percentage" is 10%
                     let amt_to_wrap = targ_amt.multiply_ratio(100_u128, 90_u128);
                     SystemResult::Ok(ContractResult::Ok(

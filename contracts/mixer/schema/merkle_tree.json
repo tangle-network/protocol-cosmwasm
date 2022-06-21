@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "MerkleTree",
+  "description": "MerkleTree",
   "type": "object",
   "required": [
     "current_root_index",
