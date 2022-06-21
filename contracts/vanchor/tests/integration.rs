@@ -44,6 +44,6 @@ fn integration_test_instantiate_mixer() {
 
     assert_eq!(
         response.attributes,
-        vec![attr("method", "instantiate"), attr("owner", "creator"),]
+        vec![attr("action", "instantiate"), attr("owner", "creator"),]
     );
 }

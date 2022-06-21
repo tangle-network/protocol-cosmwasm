@@ -51,7 +51,7 @@ fn integration_test_instantiate_anchor() {
 
     assert_eq!(
         response.attributes,
-        vec![attr("method", "instantiate"), attr("owner", "anyone"),]
+        vec![attr("action", "instantiate"), attr("owner", "anyone"),]
     );
 }
 
@@ -91,10 +91,7 @@ fn test_deposit_cw20() {
     });
 
     let response: Response = execute(&mut deps, mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit_cw20"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
 }
 
 // NOT: Didn't add the "withdraw" test since it needs the input params from "test_util" module.
