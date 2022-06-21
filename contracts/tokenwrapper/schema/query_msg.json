@@ -1,6 +1,120 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "QueryMsg",
-  "type": "string",
-  "enum": []
+  "oneOf": [
+    {
+      "description": "Implements CW20. Returns the current balance of the given address, 0 if unset.",
+      "type": "object",
+      "required": [
+        "balance"
+      ],
+      "properties": {
+        "balance": {
+          "type": "object",
+          "required": [
+            "address"
+          ],
+          "properties": {
+            "address": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Implements CW20. Returns metadata on the contract - name, decimals, supply, etc.",
+      "type": "object",
+      "required": [
+        "token_info"
+      ],
+      "properties": {
+        "token_info": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Implements CW20 \"allowance\" extension. Returns how much spender can use from owner account, 0 if unset.",
+      "type": "object",
+      "required": [
+        "allowance"
+      ],
+      "properties": {
+        "allowance": {
+          "type": "object",
+          "required": [
+            "owner",
+            "spender"
+          ],
+          "properties": {
+            "owner": {
+              "type": "string"
+            },
+            "spender": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Custom queries Returns the Config of contract",
+      "type": "object",
+      "required": [
+        "config"
+      ],
+      "properties": {
+        "config": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Calculates the \"fee\" from \"amount_to_wrap\"",
+      "type": "object",
+      "required": [
+        "fee_from_amount"
+      ],
+      "properties": {
+        "fee_from_amount": {
+          "type": "object",
+          "required": [
+            "amount_to_wrap"
+          ],
+          "properties": {
+            "amount_to_wrap": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Calculates the \"amount_to_wrap\" for target amt",
+      "type": "object",
+      "required": [
+        "get_amount_to_wrap"
+      ],
+      "properties": {
+        "get_amount_to_wrap": {
+          "type": "object",
+          "required": [
+            "target_amount"
+          ],
+          "properties": {
+            "target_amount": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
 }

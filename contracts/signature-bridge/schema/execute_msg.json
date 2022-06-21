@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExecuteMsg",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "admin_set_resource_with_sig"
+      ],
+      "properties": {
+        "admin_set_resource_with_sig": {
+          "$ref": "#/definitions/SetResourceWithSigMsg"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "exec_proposal_with_sig"
+      ],
+      "properties": {
+        "exec_proposal_with_sig": {
+          "$ref": "#/definitions/ExecProposalWithSigMsg"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "definitions": {
+    "ExecProposalWithSigMsg": {
+      "type": "object",
+      "required": [
+        "data",
+        "sig"
+      ],
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          }
+        },
+        "sig": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          }
+        }
+      }
+    },
+    "SetResourceWithSigMsg": {
+      "type": "object",
+      "required": [
+        "execution_context_addr",
+        "function_sig",
+        "handler_addr",
+        "new_resource_id",
+        "nonce",
+        "resource_id",
+        "sig"
+      ],
+      "properties": {
+        "execution_context_addr": {
+          "type": "string"
+        },
+        "function_sig": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          },
+          "maxItems": 4,
+          "minItems": 4
+        },
+        "handler_addr": {
+          "type": "string"
+        },
+        "new_resource_id": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          },
+          "maxItems": 32,
+          "minItems": 32
+        },
+        "nonce": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "resource_id": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          },
+          "maxItems": 32,
+          "minItems": 32
+        },
+        "sig": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          }
+        }
+      }
+    }
+  }
+}

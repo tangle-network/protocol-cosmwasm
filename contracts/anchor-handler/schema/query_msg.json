@@ -5,10 +5,10 @@
     {
       "type": "object",
       "required": [
-        "config"
+        "get_bridge_address"
       ],
       "properties": {
-        "config": {
+        "get_bridge_address": {
           "type": "object"
         }
       },
@@ -17,19 +17,24 @@
     {
       "type": "object",
       "required": [
-        "edge_info"
+        "get_contract_address"
       ],
       "properties": {
-        "edge_info": {
+        "get_contract_address": {
           "type": "object",
           "required": [
-            "id"
+            "resource_id"
           ],
           "properties": {
-            "id": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
+            "resource_id": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "uint8",
+                "minimum": 0.0
+              },
+              "maxItems": 32,
+              "minItems": 32
             }
           }
         }
@@ -39,58 +44,64 @@
     {
       "type": "object",
       "required": [
-        "neighbor_root_info"
+        "get_resource_id"
       ],
       "properties": {
-        "neighbor_root_info": {
+        "get_resource_id": {
           "type": "object",
           "required": [
-            "chain_id",
-            "id"
+            "contract_addr"
           ],
           "properties": {
-            "chain_id": {
+            "contract_addr": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "is_contract_whitelisted"
+      ],
+      "properties": {
+        "is_contract_whitelisted": {
+          "type": "object",
+          "required": [
+            "contract_addr"
+          ],
+          "properties": {
+            "contract_addr": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_update_record"
+      ],
+      "properties": {
+        "get_update_record": {
+          "type": "object",
+          "required": [
+            "src_chain_id",
+            "update_nonce"
+          ],
+          "properties": {
+            "src_chain_id": {
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
             },
-            "id": {
+            "update_nonce": {
               "type": "integer",
-              "format": "uint32",
-              "minimum": 0.0
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "merkle_tree_info"
-      ],
-      "properties": {
-        "merkle_tree_info": {
-          "type": "object"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "merkle_root_info"
-      ],
-      "properties": {
-        "merkle_root_info": {
-          "type": "object",
-          "required": [
-            "id"
-          ],
-          "properties": {
-            "id": {
-              "type": "integer",
-              "format": "uint32",
+              "format": "uint64",
               "minimum": 0.0
             }
           }

@@ -3,6 +3,7 @@
   "title": "ExecuteMsg",
   "oneOf": [
     {
+      "description": "Withdraw a deposit from the contract",
       "type": "object",
       "required": [
         "withdraw"
@@ -15,6 +16,121 @@
       "additionalProperties": false
     },
     {
+      "description": "Unwraps the Anchor's TokenWrapper token for the `sender` into one of its wrappable tokens.",
+      "type": "object",
+      "required": [
+        "unwrap_into_token"
+      ],
+      "properties": {
+        "unwrap_into_token": {
+          "type": "object",
+          "required": [
+            "amount",
+            "token_addr"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "token_addr": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Wraps the native token to \"TokenWrapper\" token",
+      "type": "object",
+      "required": [
+        "wrap_native"
+      ],
+      "properties": {
+        "wrap_native": {
+          "type": "object",
+          "required": [
+            "amount"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Unwraps the \"TokenWrapper\" token to native token",
+      "type": "object",
+      "required": [
+        "unwrap_native"
+      ],
+      "properties": {
+        "unwrap_native": {
+          "type": "object",
+          "required": [
+            "amount"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Wraps the native token & deposit it into the contract",
+      "type": "object",
+      "required": [
+        "wrap_and_deposit"
+      ],
+      "properties": {
+        "wrap_and_deposit": {
+          "type": "object",
+          "required": [
+            "amount"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "commitment": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "integer",
+                "format": "uint8",
+                "minimum": 0.0
+              },
+              "maxItems": 32,
+              "minItems": 32
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Withdraws the deposit & unwraps into valid token for `sender`",
+      "type": "object",
+      "required": [
+        "withdraw_and_unwrap"
+      ],
+      "properties": {
+        "withdraw_and_unwrap": {
+          "$ref": "#/definitions/WithdrawMsg"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Handles the cw20 token receive cases 1. DepositCw20 2. WrapToken",
       "type": "object",
       "required": [
         "receive"
@@ -22,6 +138,84 @@
       "properties": {
         "receive": {
           "$ref": "#/definitions/Cw20ReceiveMsg"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Sets a new handler for contract",
+      "type": "object",
+      "required": [
+        "set_handler"
+      ],
+      "properties": {
+        "set_handler": {
+          "type": "object",
+          "required": [
+            "handler",
+            "nonce"
+          ],
+          "properties": {
+            "handler": {
+              "type": "string"
+            },
+            "nonce": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Update/add an edge for underlying tree",
+      "type": "object",
+      "required": [
+        "update_edge"
+      ],
+      "properties": {
+        "update_edge": {
+          "type": "object",
+          "required": [
+            "latest_leaf_index",
+            "root",
+            "src_chain_id",
+            "target"
+          ],
+          "properties": {
+            "latest_leaf_index": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "root": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "uint8",
+                "minimum": 0.0
+              },
+              "maxItems": 32,
+              "minItems": 32
+            },
+            "src_chain_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "target": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "uint8",
+                "minimum": 0.0
+              },
+              "maxItems": 32,
+              "minItems": 32
+            }
+          }
         }
       },
       "additionalProperties": false
@@ -56,15 +250,10 @@
       "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
       "type": "string"
     },
-    "Uint256": {
-      "description": "An implementation of u256 that is using strings for JSON encoding/decoding, such that the full u256 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances out of primitive uint types or `new` to provide big endian bytes:\n\n``` # use cosmwasm_std::Uint256; let a = Uint256::from(258u128); let b = Uint256::new([ 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 1u8, 2u8, ]); assert_eq!(a, b); ```",
-      "type": "string"
-    },
     "WithdrawMsg": {
       "type": "object",
       "required": [
         "commitment",
-        "cw20_address",
         "fee",
         "nullifier_hash",
         "proof_bytes",
@@ -85,10 +274,13 @@
           "minItems": 32
         },
         "cw20_address": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "fee": {
-          "$ref": "#/definitions/Uint256"
+          "$ref": "#/definitions/Uint128"
         },
         "nullifier_hash": {
           "type": "array",
@@ -112,7 +304,7 @@
           "type": "string"
         },
         "refund": {
-          "$ref": "#/definitions/Uint256"
+          "$ref": "#/definitions/Uint128"
         },
         "relayer": {
           "type": "string"
