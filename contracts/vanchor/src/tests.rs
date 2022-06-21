@@ -210,10 +210,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_deposit_cw20() {
     });
 
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "transact_deposit"), attr("ext_amt", "10"),]
-    );
+    assert_eq!(response.events.len(), 1);
 }
 
 #[test]
@@ -365,10 +362,7 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
 
     // Withdraw "7" cw20 tokens.
     let response = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "transact_withdraw"), attr("ext_amt", "-5"),]
-    );
+    assert_eq!(response.events.len(), 1);
 }
 
 #[test]
@@ -1078,10 +1072,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_deposit_cw20() {
     });
 
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "transact_deposit"), attr("ext_amt", "160"),]
-    );
+    assert_eq!(response.events.len(), 1);
 }
 
 #[test]
@@ -1233,10 +1224,7 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
 
     // Withdraw "7" cw20 tokens.
     let response = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "transact_withdraw"), attr("ext_amt", "-50"),]
-    );
+    assert_eq!(response.events.len(), 1);
 }
 
 #[test]
@@ -1256,7 +1244,7 @@ fn test_vanchor_wrap_native() {
     assert_eq!(
         response.attributes,
         vec![
-            attr("method", "wrap_native"),
+            attr("action", "wrap_native"),
             attr("denom", "uusd"),
             attr("amount", wrap_amt.to_string()),
         ]
@@ -1280,7 +1268,7 @@ fn test_vanchor_unwrap_native() {
     assert_eq!(
         response.attributes,
         vec![
-            attr("method", "unwrap_native"),
+            attr("action", "unwrap_native"),
             attr("amount", unwrap_amt.to_string()),
         ]
     );
@@ -1305,7 +1293,7 @@ fn test_vanchor_wrap_token() {
     assert_eq!(
         response.attributes,
         vec![
-            attr("method", "wrap_token"),
+            attr("action", "wrap_token"),
             attr("token", wrap_token.to_string()),
             attr("amount", wrap_amt.to_string()),
         ]
@@ -1331,7 +1319,7 @@ fn test_vanchor_unwrap_into_token() {
     assert_eq!(
         response.attributes,
         vec![
-            attr("method", "unwrap_into_token"),
+            attr("action", "unwrap_into_token"),
             attr("token", recv_token),
             attr("amount", unwrap_amt.to_string()),
         ]
@@ -1418,13 +1406,7 @@ fn test_vanchor_wrap_and_deposit_cw20() {
     });
 
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![
-            attr("method", "transact_deposit_wrap_cw20"),
-            attr("ext_amt", "10"),
-        ]
-    );
+    assert_eq!(response.events.len(), 1);
     assert_eq!(response.messages.len(), 1);
 }
 
@@ -1584,13 +1566,7 @@ fn test_vanchor_withdraw_and_unwrap_native() {
 
     // Withdraw "7" cw20 tokens.
     let response = execute(deps.as_mut(), mock_env(), info, withdraw_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![
-            attr("method", "transact_withdraw_unwrap"),
-            attr("ext_amt", "-5"),
-        ]
-    );
+    assert_eq!(response.events.len(), 1);
 }
 
 #[test]
@@ -1628,7 +1604,7 @@ fn test_vanchor_set_handler() {
     assert_eq!(
         res.attributes,
         vec![
-            attr("method", "set_handler"),
+            attr("action", "set_handler"),
             attr("handler", new_handler),
             attr("nonce", nonce.to_string()),
         ]
