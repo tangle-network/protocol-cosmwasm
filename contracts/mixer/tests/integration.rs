@@ -47,7 +47,7 @@ fn integration_test_instantiate_mixer() {
 
     assert_eq!(
         response.attributes,
-        vec![attr("method", "instantiate"), attr("owner", "anyone"),]
+        vec![attr("action", "instantiate"), attr("owner", "anyone"),]
     );
 }
 
@@ -84,10 +84,7 @@ fn integration_test_mixer_deposit_native_token() {
     });
 
     let response: Response = execute(&mut deps, mock_env(), info, deposit_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
 }
 
 #[test]
@@ -125,10 +122,7 @@ fn integration_test_mixer_deposit_cw20_token() {
     });
 
     let response: Response = execute(&mut deps, mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit_cw20"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
 }
 
 // NOT: Didn't add the "withdraw" test since it needs the input params from "test_util" module.

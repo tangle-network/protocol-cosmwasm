@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
+    attr, from_binary, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, Event,
     MessageInfo, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
@@ -103,7 +103,7 @@ pub fn instantiate(
     save_root(deps.storage, 0_u32, &zeroes(msg.levels))?;
 
     Ok(Response::new()
-        .add_attribute("method", "instantiate")
+        .add_attribute("action", "instantiate")
         .add_attribute("owner", info.sender))
 }
 
@@ -135,6 +135,7 @@ pub fn execute(
         // Wrap the native token & deposit it into the contract
         ExecuteMsg::WrapAndDeposit { commitment, amount } => wrap_and_deposit_native(
             deps,
+            env.clone(),
             info.sender.to_string(),
             env.contract.address.to_string(),
             commitment,
@@ -176,11 +177,12 @@ pub fn receive_cw20(
     let sender = cw20_msg.sender;
     match from_binary(&cw20_msg.msg) {
         Ok(Cw20HookMsg::DepositCw20 { commitment }) => {
-            deposit_cw20(deps, commitment, recv_token_addr, recv_token_amt)
+            deposit_cw20(deps, env, commitment, recv_token_addr, recv_token_amt)
         }
         Ok(Cw20HookMsg::WrapToken {}) => wrap_token(deps, sender, recv_token_addr, recv_token_amt),
         Ok(Cw20HookMsg::WrapAndDeposit { commitment, amount }) => wrap_and_deposit_cw20(
             deps,
+            env.clone(),
             sender,
             env.contract.address.to_string(),
             commitment,
@@ -195,6 +197,7 @@ pub fn receive_cw20(
 /// Deposit CW20 token("TokenWrapper") with the commitment
 fn deposit_cw20(
     mut deps: DepsMut,
+    env: Env,
     commitment: Option<[u8; 32]>,
     recv_token_addr: String,
     recv_token_amt: Uint128,
@@ -214,15 +217,19 @@ fn deposit_cw20(
     // Handle the "deposit" cw20 tokens
     if let Some(commitment) = commitment {
         // Handle the "commitment"
-        let res = validate_and_store_commitment(deps.branch(), commitment)?;
+        let inserted_index = validate_and_store_commitment(deps.branch(), commitment)?;
 
         // No need to handle any cw20 token transfer
         // since "TokenWrapper" tokens are already sent to this contract
-
-        Ok(Response::new().add_attributes(vec![
-            attr("method", "deposit_cw20"),
-            attr("result", res.to_string()),
-        ]))
+        println!("commitment: {:?}", commitment);
+        Ok(
+            Response::new().add_event(Event::new("anchor-deposit").add_attributes(vec![
+                attr("action", "deposit_cw20"),
+                attr("inserted_index", inserted_index.to_string()),
+                attr("commitment", format!("{:?}", commitment)),
+                attr("timestamp", env.block.time.seconds().to_string()),
+            ])),
+        )
     } else {
         Err(ContractError::Std(StdError::NotFound {
             kind: "Commitment".to_string(),
@@ -260,7 +267,7 @@ fn wrap_token(
     })];
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "wrap_token"),
+        attr("action", "wrap_token"),
         attr("token", recv_token_addr),
         attr("amount", recv_token_amt),
     ]))
@@ -288,7 +295,7 @@ fn unwrap_into_token(
     })];
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "unwrap_into_token"),
+        attr("action", "unwrap_into_token"),
         attr("token", token_addr),
         attr("amount", amount),
     ]))
@@ -301,8 +308,8 @@ pub fn withdraw(
     info: MessageInfo,
     msg: WithdrawMsg,
 ) -> Result<Response, ContractError> {
-    let recipient = msg.recipient;
-    let relayer = msg.relayer;
+    let recipient = msg.recipient.clone();
+    let relayer = msg.relayer.clone();
     let fee = msg.fee;
     let refund = msg.refund;
     let sent_funds = info.funds;
@@ -418,8 +425,15 @@ pub fn withdraw(
     }
 
     Ok(Response::new()
-        .add_attributes(vec![attr("method", "withdraw")])
-        .add_messages(msgs))
+        .add_messages(msgs)
+        .add_event(Event::new("anchor-withdraw").add_attributes(vec![
+            attr("action", "withdraw"),
+            attr("recipient", msg.recipient),
+            attr("relayer", msg.relayer),
+            attr("fee", msg.fee),
+            attr("commitment", format!("{:?}", msg.commitment)),
+            attr("nullifier_hash", format!("{:?}", msg.nullifier_hash)),
+        ])))
 }
 
 /// Wrap the native token into "TokenWrapper" token
@@ -456,7 +470,7 @@ fn wrap_native(
     })];
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "wrap_native"),
+        attr("action", "wrap_native"),
         attr("denom", token_denom),
         attr("amount", amount),
     ]))
@@ -483,7 +497,7 @@ fn unwrap_native(
     })];
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "unwrap_native"),
+        attr("action", "unwrap_native"),
         attr("amount", amount),
     ]))
 }
@@ -491,6 +505,7 @@ fn unwrap_native(
 /// Wrap the native token & deposit it into the contract
 fn wrap_and_deposit_native(
     mut deps: DepsMut,
+    env: Env,
     sender: String,
     recipient: String,
     commitment: Option<[u8; 32]>,
@@ -525,23 +540,26 @@ fn wrap_and_deposit_native(
     // Handle the "deposit"
     if let Some(commitment) = commitment {
         // Handle the "commitment"
-        let res = validate_and_store_commitment(deps.branch(), commitment)?;
+        let inserted_index = validate_and_store_commitment(deps.branch(), commitment)?;
 
         // Wrap into the token and send directly to this contract
         let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: tokenwrapper.to_string(),
             msg: to_binary(&TokenWrapperExecuteMsg::Wrap {
-                sender: Some(sender.clone()),
+                sender: Some(sender),
                 recipient: Some(recipient),
             })?,
             funds: sent_funds,
         })];
 
-        Ok(Response::new().add_messages(msgs).add_attributes(vec![
-            attr("method", "wrap_and_deposit_native"),
-            attr("sender", sender),
-            attr("result", res.to_string()),
-        ]))
+        Ok(Response::new().add_messages(msgs).add_event(
+            Event::new("anchor-deposit").add_attributes(vec![
+                attr("action", "wrap_and_deposit_native"),
+                attr("inserted_index", inserted_index.to_string()),
+                attr("commitment", format!("{:?}", commitment)),
+                attr("timestamp", env.block.time.seconds().to_string()),
+            ]),
+        ))
     } else {
         Err(ContractError::Std(StdError::NotFound {
             kind: "Commitment".to_string(),
@@ -550,8 +568,10 @@ fn wrap_and_deposit_native(
 }
 
 /// Wrap the cw20 token & deposit it into the contract
+#[allow(clippy::too_many_arguments)]
 fn wrap_and_deposit_cw20(
     mut deps: DepsMut,
+    env: Env,
     sender: String,
     recipient: String,
     commitment: Option<[u8; 32]>,
@@ -583,7 +603,7 @@ fn wrap_and_deposit_cw20(
     // Handle the "deposit"
     if let Some(commitment) = commitment {
         // Handle the "commitment"
-        let res = validate_and_store_commitment(deps.branch(), commitment)?;
+        let inserted_index = validate_and_store_commitment(deps.branch(), commitment)?;
 
         // Wrap into the token and send directly to this contract
         let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
@@ -592,18 +612,21 @@ fn wrap_and_deposit_cw20(
                 contract: tokenwrapper.to_string(),
                 amount: amt_to_wrap,
                 msg: to_binary(&TokenWrapperHookMsg::Wrap {
-                    sender: Some(sender.clone()),
+                    sender: Some(sender),
                     recipient: Some(recipient),
                 })?,
             })?,
             funds: vec![],
         })];
 
-        Ok(Response::new().add_messages(msgs).add_attributes(vec![
-            attr("method", "wrap_and_deposit_cw20"),
-            attr("sender", sender),
-            attr("result", res.to_string()),
-        ]))
+        Ok(Response::new().add_messages(msgs).add_event(
+            Event::new("anchor-deposit").add_attributes(vec![
+                attr("action", "wrap_and_deposit_cw20"),
+                attr("inserted_index", inserted_index.to_string()),
+                attr("commitment", format!("{:?}", commitment)),
+                attr("timestamp", env.block.time.seconds().to_string()),
+            ]),
+        ))
     } else {
         Err(ContractError::Std(StdError::NotFound {
             kind: "Commitment".to_string(),
@@ -618,8 +641,8 @@ fn withdraw_and_unwrap(
     info: MessageInfo,
     msg: WithdrawMsg,
 ) -> Result<Response, ContractError> {
-    let recipient = msg.recipient;
-    let relayer = msg.relayer;
+    let recipient = msg.recipient.clone();
+    let relayer = msg.relayer.clone();
     let fee = msg.fee;
     let refund = msg.refund;
     let sent_funds = info.funds;
@@ -741,8 +764,15 @@ fn withdraw_and_unwrap(
     }
 
     Ok(Response::new()
-        .add_attributes(vec![attr("method", "withdraw_and_unwrap")])
-        .add_messages(msgs))
+        .add_messages(msgs)
+        .add_event(Event::new("anchor-withdraw").add_attributes(vec![
+            attr("action", "withdraw_and_unwrap"),
+            attr("recipient", msg.recipient),
+            attr("relayer", msg.relayer),
+            attr("fee", msg.fee),
+            attr("commitment", format!("{:?}", msg.commitment)),
+            attr("nullifier_hash", format!("{:?}", msg.nullifier_hash)),
+        ])))
 }
 
 /// Sets a new handler for the contract
@@ -772,7 +802,7 @@ fn set_handler(
     ANCHOR.save(deps.storage, &anchor)?;
 
     Ok(Response::new().add_attributes(vec![
-        attr("method", "set_handler"),
+        attr("action", "set_handler"),
         attr("handler", handler),
         attr("nonce", nonce.to_string()),
     ]))
@@ -813,7 +843,14 @@ fn add_edge(
 
     save_neighbor_roots(deps.storage, (src_chain_id, curr_neighbor_root_idx), root)?;
 
-    Ok(Response::new().add_attribute("method", "add_edge"))
+    Ok(
+        Response::new().add_event(Event::new("anchor-edge_add").add_attributes(vec![
+            attr("action", "add_edge"),
+            attr("src_chain_id", src_chain_id.to_string()),
+            attr("leaf_index", latest_leaf_index.to_string()),
+            attr("root", format!("{:?}", root)),
+        ])),
+    )
 }
 
 /// Update an edge for underlying linkable tree
@@ -840,7 +877,14 @@ fn update_edge(
 
     save_neighbor_roots(deps.storage, (src_chain_id, neighbor_root_idx), root)?;
 
-    Ok(Response::new().add_attributes(vec![attr("method", "udpate_edge")]))
+    Ok(
+        Response::new().add_event(Event::new("anchor-edge_update").add_attributes(vec![
+            attr("action", "update_edge"),
+            attr("src_chain_id", src_chain_id.to_string()),
+            attr("leaf_index", latest_leaf_index.to_string()),
+            attr("root", format!("{:?}", root)),
+        ])),
+    )
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

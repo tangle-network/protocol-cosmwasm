@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
+    attr, from_binary, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, Event,
     MessageInfo, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
@@ -92,7 +92,7 @@ pub fn instantiate(
     save_root(deps.storage, 0_u32, &zeroes(msg.merkletree_levels))?;
 
     Ok(Response::new()
-        .add_attribute("method", "instantiate")
+        .add_attribute("action", "instantiate")
         .add_attribute("owner", info.sender))
 }
 
@@ -140,7 +140,7 @@ pub fn deposit_native(
     if let Some(commitment) = msg.commitment {
         let mut merkle_tree = mixer.merkle_tree;
         let poseidon = POSEIDON.load(deps.storage)?;
-        let res = merkle_tree.insert(poseidon, commitment, deps.storage)?;
+        let inserted_index = merkle_tree.insert(poseidon, commitment, deps.storage)?;
         MIXER.save(
             deps.storage,
             &Mixer {
@@ -150,10 +150,13 @@ pub fn deposit_native(
                 merkle_tree,
             },
         )?;
-        Ok(Response::new().add_attributes(vec![
-            attr("method", "deposit"),
-            attr("result", res.to_string()),
-        ]))
+        Ok(
+            Response::new().add_event(Event::new("mixer-deposit").add_attributes(vec![
+                attr("action", "deposit_native"),
+                attr("inserted_index", inserted_index.to_string()),
+                attr("commitment", format!("{:?}", commitment)),
+            ])),
+        )
     } else {
         Err(ContractError::Std(StdError::NotFound {
             kind: "Commitment".to_string(),
@@ -190,7 +193,7 @@ pub fn receive_cw20(
             if let Some(commitment) = commitment {
                 let mut merkle_tree = mixer.merkle_tree;
                 let poseidon = POSEIDON.load(deps.storage)?;
-                let res = merkle_tree
+                let inserted_index = merkle_tree
                     .insert(poseidon, commitment, deps.storage)
                     .map_err(|_| ContractError::MerkleTreeIsFull)?;
 
@@ -204,10 +207,13 @@ pub fn receive_cw20(
                     },
                 )?;
 
-                Ok(Response::new().add_attributes(vec![
-                    attr("method", "deposit_cw20"),
-                    attr("result", res.to_string()),
-                ]))
+                Ok(
+                    Response::new().add_event(Event::new("mixer-deposit").add_attributes(vec![
+                        attr("action", "deposit_cw20"),
+                        attr("inserted_index", inserted_index.to_string()),
+                        attr("commitment", format!("{:?}", commitment)),
+                    ])),
+                )
             } else {
                 Err(ContractError::Std(StdError::NotFound {
                     kind: "Commitment".to_string(),
@@ -357,14 +363,19 @@ pub fn withdraw(
 
     if !refund.is_zero() {
         msgs.push(CosmosMsg::Bank(BankMsg::Send {
-            to_address: recipient,
+            to_address: recipient.clone(),
             amount: sent_funds,
         }));
     }
 
     Ok(Response::new()
-        .add_attributes(vec![attr("method", "withdraw")])
-        .add_messages(msgs))
+        .add_messages(msgs)
+        .add_event(Event::new("mixer-withdraw").add_attributes(vec![
+            attr("action", "withdraw"),
+            attr("recipient", recipient),
+            attr("root", format!("{:?}", msg.root)),
+            attr("nullifier_hash", format!("{:?}", msg.nullifier_hash)),
+        ])))
 }
 
 fn is_known_nullifier(store: &dyn Storage, nullifier: [u8; 32]) -> bool {

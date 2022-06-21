@@ -126,7 +126,7 @@ fn test_mixer_proper_initialization() {
 
     assert_eq!(
         response.attributes,
-        vec![attr("method", "instantiate"), attr("owner", "anyone"),]
+        vec![attr("action", "instantiate"), attr("owner", "anyone"),]
     );
 }
 
@@ -188,10 +188,7 @@ fn test_mixer_should_be_able_to_deposit_native_token() {
         ExecuteMsg::Deposit(deposit_msg),
     )
     .unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
 }
 
 #[test]
@@ -217,10 +214,7 @@ fn test_mixer_should_be_able_to_deposit_cw20_token() {
     });
 
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit_cw20"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
 }
 
 #[test]
@@ -245,10 +239,7 @@ fn test_mixer_should_work_with_wasm_utils() {
         ExecuteMsg::Deposit(deposit_msg).clone(),
     )
     .unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
     let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
     let local_root = root_element.0;
     assert_eq!(on_chain_root, local_root);
@@ -272,7 +263,7 @@ fn test_mixer_should_work_with_wasm_utils() {
         ExecuteMsg::Withdraw(withdraw_msg),
     )
     .unwrap();
-    assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
+    assert_eq!(response.events.len(), 1);
 }
 
 #[test]
@@ -298,10 +289,7 @@ fn test_mixer_fail_when_any_byte_is_changed_in_proof() {
         ExecuteMsg::Deposit(deposit_msg.clone()),
     )
     .unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
     let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
     let local_root = root_element.0;
     assert_eq!(on_chain_root, local_root);
@@ -355,10 +343,7 @@ fn test_mixer_should_withdraw_native_token() {
         ExecuteMsg::Deposit(deposit_msg.clone()),
     )
     .unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
     let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
     let local_root = root_element.0;
     assert_eq!(on_chain_root, local_root);
@@ -381,7 +366,7 @@ fn test_mixer_should_withdraw_native_token() {
         ExecuteMsg::Withdraw(withdraw_msg),
     )
     .unwrap();
-    assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
+    assert_eq!(response.events.len(), 1);
 }
 
 #[test]
@@ -407,10 +392,7 @@ fn test_mixer_should_fail_when_invalid_merkle_roots() {
         ExecuteMsg::Deposit(deposit_msg.clone()),
     )
     .unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
     let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
     let local_root = root_element.0;
     assert_eq!(on_chain_root, local_root);
@@ -460,10 +442,7 @@ fn test_mixer_should_withdraw_cw20_token() {
     });
 
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit_cw20"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
 
     let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
     let local_root = root_element.0;
@@ -488,7 +467,7 @@ fn test_mixer_should_withdraw_cw20_token() {
         ExecuteMsg::Withdraw(withdraw_msg),
     )
     .unwrap();
-    assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
+    assert_eq!(response.events.len(), 1);
 
     let expected_recipient = RECIPIENT.to_string();
     let expected_messages: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
@@ -522,10 +501,7 @@ fn test_mixer_should_fail_when_wrong_relayer_input() {
     });
 
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit_cw20"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
 
     let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
     let local_root = root_element.0;
@@ -575,10 +551,7 @@ fn test_mixer_should_fail_when_fee_submitted_is_changed() {
     });
 
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit_cw20"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
 
     let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
     let local_root = root_element.0;

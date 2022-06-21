@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
-    Response, StdError, StdResult, Storage, Uint128, WasmMsg,
+    attr, from_binary, to_binary, Attribute, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, Event,
+    MessageInfo, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 
@@ -115,7 +115,7 @@ pub fn instantiate(
     save_root(deps.storage, 0_u32, &zeroes(msg.levels))?;
 
     Ok(Response::new()
-        .add_attribute("method", "instantiate")
+        .add_attribute("action", "instantiate")
         .add_attribute("owner", info.sender))
 }
 
@@ -230,7 +230,7 @@ fn config_max_deposit_limit(
     vanchor.max_deposit_amt = maximum_deposit_amount;
     VANCHOR.save(deps.storage, &vanchor)?;
 
-    Ok(Response::new().add_attributes(vec![attr("method", "config_max_deposit_amount")]))
+    Ok(Response::new().add_attributes(vec![attr("action", "config_max_deposit_amount")]))
 }
 
 fn config_min_withdraw_limit(
@@ -247,7 +247,7 @@ fn config_min_withdraw_limit(
     vanchor.min_withdraw_amt = minimal_withdrawal_amount;
     VANCHOR.save(deps.storage, &vanchor)?;
 
-    Ok(Response::new().add_attributes(vec![attr("method", "config_min_withdraw_amount")]))
+    Ok(Response::new().add_attributes(vec![attr("action", "config_min_withdraw_amount")]))
 }
 
 fn update_vanchor_config(
@@ -277,7 +277,7 @@ fn update_vanchor_config(
 
     VANCHOR.save(deps.storage, &vanchor)?;
 
-    Ok(Response::new().add_attributes(vec![attr("method", "update_vanchor_config")]))
+    Ok(Response::new().add_attributes(vec![attr("action", "update_vanchor_config")]))
 }
 
 fn receive_cw20(
@@ -377,12 +377,34 @@ fn transact_deposit(
         }));
     }
 
-    execute_insertions(deps, proof_data)?;
+    execute_insertions(deps, &proof_data)?;
 
-    Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "transact_deposit"),
-        attr("ext_amt", ext_amt.to_string()),
-    ]))
+    let new_commitments: Vec<Attribute> = vec![
+        attr(
+            format!("{:?}", proof_data.output_commitments[0]),
+            format!("{:?}", ext_data.encrypted_output1),
+        ),
+        attr(
+            format!("{:?}", proof_data.output_commitments[1]),
+            format!("{:?}", ext_data.encrypted_output2),
+        ),
+    ];
+
+    let nullifiers = proof_data
+        .input_nullifiers
+        .iter()
+        .map(|null| attr("nullifier_hash", format!("{:?}", null)))
+        .collect::<Vec<Attribute>>();
+
+    Ok(Response::new().add_messages(msgs).add_event(
+        Event::new("vanchor-deposit")
+            .add_attributes(vec![
+                attr("action", "transact_deposit"),
+                attr("ext_amt", ext_amt.to_string()),
+            ])
+            .add_attributes(new_commitments)
+            .add_attributes(nullifiers),
+    ))
 }
 
 // Executes a deposit(native token) or combination join/split transaction
@@ -462,12 +484,34 @@ fn transact_deposit_wrap_native(
         }));
     }
 
-    execute_insertions(deps, proof_data)?;
+    execute_insertions(deps, &proof_data)?;
 
-    Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "transact_deposit_wrap_native"),
-        attr("ext_amt", ext_amt.to_string()),
-    ]))
+    let new_commitments: Vec<Attribute> = vec![
+        attr(
+            format!("{:?}", proof_data.output_commitments[0]),
+            format!("{:?}", ext_data.encrypted_output1),
+        ),
+        attr(
+            format!("{:?}", proof_data.output_commitments[1]),
+            format!("{:?}", ext_data.encrypted_output2),
+        ),
+    ];
+
+    let nullifiers = proof_data
+        .input_nullifiers
+        .iter()
+        .map(|null| attr("nullifier_hash", format!("{:?}", null)))
+        .collect::<Vec<Attribute>>();
+
+    Ok(Response::new().add_messages(msgs).add_event(
+        Event::new("vanchor-deposit")
+            .add_attributes(vec![
+                attr("action", "transact_deposit_wrap_native"),
+                attr("ext_amt", ext_amt.to_string()),
+            ])
+            .add_attributes(new_commitments)
+            .add_attributes(nullifiers),
+    ))
 }
 
 // Executes a deposit(cw20) or combination join/split transaction
@@ -543,12 +587,34 @@ fn transact_deposit_wrap_cw20(
         }));
     }
 
-    execute_insertions(deps.branch(), proof_data)?;
+    execute_insertions(deps.branch(), &proof_data)?;
 
-    Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "transact_deposit_wrap_cw20"),
-        attr("ext_amt", ext_amt.to_string()),
-    ]))
+    let new_commitments: Vec<Attribute> = vec![
+        attr(
+            format!("{:?}", proof_data.output_commitments[0]),
+            format!("{:?}", ext_data.encrypted_output1),
+        ),
+        attr(
+            format!("{:?}", proof_data.output_commitments[1]),
+            format!("{:?}", ext_data.encrypted_output2),
+        ),
+    ];
+
+    let nullifiers = proof_data
+        .input_nullifiers
+        .iter()
+        .map(|null| attr("nullifier_hash", format!("{:?}", null)))
+        .collect::<Vec<Attribute>>();
+
+    Ok(Response::new().add_messages(msgs).add_event(
+        Event::new("vanchor-deposit")
+            .add_attributes(vec![
+                attr("action", "transact_deposit_wrap_cw20"),
+                attr("ext_amt", ext_amt.to_string()),
+            ])
+            .add_attributes(new_commitments)
+            .add_attributes(nullifiers),
+    ))
 }
 
 // Executes a deposit/withdrawal or combination join/split transaction
@@ -598,12 +664,34 @@ fn transact_withdraw(
         }));
     }
 
-    execute_insertions(deps, proof_data)?;
+    execute_insertions(deps, &proof_data)?;
 
-    Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "transact_withdraw"),
-        attr("ext_amt", ext_amt.to_string()),
-    ]))
+    let new_commitments: Vec<Attribute> = vec![
+        attr(
+            format!("{:?}", proof_data.output_commitments[0]),
+            format!("{:?}", ext_data.encrypted_output1),
+        ),
+        attr(
+            format!("{:?}", proof_data.output_commitments[1]),
+            format!("{:?}", ext_data.encrypted_output2),
+        ),
+    ];
+
+    let nullifiers = proof_data
+        .input_nullifiers
+        .iter()
+        .map(|null| attr("nullifier_hash", format!("{:?}", null)))
+        .collect::<Vec<Attribute>>();
+
+    Ok(Response::new().add_messages(msgs).add_event(
+        Event::new("vanchor-withdraw")
+            .add_attributes(vec![
+                attr("action", "transact_withdraw"),
+                attr("ext_amt", ext_amt.to_string()),
+            ])
+            .add_attributes(new_commitments)
+            .add_attributes(nullifiers),
+    ))
 }
 
 // Executes a withdrawal(native + cw20) or combination join/split transaction
@@ -657,12 +745,34 @@ fn transact_withdraw_unwrap(
         }));
     }
 
-    execute_insertions(deps, proof_data)?;
+    execute_insertions(deps, &proof_data)?;
 
-    Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "transact_withdraw_unwrap"),
-        attr("ext_amt", ext_amt.to_string()),
-    ]))
+    let new_commitments: Vec<Attribute> = vec![
+        attr(
+            format!("{:?}", proof_data.output_commitments[0]),
+            format!("{:?}", ext_data.encrypted_output1),
+        ),
+        attr(
+            format!("{:?}", proof_data.output_commitments[1]),
+            format!("{:?}", ext_data.encrypted_output2),
+        ),
+    ];
+
+    let nullifiers = proof_data
+        .input_nullifiers
+        .iter()
+        .map(|null| attr("nullifier_hash", format!("{:?}", null)))
+        .collect::<Vec<Attribute>>();
+
+    Ok(Response::new().add_messages(msgs).add_event(
+        Event::new("vanchor-withdraw")
+            .add_attributes(vec![
+                attr("action", "transact_withdraw_unwrap"),
+                attr("ext_amt", ext_amt.to_string()),
+            ])
+            .add_attributes(new_commitments)
+            .add_attributes(nullifiers),
+    ))
 }
 
 // Check whether if the zkSNARK proof is valid
@@ -789,7 +899,7 @@ fn validate_proof(
 }
 
 // Inserts the output commitments into the underlying merkle tree
-fn execute_insertions(deps: DepsMut, proof_data: ProofData) -> Result<(), ContractError> {
+fn execute_insertions(deps: DepsMut, proof_data: &ProofData) -> Result<(), ContractError> {
     let vanchor = VANCHOR.load(deps.storage)?;
     // Insert output commitments into the tree
     let mut merkle_tree = vanchor.merkle_tree;
@@ -851,7 +961,7 @@ fn wrap_native(
     })];
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "wrap_native"),
+        attr("action", "wrap_native"),
         attr("denom", token_denom),
         attr("amount", amount),
     ]))
@@ -879,7 +989,7 @@ fn unwrap_native(
     })];
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "unwrap_native"),
+        attr("action", "unwrap_native"),
         attr("amount", amount),
     ]))
 }
@@ -915,7 +1025,7 @@ fn wrap_token(
     })];
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "wrap_token"),
+        attr("action", "wrap_token"),
         attr("token", recv_token_addr),
         attr("amount", recv_token_amt),
     ]))
@@ -944,7 +1054,7 @@ fn unwrap_into_token(
     })];
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
-        attr("method", "unwrap_into_token"),
+        attr("action", "unwrap_into_token"),
         attr("token", token_addr),
         attr("amount", amount),
     ]))
@@ -987,7 +1097,14 @@ fn add_edge(
     // Append new edge to the end of the edge list for the given tree
     save_edge(deps.storage, src_chain_id, edge)?;
 
-    Ok(Response::new().add_attributes(vec![attr("method", "add_edge")]))
+    Ok(
+        Response::new().add_event(Event::new("vanchor-edge_add").add_attributes(vec![
+            attr("action", "add_edge"),
+            attr("src_chain_id", src_chain_id.to_string()),
+            attr("leaf_index", latest_leaf_id.to_string()),
+            attr("root", format!("{:?}", root)),
+        ])),
+    )
 }
 
 /// Update an edge for underlying linkable tree
@@ -1011,7 +1128,14 @@ fn update_edge(
 
     save_edge(deps.storage, src_chain_id, edge)?;
 
-    Ok(Response::new().add_attributes(vec![attr("method", "udpate_edge")]))
+    Ok(
+        Response::new().add_event(Event::new("vanchor-edge_update").add_attributes(vec![
+            attr("action", "update_edge"),
+            attr("src_chain_id", src_chain_id.to_string()),
+            attr("leaf_index", latest_leaf_id.to_string()),
+            attr("root", format!("{:?}", root)),
+        ])),
+    )
 }
 
 /// Sets a new handler for the contract
@@ -1041,7 +1165,7 @@ fn set_handler(
     VANCHOR.save(deps.storage, &vanchor)?;
 
     Ok(Response::new().add_attributes(vec![
-        attr("method", "set_handler"),
+        attr("action", "set_handler"),
         attr("handler", handler),
         attr("nonce", nonce.to_string()),
     ]))

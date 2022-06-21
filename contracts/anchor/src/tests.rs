@@ -74,7 +74,7 @@ fn test_anchor_proper_initialization() {
 
     assert_eq!(
         response.attributes,
-        vec![attr("method", "instantiate"), attr("owner", "anyone"),]
+        vec![attr("action", "instantiate"), attr("owner", "anyone"),]
     );
 }
 
@@ -101,10 +101,7 @@ fn test_anchor_should_be_able_to_deposit() {
     });
 
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit_cw20"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
 }
 
 #[test]
@@ -146,10 +143,7 @@ fn test_anchor_fail_when_any_byte_is_changed_in_proof() {
     });
 
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit_cw20"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
 
     let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
     let local_root = root_elements[0].0;
@@ -227,10 +221,7 @@ fn test_anchor_fail_when_invalid_merkle_roots() {
     });
 
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit_cw20"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
 
     let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
     let local_root = root_elements[0].0;
@@ -304,10 +295,7 @@ fn test_anchor_works_with_wasm_utils() {
     });
 
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit_cw20"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
 
     let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
     let local_root = root_elements[0].0;
@@ -338,7 +326,7 @@ fn test_anchor_works_with_wasm_utils() {
         ExecuteMsg::Withdraw(withdraw_msg),
     )
     .unwrap();
-    assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
+    assert_eq!(response.events.len(), 1);
 
     let expected_recipient = RECIPIENT.to_string();
     let expected_messages: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
@@ -392,10 +380,7 @@ fn test_anchor_works() {
     });
 
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit_cw20"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
 
     let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
     let local_root = root_elements[0].0;
@@ -425,7 +410,7 @@ fn test_anchor_works() {
         ExecuteMsg::Withdraw(withdraw_msg),
     )
     .unwrap();
-    assert_eq!(response.attributes, vec![attr("method", "withdraw")]);
+    assert_eq!(response.events.len(), 1);
 
     let expected_recipient = RECIPIENT.to_string();
     let expected_messages: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
@@ -479,10 +464,7 @@ fn test_anchor_fail_when_relayer_is_diff_from_that_in_proof_generation() {
     });
 
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit_cw20"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
 
     let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
     let local_root = root_elements[0].0;
@@ -555,10 +537,7 @@ fn test_anchor_fail_when_fee_submitted_is_changed() {
     });
 
     let response = execute(deps.as_mut(), mock_env(), info, deposit_cw20_msg).unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "deposit_cw20"), attr("result", "0")]
-    );
+    assert_eq!(response.events.len(), 1);
 
     let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
     let local_root = root_elements[0].0;
@@ -611,7 +590,7 @@ fn test_anchor_wrap_token() {
     assert_eq!(
         response.attributes,
         vec![
-            attr("method", "wrap_token"),
+            attr("action", "wrap_token"),
             attr("token", wrap_token.to_string()),
             attr("amount", wrap_amt.to_string()),
         ]
@@ -636,7 +615,7 @@ fn test_anchor_unwrap_into_token() {
     assert_eq!(
         response.attributes,
         vec![
-            attr("method", "unwrap_into_token"),
+            attr("action", "unwrap_into_token"),
             attr("token", recv_token),
             attr("amount", unwrap_amt),
         ]
@@ -657,7 +636,7 @@ fn test_anchor_wrap_native() {
     assert_eq!(
         response.attributes,
         vec![
-            attr("method", "wrap_native"),
+            attr("action", "wrap_native"),
             attr("denom", "uusd"),
             attr("amount", wrap_amt.to_string()),
         ]
@@ -678,7 +657,7 @@ fn test_anchor_unwrap_native() {
     assert_eq!(
         response.attributes,
         vec![
-            attr("method", "unwrap_native"),
+            attr("action", "unwrap_native"),
             attr("amount", unwrap_amt.to_string()),
         ]
     );
@@ -704,14 +683,7 @@ fn test_anchor_wrap_and_deposit_native() {
     let res = execute(deps.as_mut(), mock_env(), info, wrap_and_deposit_native_msg).unwrap();
 
     assert_eq!(res.messages.len(), 1);
-    assert_eq!(
-        res.attributes,
-        vec![
-            attr("method", "wrap_and_deposit_native"),
-            attr("sender", DEPOSITOR),
-            attr("result", "0"),
-        ]
-    )
+    assert_eq!(res.events.len(), 1);
 }
 
 #[test]
@@ -740,14 +712,7 @@ fn test_anchor_wrap_and_deposit_cw20() {
     let res = execute(deps.as_mut(), mock_env(), info, wrap_deposit_cw20_msg).unwrap();
 
     assert_eq!(res.messages.len(), 1);
-    assert_eq!(
-        res.attributes,
-        vec![
-            attr("method", "wrap_and_deposit_cw20"),
-            attr("sender", DEPOSITOR),
-            attr("result", "0"),
-        ]
-    )
+    assert_eq!(res.events.len(), 1);
 }
 
 #[test]
@@ -785,14 +750,7 @@ fn test_anchor_withdraw_and_unwrap_native() {
     };
     let res = execute(deps.as_mut(), mock_env(), info, wrap_and_deposit_native_msg).unwrap();
 
-    assert_eq!(
-        res.attributes,
-        vec![
-            attr("method", "wrap_and_deposit_native"),
-            attr("sender", DEPOSITOR),
-            attr("result", "0"),
-        ],
-    );
+    assert_eq!(res.events.len(), 1);
 
     let on_chain_root = crate::state::read_root(&deps.storage, 1).unwrap();
     let local_root = root_elements[0].0;
@@ -823,10 +781,7 @@ fn test_anchor_withdraw_and_unwrap_native() {
         ExecuteMsg::WithdrawAndUnwrap(withdraw_msg),
     )
     .unwrap();
-    assert_eq!(
-        response.attributes,
-        vec![attr("method", "withdraw_and_unwrap")]
-    );
+    assert_eq!(response.events.len(), 1);
 }
 
 #[test]
@@ -864,7 +819,7 @@ fn test_anchor_set_handler() {
     assert_eq!(
         res.attributes,
         vec![
-            attr("method", "set_handler"),
+            attr("action", "set_handler"),
             attr("handler", new_handler),
             attr("nonce", nonce.to_string()),
         ]
