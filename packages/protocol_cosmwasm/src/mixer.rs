@@ -1,10 +1,11 @@
+use cosmwasm_std::Uint128;
 use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct InstantiateMsg {
-    pub deposit_size: String,
+    pub deposit_size: Uint128,
     pub merkletree_levels: u32,
     pub native_token_denom: Option<String>,
     pub cw20_address: Option<String>,
@@ -37,8 +38,8 @@ pub struct WithdrawMsg {
     pub nullifier_hash: [u8; 32],
     pub recipient: String,
     pub relayer: String,
-    pub fee: String,
-    pub refund: String,
+    pub fee: Uint128,
+    pub refund: Uint128,
     pub cw20_address: Option<String>,
 }
 

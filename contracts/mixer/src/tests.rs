@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use ark_bn254::Fr;
 use ark_ff::BigInteger;
 use ark_ff::PrimeField;
@@ -42,7 +44,7 @@ fn create_mixer(ty: MixerType) -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
         merkletree_levels: MERKLE_TREE_LEVELS,
-        deposit_size: DEPOSIT_SIZE.to_string(),
+        deposit_size: Uint128::from_str(DEPOSIT_SIZE).unwrap(),
         cw20_address: if ty == MixerType::Cw20 {
             Some(CW20_ADDRESS.to_string())
         } else {
@@ -116,7 +118,7 @@ fn test_mixer_proper_initialization() {
     let info = mock_info("anyone", &[]);
     let instantiate_msg = InstantiateMsg {
         merkletree_levels: MERKLE_TREE_LEVELS,
-        deposit_size: DEPOSIT_SIZE.to_string(),
+        deposit_size: Uint128::from_str(DEPOSIT_SIZE).unwrap(),
         native_token_denom: Some(NATIVE_TOKEN_DENOM.to_string()),
         cw20_address: None,
     };
@@ -251,8 +253,8 @@ fn test_mixer_should_work_with_wasm_utils() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         cw20_address: None,
     };
     let info = mock_info("withdraw", &[]);
@@ -303,8 +305,8 @@ fn test_mixer_fail_when_any_byte_is_changed_in_proof() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         cw20_address: None,
     };
     let info = mock_info("withdraw", &[]);
@@ -354,8 +356,8 @@ fn test_mixer_should_withdraw_native_token() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         cw20_address: None,
     };
     let info = mock_info("withdraw", &[]);
@@ -405,8 +407,8 @@ fn test_mixer_should_fail_when_invalid_merkle_roots() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         cw20_address: None,
     };
     let info = mock_info("withdraw", &[]);
@@ -455,8 +457,8 @@ fn test_mixer_should_withdraw_cw20_token() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: RELAYER.to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         cw20_address: Some(CW20_ADDRESS.to_string()),
     };
     let info = mock_info("withdraw", &[]);
@@ -514,8 +516,8 @@ fn test_mixer_should_fail_when_wrong_relayer_input() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: "wrong_relayer_address".to_string(),
-        fee: FEE.to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(FEE),
+        refund: Uint128::from(REFUND),
         cw20_address: None,
     };
     let info = mock_info("withdraw", &[]);
@@ -564,8 +566,8 @@ fn test_mixer_should_fail_when_fee_submitted_is_changed() {
         nullifier_hash: nullifier_hash_element.0,
         recipient: RECIPIENT.to_string(),
         relayer: "wrong_relayer_address".to_string(),
-        fee: "1".to_string(),
-        refund: REFUND.to_string(),
+        fee: Uint128::from(1u128),
+        refund: Uint128::from(REFUND),
         cw20_address: None,
     };
     let info = mock_info("withdraw", &[]);

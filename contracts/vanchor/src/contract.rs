@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -20,9 +22,7 @@ use protocol_cosmwasm::token_wrapper::{
     ExecuteMsg as TokenWrapperExecuteMsg, GetAmountToWrapResponse,
     QueryMsg as TokenWrapperQueryMsg,
 };
-use protocol_cosmwasm::utils::{
-    compute_chain_id, compute_chain_id_type, element_encoder, parse_string_to_uint128,
-};
+use protocol_cosmwasm::utils::{compute_chain_id, compute_chain_id_type, element_encoder};
 use protocol_cosmwasm::vanchor::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, ExtData, InstantiateMsg, MigrateMsg, ProofData,
     QueryMsg, UpdateConfigMsg,
@@ -441,7 +441,7 @@ fn transact_deposit_wrap_native(
             target_amount: abs_ext_amt.to_string(),
         },
     )?;
-    let amt_to_wrap = parse_string_to_uint128(amt_to_wrap_query.amount_to_wrap)?;
+    let amt_to_wrap = Uint128::from_str(&amt_to_wrap_query.amount_to_wrap)?;
 
     if recv_token_amt != amt_to_wrap {
         return Err(ContractError::InsufficientFunds {});
@@ -541,7 +541,7 @@ fn transact_deposit_wrap_cw20(
             target_amount: abs_ext_amt.to_string(),
         },
     )?;
-    let amt_to_wrap = parse_string_to_uint128(amt_to_wrap_query.amount_to_wrap)?;
+    let amt_to_wrap = Uint128::from_str(&amt_to_wrap_query.amount_to_wrap)?;
 
     if recv_token_amt != amt_to_wrap {
         return Err(ContractError::InsufficientFunds {});

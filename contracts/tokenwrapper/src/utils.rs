@@ -61,11 +61,3 @@ pub fn calc_fee_perc_from_string(v: String) -> Result<Decimal, ContractError> {
     };
     Ok(res)
 }
-
-pub fn parse_string_to_uint128(v: String) -> Result<Uint128, StdError> {
-    let res = match v.parse::<u128>() {
-        Ok(v) => Uint128::from(v),
-        Err(e) => return Err(StdError::GenericErr { msg: e.to_string() }),
-    };
-    Ok(res)
-}
