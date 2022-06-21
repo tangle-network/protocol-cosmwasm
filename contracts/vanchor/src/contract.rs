@@ -393,7 +393,7 @@ fn transact_deposit(
     let nullifiers = proof_data
         .input_nullifiers
         .iter()
-        .map(|null| attr("nullifier", format!("{:?}", null)))
+        .map(|null| attr("nullifier_hash", format!("{:?}", null)))
         .collect::<Vec<Attribute>>();
 
     Ok(Response::new().add_messages(msgs).add_event(
@@ -500,7 +500,7 @@ fn transact_deposit_wrap_native(
     let nullifiers = proof_data
         .input_nullifiers
         .iter()
-        .map(|null| attr("nullifier", format!("{:?}", null)))
+        .map(|null| attr("nullifier_hash", format!("{:?}", null)))
         .collect::<Vec<Attribute>>();
 
     Ok(Response::new().add_messages(msgs).add_event(
@@ -603,7 +603,7 @@ fn transact_deposit_wrap_cw20(
     let nullifiers = proof_data
         .input_nullifiers
         .iter()
-        .map(|null| attr("nullifier", format!("{:?}", null)))
+        .map(|null| attr("nullifier_hash", format!("{:?}", null)))
         .collect::<Vec<Attribute>>();
 
     Ok(Response::new().add_messages(msgs).add_event(
@@ -680,7 +680,7 @@ fn transact_withdraw(
     let nullifiers = proof_data
         .input_nullifiers
         .iter()
-        .map(|null| attr("nullifier", format!("{:?}", null)))
+        .map(|null| attr("nullifier_hash", format!("{:?}", null)))
         .collect::<Vec<Attribute>>();
 
     Ok(Response::new().add_messages(msgs).add_event(
@@ -761,7 +761,7 @@ fn transact_withdraw_unwrap(
     let nullifiers = proof_data
         .input_nullifiers
         .iter()
-        .map(|null| attr("nullifier", format!("{:?}", null)))
+        .map(|null| attr("nullifier_hash", format!("{:?}", null)))
         .collect::<Vec<Attribute>>();
 
     Ok(Response::new().add_messages(msgs).add_event(
