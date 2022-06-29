@@ -30,7 +30,7 @@ export async function testTokenWrapperInitialize(
     expect(result.governor == localjuno.addresses.wallet1).to.be.ok;
     expect(result.native_token_denom == localjuno.contractsConsts.nativeTokenDenom).to.be.ok;
     expect(result.fee_recipient == localjuno.addresses.wallet2).to.be.ok;
-    expect(result.fee_percentage == (parseInt(localjuno.contractsConsts.feePercentage) / 100).toString()).to.be.ok;
+    expect(result.fee_percentage == localjuno.contractsConsts.feePercentage.toString()).to.be.ok;
     expect(result.is_native_allowed == (localjuno.contractsConsts.isNativeAllowed == 1).toString()).to.be.ok;
     expect(result.wrapping_limit == localjuno.contractsConsts.tokenWrapperWrappingLimit).to.be.ok;
     expect(result.proposal_nonce == "1").to.be.ok;
