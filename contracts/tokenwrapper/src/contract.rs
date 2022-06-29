@@ -4,7 +4,7 @@ use std::str::FromStr;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, coins, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
-    Fraction, MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
+    MessageInfo, Response, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 
@@ -22,13 +22,13 @@ use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::token_wrapper::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, FeeFromAmountResponse, GetAmountToWrapResponse,
-    InstantiateMsg, QueryMsg, UpdateConfigMsg,
+    InstantiateMsg, QueryMsg, UpdateConfigMsg, WRAP_FEE_CALC_DENOMINATOR,
 };
 
 use crate::state::{Config, CONFIG, HISTORICAL_TOKENS, TOKENS};
 use crate::utils::{
-    calc_fee_perc_from_string, get_amount_to_wrap, get_fee_from_amount, is_valid_address,
-    is_valid_unwrap_amount, is_valid_wrap_amount,
+    get_amount_to_wrap, get_fee_from_amount, is_valid_address, is_valid_unwrap_amount,
+    is_valid_wrap_amount,
 };
 
 // version info for migration info
@@ -64,7 +64,12 @@ pub fn instantiate(
         None => info.sender,
     };
     let fee_recipient = deps.api.addr_validate(msg.fee_recipient.as_str())?;
-    let fee_percentage = calc_fee_perc_from_string(msg.fee_percentage)?;
+    if msg.fee_percentage > WRAP_FEE_CALC_DENOMINATOR {
+        return Err(ContractError::Std(StdError::generic_err(
+            "Fee percenage cannot be greater than 100",
+        )));
+    }
+    let fee_percentage = msg.fee_percentage;
     CONFIG.save(
         deps.storage,
         &Config {
@@ -197,8 +202,7 @@ fn wrap_native(
     }
 
     // Calculate the "fee" & "amount_to_wrap".
-    let cost_to_wrap =
-        get_fee_from_amount(wrapping_amount, config.fee_percentage.numerator().u128());
+    let cost_to_wrap = get_fee_from_amount(wrapping_amount, config.fee_percentage);
     let left_over = wrapping_amount - cost_to_wrap;
 
     // call into cw20-base to mint the token, call as self as no one else is allowed
@@ -369,8 +373,7 @@ fn wrap_cw20(
 
     // Calculate the "fee" & "amount_to_wrap".
     let config = CONFIG.load(deps.storage)?;
-    let cost_to_wrap =
-        get_fee_from_amount(cw20_msg.amount, config.fee_percentage.numerator().u128());
+    let cost_to_wrap = get_fee_from_amount(cw20_msg.amount, config.fee_percentage);
     let left_over = cw20_msg.amount - cost_to_wrap;
 
     match from_binary(&cw20_msg.msg) {
@@ -433,24 +436,29 @@ fn update_config(
     }
 
     // Update the config
-    if msg.governor.is_some() {
-        config.governor = deps.api.addr_validate(msg.governor.unwrap().as_str())?;
+    if let Some(new_governor) = msg.governor {
+        config.governor = deps.api.addr_validate(&new_governor)?;
     }
 
-    if msg.is_native_allowed.is_some() {
-        config.is_native_allowed = msg.is_native_allowed.unwrap();
+    if let Some(is_native_allowed) = msg.is_native_allowed {
+        config.is_native_allowed = is_native_allowed;
     }
 
-    if msg.wrapping_limit.is_some() {
-        config.wrapping_limit = msg.wrapping_limit.unwrap_or(config.wrapping_limit);
+    if let Some(wrapping_limit) = msg.wrapping_limit {
+        config.wrapping_limit = wrapping_limit;
     }
 
-    if msg.fee_percentage.is_some() {
-        config.fee_percentage = calc_fee_perc_from_string(msg.fee_percentage.unwrap())?;
+    if let Some(fee_percentage) = msg.fee_percentage {
+        if fee_percentage > WRAP_FEE_CALC_DENOMINATOR {
+            return Err(ContractError::Std(StdError::generic_err(
+                "Fee percenage cannot be greater than 100",
+            )));
+        }
+        config.fee_percentage = fee_percentage;
     }
 
-    if msg.fee_recipient.is_some() {
-        config.fee_recipient = deps.api.addr_validate(&msg.fee_recipient.unwrap())?;
+    if let Some(fee_recipient) = msg.fee_recipient {
+        config.fee_recipient = deps.api.addr_validate(&fee_recipient)?;
     }
 
     // Save the new config
@@ -579,8 +587,7 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 fn query_fee_from_amount(deps: Deps, amount_to_wrap: String) -> StdResult<FeeFromAmountResponse> {
     let config = CONFIG.load(deps.storage)?;
     let amount_to_wrap = Uint128::from_str(&amount_to_wrap)?;
-    let fee_perc = config.fee_percentage.numerator();
-    let fee_amt = get_fee_from_amount(amount_to_wrap, fee_perc.u128());
+    let fee_amt = get_fee_from_amount(amount_to_wrap, config.fee_percentage);
     Ok(FeeFromAmountResponse {
         amount_to_wrap: amount_to_wrap.to_string(),
         fee_amt: fee_amt.to_string(),
@@ -590,8 +597,7 @@ fn query_fee_from_amount(deps: Deps, amount_to_wrap: String) -> StdResult<FeeFro
 fn query_amount_to_wrap(deps: Deps, target_amount: String) -> StdResult<GetAmountToWrapResponse> {
     let config = CONFIG.load(deps.storage)?;
     let target_amount = Uint128::from_str(&target_amount)?;
-    let fee_perc = config.fee_percentage.numerator();
-    let amount_to_wrap = get_amount_to_wrap(target_amount, fee_perc.u128());
+    let amount_to_wrap = get_amount_to_wrap(target_amount, config.fee_percentage);
     Ok(GetAmountToWrapResponse {
         target_amount: target_amount.to_string(),
         amount_to_wrap: amount_to_wrap.to_string(),
