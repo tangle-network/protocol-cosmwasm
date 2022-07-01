@@ -3,6 +3,7 @@ use cw20::{Cw20ReceiveMsg, Expiration};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+pub const WRAP_FEE_CALC_DENOMINATOR: u8 = 100_u8;
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct InstantiateMsg {
     /// name of the Wrapping target token
@@ -18,7 +19,7 @@ pub struct InstantiateMsg {
     /// addr of fee recipient
     pub fee_recipient: String,
     /// fee_percentage( 0 ~ 100 )
-    pub fee_percentage: String,
+    pub fee_percentage: u8,
     /// native token denom string to be wrapped
     pub native_token_denom: String,
     /// flag of is_native_allowed
@@ -145,7 +146,7 @@ pub struct UpdateConfigMsg {
     pub governor: Option<String>,
     pub is_native_allowed: Option<bool>,
     pub wrapping_limit: Option<Uint128>,
-    pub fee_percentage: Option<String>,
+    pub fee_percentage: Option<u8>,
     pub fee_recipient: Option<String>,
 }
 

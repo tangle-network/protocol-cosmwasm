@@ -1,9 +1,9 @@
-use cosmwasm_std::{Addr, Decimal, DepsMut, Fraction, StdError, Uint128};
+use cosmwasm_std::{Addr, DepsMut, Uint128};
 use cw20::BalanceResponse;
 use cw20_base::contract::{query_balance, query_token_info};
-use protocol_cosmwasm::error::ContractError;
 
 use crate::state::{CONFIG, TOKENS};
+use protocol_cosmwasm::token_wrapper::WRAP_FEE_CALC_DENOMINATOR;
 
 // Check if the cw20 token address is valid in "TOKENS".
 pub fn is_valid_address(deps: DepsMut, token_address: Addr) -> bool {
@@ -30,34 +30,14 @@ pub fn is_valid_unwrap_amount(deps: DepsMut, sender: &str, amount: Uint128) -> b
 }
 
 // Calculates the "fee" from "wrap_amount".
-pub fn get_fee_from_amount(amount_to_wrap: Uint128, fee_perc: u128) -> Uint128 {
-    amount_to_wrap.multiply_ratio(fee_perc, Decimal::MAX.denominator())
+pub fn get_fee_from_amount(amount_to_wrap: Uint128, fee_perc: u8) -> Uint128 {
+    amount_to_wrap.multiply_ratio(fee_perc, WRAP_FEE_CALC_DENOMINATOR)
 }
 
 // Calculate the "amount_to_send" from "deposit_target" amount.
-pub fn get_amount_to_wrap(target_amount: Uint128, fee_perc: u128) -> Uint128 {
+pub fn get_amount_to_wrap(target_amount: Uint128, fee_perc: u8) -> Uint128 {
     target_amount.multiply_ratio(
-        Decimal::MAX.denominator(),
-        Decimal::MAX.denominator().u128() - fee_perc,
+        WRAP_FEE_CALC_DENOMINATOR,
+        WRAP_FEE_CALC_DENOMINATOR - fee_perc,
     )
-}
-
-pub fn calc_fee_perc_from_string(v: String) -> Result<Decimal, ContractError> {
-    let res = match v.parse::<u64>() {
-        Ok(v) => {
-            if v > 100 {
-                return Err(ContractError::Std(StdError::GenericErr {
-                    msg: "Percentage should be in range [0, 100]".to_string(),
-                }));
-            } else {
-                Decimal::percent(v)
-            }
-        }
-        Err(e) => {
-            return Err(ContractError::Std(StdError::GenericErr {
-                msg: e.to_string(),
-            }))
-        }
-    };
-    Ok(res)
 }

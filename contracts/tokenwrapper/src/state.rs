@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, Decimal, Uint128};
+use cosmwasm_std::{Addr, Uint128};
 use cw_storage_plus::{Item, Map};
 
 /// Config
@@ -11,7 +11,7 @@ pub struct Config {
     pub governor: Addr,
     pub native_token_denom: String,
     pub fee_recipient: Addr,
-    pub fee_percentage: Decimal,
+    pub fee_percentage: u8,
     pub is_native_allowed: bool,
     pub wrapping_limit: Uint128,
     pub proposal_nonce: u64,

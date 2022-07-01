@@ -16,7 +16,7 @@ const NAME: &str = "Webb-WRAP";
 const SYMBOL: &str = "WWRP";
 const DECIMALS: u8 = 6;
 const FEE_RECIPIENT: &str = "terra1qca9hs2qk2w29gqduaq9k720k9293qt7q8nszl";
-const FEE_PERCENTAGE: &str = "1";
+const FEE_PERCENTAGE: u8 = 1_u8;
 const NATIVE_TOKEN_DENOM: &str = "uusd";
 const CW20_TOKEN: &str = "cw20_token";
 const WRAPPING_LIMIT: u128 = 5000000;
@@ -32,7 +32,7 @@ fn init_tokenwrapper(coins: Vec<Coin>) -> OwnedDeps<MockStorage, MockApi, MockQu
         decimals: DECIMALS,
         governor: None,
         fee_recipient: FEE_RECIPIENT.to_string(),
-        fee_percentage: FEE_PERCENTAGE.to_string(),
+        fee_percentage: FEE_PERCENTAGE,
         native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
         is_native_allowed: IS_NATIVE_ALLOWED,
         wrapping_limit: Uint128::from(WRAPPING_LIMIT),
@@ -54,7 +54,7 @@ fn proper_initialization() {
         decimals: DECIMALS,
         governor: None,
         fee_recipient: FEE_RECIPIENT.to_string(),
-        fee_percentage: FEE_PERCENTAGE.to_string(),
+        fee_percentage: FEE_PERCENTAGE,
         native_token_denom: NATIVE_TOKEN_DENOM.to_string(),
         is_native_allowed: IS_NATIVE_ALLOWED,
         wrapping_limit: Uint128::from(WRAPPING_LIMIT),
@@ -82,7 +82,7 @@ fn proper_initialization() {
         NATIVE_TOKEN_DENOM.to_string()
     );
     assert_eq!(config_response.fee_recipient, FEE_RECIPIENT.to_string());
-    assert_eq!(config_response.fee_percentage, "0.01".to_string());
+    assert_eq!(config_response.fee_percentage, "1".to_string());
 }
 
 #[test]
