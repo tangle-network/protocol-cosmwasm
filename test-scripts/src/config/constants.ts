@@ -28,6 +28,8 @@ export const testnet = {
       anchor: "juno...",
       vanchor: "juno...",
       mixer: "juno...",
+      treasury: "juno...",
+      treasuryHandler: "juno...",
     },
 
   } as const;

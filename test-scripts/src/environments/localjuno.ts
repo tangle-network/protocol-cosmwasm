@@ -30,6 +30,8 @@ let anchorHandler: string;
 let anchor: string;
 let vanchor: string;
 let mixer: string;
+let treasury: string;
+let treasuryHandler: string;
 
 // -------------------------------------------------------------------------------------
 // initialize variables
@@ -57,6 +59,8 @@ async function initialize() {
     anchor = config.contracts.anchor;
     vanchor = config.contracts.vanchor;
     mixer = config.contracts.mixer;
+    treasury = config.contracts.treasury;
+    treasuryHandler = config.contracts.treasuryHandler;
 
     console.log(`Use ${chalk.cyan(cw20)} as Cw20(AUTO) token`);
     console.log(`Use ${chalk.cyan(signatureBridge)} as SignatureBridge`);
@@ -66,6 +70,8 @@ async function initialize() {
     console.log(`Use ${chalk.cyan(anchor)} as Anchor`);
     console.log(`Use ${chalk.cyan(vanchor)} as VAnchor`);
     console.log(`Use ${chalk.cyan(mixer)} as Mixer`);
+    console.log(`Use ${chalk.cyan(treasury)} as Treasury`);
+    console.log(`Use ${chalk.cyan(treasuryHandler)} as TreasuryHandler`);
 }
 
 
@@ -109,5 +115,7 @@ export async function startTests(): Promise<void> {
         anchor,
         vanchor,
         mixer,
+        treasury, 
+        treasuryHandler
     );
 }
