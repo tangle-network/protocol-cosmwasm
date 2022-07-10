@@ -5,7 +5,9 @@ use cosmwasm_std::testing::{
 use cosmwasm_std::{attr, coin, from_binary, Coin, OwnedDeps, Uint128};
 
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::treasury::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, TokenInfo};
+use protocol_cosmwasm::treasury::{
+    ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, TokenInfo,
+};
 
 use crate::contract::{execute, instantiate, query};
 

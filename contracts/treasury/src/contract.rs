@@ -8,7 +8,9 @@ use cw2::set_contract_version;
 
 use cw20::{BalanceResponse, Cw20ExecuteMsg};
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::treasury::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, TokenInfo};
+use protocol_cosmwasm::treasury::{
+    ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, TokenInfo,
+};
 
 use crate::state::{Config, CONFIG};
 
@@ -117,7 +119,7 @@ fn rescue_tokens(
                     token_balance.balance
                 };
                 msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: token_addr.to_string(),
+                    contract_addr: token_addr,
                     msg: to_binary(&Cw20ExecuteMsg::Transfer {
                         recipient: to.to_string(),
                         amount,
