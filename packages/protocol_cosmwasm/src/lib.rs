@@ -18,3 +18,4 @@ pub mod vanchor;
 pub mod vanchor_verifier;
 pub mod verifier;
 pub mod zeroes;
+pub mod treasury;

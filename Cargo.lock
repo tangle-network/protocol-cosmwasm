@@ -868,6 +868,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "cosmwasm-treasury"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cosmwasm-vm",
+ "cw-controllers",
+ "cw-storage-plus",
+ "cw-utils",
+ "cw2",
+ "cw20",
+ "cw20-base",
+ "protocol-cosmwasm",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cosmwasm-vanchor"
 version = "0.1.0"
 dependencies = [
