@@ -888,6 +888,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "cosmwasm-treasury-handler"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-storage-plus",
+ "cw2",
+ "getrandom 0.2.6",
+ "protocol-cosmwasm",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cosmwasm-vanchor"
 version = "0.1.0"
 dependencies = [

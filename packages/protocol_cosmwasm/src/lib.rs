@@ -19,3 +19,4 @@ pub mod vanchor_verifier;
 pub mod verifier;
 pub mod zeroes;
 pub mod treasury;
+pub mod treasury_handler;
