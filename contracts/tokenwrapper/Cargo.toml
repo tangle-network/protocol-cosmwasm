@@ -29,7 +29,7 @@ cw-utils = "0.13.4"
 cw2 = "0.13.4"
 cw20 = "0.13.4"
 cw-controllers = "0.13.4"
-cw20-base = "0.13.4"
+cw20-base = { version = "0.13.4", features = ["library"] }
 schemars = "0.8.3"
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.26" }

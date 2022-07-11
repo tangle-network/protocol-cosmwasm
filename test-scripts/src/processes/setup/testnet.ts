@@ -30,6 +30,8 @@ let anchorHandler: string;
 let anchor: string;
 let vanchor: string;
 let mixer: string;
+let treasuryHandler: string;
+let treasury: string;
 
 // -------------------------------------------------------------------------------------
 // setup all contracts for LocalJuno and TestNet
@@ -128,6 +130,21 @@ async function setup(
     );
     console.log(chalk.green(" Done!"), `${chalk.blue("codeId")} = ${mixerCodeId}`);
 
+    process.stdout.write("Uploading TreasuryHandler Wasm");
+    const treasuryHandlerCodeId = await storeCode(
+        junod,
+        wallet1, 
+        `${wasm_path.station}/cosmwasm_treasury_handler.wasm`
+    );
+    console.log(chalk.green(" Done!"), `${chalk.blue("codeId")} = ${treasuryHandlerCodeId}`);
+
+    process.stdout.write("Uploading Treasury Wasm");
+    const treasuryCodeId = await storeCode(
+        junod,
+        wallet1, 
+        `${wasm_path.station}/cosmwasm_treasury.wasm`
+    );
+    console.log(chalk.green(" Done!"), `${chalk.blue("codeId")} = ${treasuryCodeId}`);
 
     // Step 2. Instantiate contracts
 
@@ -311,6 +328,38 @@ async function setup(
       );
     mixer = mixerResult.contractAddress;
     console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${mixer}`);
+
+    // TreasuryHandler
+    process.stdout.write("Instantiating TreasuryHandler contract");
+
+    const treasuryHandlerResult = await instantiateContract(
+        junod,
+        wallet1,
+        wallet1,
+        treasuryHandlerCodeId,
+        {
+            "bridge_addr": signatureBridge,
+            "initial_resource_ids": [],
+            "initial_contract_addresses": [],
+        }
+    );
+    treasuryHandler = treasuryHandlerResult.contractAddress;
+    console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${treasuryHandler}`);
+
+    // Treasury
+    process.stdout.write("Instantiating Treasury contract");
+
+    const treasuryResult = await instantiateContract(
+        junod,
+        wallet1,
+        wallet1,
+        treasuryCodeId,
+        {
+            "treasury_handler": treasuryHandler,
+        }
+    );
+    treasury = treasuryResult.contractAddress;
+    console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${treasury}`);
 
     process.exit();
 }

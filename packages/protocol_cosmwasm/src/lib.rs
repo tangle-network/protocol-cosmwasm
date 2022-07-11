@@ -13,6 +13,8 @@ pub mod signature_bridge;
 pub mod structs;
 pub mod token_wrapper;
 pub mod tokenwrapper_handler;
+pub mod treasury;
+pub mod treasury_handler;
 pub mod utils;
 pub mod vanchor;
 pub mod vanchor_verifier;

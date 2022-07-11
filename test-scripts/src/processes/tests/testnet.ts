@@ -44,6 +44,8 @@ import {
   testSignatureBridgeInitialize
 } from "./signatureBridge";
 
+import { testTreasuryInitialize } from "./treasury";
+
 export async function testExecute(
   junod: SigningCosmWasmClient,
   wallet1: DirectSecp256k1HdWallet,
@@ -57,12 +59,14 @@ export async function testExecute(
   anchor: string,
   vanchor: string,
   mixer: string,
+  treasury: string,
+  treasuryHandler: string,
 ): Promise<void> {
   console.log(chalk.yellow("\nStep 3. Running Tests"));
-  // SignatureBridge
-  await testSignatureBridgeInitialize(junod, signatureBridge);
-  await testSignatureBridgeAdminSetResWithSignature(junod, wallet1, signatureBridge);
-  await testSignatureBridgeExecProposalWithSignature(junod, wallet1, signatureBridge);
+  // // SignatureBridge
+  // await testSignatureBridgeInitialize(junod, signatureBridge);
+  // await testSignatureBridgeAdminSetResWithSignature(junod, wallet1, signatureBridge);
+  // await testSignatureBridgeExecProposalWithSignature(junod, wallet1, signatureBridge);
 
   // // TokenWrapper
   // await testTokenWrapperInitialize(junod, tokenWrapper);
@@ -91,6 +95,9 @@ export async function testExecute(
   // await testMixerInitialize(junod, mixer);
   // await testMixerDepositNativeToken(junod, mixer, wallet3, "1000000");
   // await testMixerWithdrawNativeToken(junod, mixer, wallet1, wallet2, wallet3, "1000000");
+
+  // Treasury
+  await testTreasuryInitialize(junod, treasury);
   
   process.exit();
 }
