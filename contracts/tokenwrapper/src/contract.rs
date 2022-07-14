@@ -22,7 +22,7 @@ use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::token_wrapper::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, FeeFromAmountResponse, GetAmountToWrapResponse,
-    InstantiateMsg, QueryMsg, UpdateConfigMsg, WRAP_FEE_CALC_DENOMINATOR,
+    InstantiateMsg, QueryMsg, WRAP_FEE_CALC_DENOMINATOR,
 };
 
 use crate::state::{Config, CONFIG, HISTORICAL_TOKENS, TOKENS};
@@ -116,8 +116,30 @@ pub fn execute(
         /* ------------------------------------- */
 
         /* -----  Governance functionality ----- */
-        // Resets the config. Only the governor can execute this entry.
-        ExecuteMsg::UpdateConfig(msg) => update_config(deps, info, msg),
+        // Update the `governor`. Only the governor can execute this entry.
+        ExecuteMsg::ConfigureGovernor { governor } => {
+            update_config(deps, info, governor, None, None, None, None)
+        }
+
+        // Update the `is_native_allowed`. Only the governor can execute this entry.
+        ExecuteMsg::ConfigureNativeAllowed { is_native_allowed } => {
+            update_config(deps, info, None, is_native_allowed, None, None, None)
+        }
+
+        // Update the `wrapping_limit`. Only the owner can execute this entry.
+        ExecuteMsg::ConfigureWrappingLimit { wrapping_limit } => {
+            update_config(deps, info, None, None, wrapping_limit, None, None)
+        }
+
+        // Update the `fee_percentage`. Only the owner can execute this entry.
+        ExecuteMsg::ConfigureFeePercentage { fee_percentage } => {
+            update_config(deps, info, None, None, None, fee_percentage, None)
+        }
+
+        // Update the `wrapping_limit`. Only the owner can execute this entry.
+        ExecuteMsg::ConfigureFeeRecipient { fee_recipient } => {
+            update_config(deps, info, None, None, None, None, fee_recipient)
+        }
 
         // Add new cw20 token address to wrapping list
         ExecuteMsg::AddCw20TokenAddr { token, nonce } => add_token_addr(deps, info, token, nonce),
@@ -427,7 +449,11 @@ fn wrap_cw20(
 fn update_config(
     deps: DepsMut,
     info: MessageInfo,
-    msg: UpdateConfigMsg,
+    governor: Option<String>,
+    is_native_allowed: Option<bool>,
+    wrapping_limit: Option<Uint128>,
+    fee_percentage: Option<u8>,
+    fee_recipient: Option<String>,
 ) -> Result<Response, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
     // Validate the tx sender.
@@ -436,19 +462,19 @@ fn update_config(
     }
 
     // Update the config
-    if let Some(new_governor) = msg.governor {
+    if let Some(new_governor) = governor {
         config.governor = deps.api.addr_validate(&new_governor)?;
     }
 
-    if let Some(is_native_allowed) = msg.is_native_allowed {
+    if let Some(is_native_allowed) = is_native_allowed {
         config.is_native_allowed = is_native_allowed;
     }
 
-    if let Some(wrapping_limit) = msg.wrapping_limit {
+    if let Some(wrapping_limit) = wrapping_limit {
         config.wrapping_limit = wrapping_limit;
     }
 
-    if let Some(fee_percentage) = msg.fee_percentage {
+    if let Some(fee_percentage) = fee_percentage {
         if fee_percentage > WRAP_FEE_CALC_DENOMINATOR {
             return Err(ContractError::Std(StdError::generic_err(
                 "Fee percenage cannot be greater than 100",
@@ -457,7 +483,7 @@ fn update_config(
         config.fee_percentage = fee_percentage;
     }
 
-    if let Some(fee_recipient) = msg.fee_recipient {
+    if let Some(fee_recipient) = fee_recipient {
         config.fee_recipient = deps.api.addr_validate(&fee_recipient)?;
     }
 

@@ -6,9 +6,7 @@ use cosmwasm_std::{attr, from_binary, to_binary, OwnedDeps};
 
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::structs::BridgeAddrResponse;
-use protocol_cosmwasm::token_wrapper::{
-    ExecuteMsg as GovernedTokenWrapperExecMsg, UpdateConfigMsg,
-};
+use protocol_cosmwasm::token_wrapper::ExecuteMsg as GovernedTokenWrapperExecMsg;
 use protocol_cosmwasm::tokenwrapper_handler::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
 const BRIDGE_ADDR: &str = "bridge-contract";
@@ -123,13 +121,9 @@ fn test_handler_execute_proposal() {
     // Try to set a new handler for tokenwrapper contract
     let info = mock_info(BRIDGE_ADDR, &[]);
 
-    let set_handler_proposal = GovernedTokenWrapperExecMsg::UpdateConfig(UpdateConfigMsg {
-        governor: Some("new-governor".to_string()),
+    let set_handler_proposal = GovernedTokenWrapperExecMsg::ConfigureNativeAllowed {
         is_native_allowed: Some(true),
-        wrapping_limit: None,
-        fee_percentage: None,
-        fee_recipient: None,
-    });
+    };
     let exec_data = proposal_to_exec_data(RESOURCE_ID, set_handler_proposal);
     let exec_proposal_msg = ExecuteMsg::ExecuteProposal {
         resource_id: RESOURCE_ID,
