@@ -8,9 +8,7 @@ use cw2::set_contract_version;
 
 use cw20::{BalanceResponse, Cw20ExecuteMsg};
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::treasury::{
-    ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, TokenInfo,
-};
+use protocol_cosmwasm::treasury::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 
 use crate::state::{Config, CONFIG};
 
@@ -49,11 +47,11 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::RescueTokens {
-            token_info,
+            token_address,
             to,
             amount_to_rescue,
             nonce,
-        } => rescue_tokens(deps, env, info, token_info, to, amount_to_rescue, nonce),
+        } => rescue_tokens(deps, env, info, token_address, to, amount_to_rescue, nonce),
         ExecuteMsg::SetHandler { handler, nonce } => set_handler(deps, env, info, handler, nonce),
     }
 }
@@ -62,7 +60,7 @@ fn rescue_tokens(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    token_info: TokenInfo,
+    token_address: String,
     to: String,
     amount_to_rescue: Uint128,
     nonce: u32,
@@ -86,48 +84,53 @@ fn rescue_tokens(
     }
 
     let mut msgs: Vec<CosmosMsg> = vec![];
-    match token_info {
-        TokenInfo::Native(denom) => {
-            let mut coin = deps
-                .querier
-                .query_balance(env.contract.address, &denom)
-                .unwrap_or(Coin {
-                    denom,
-                    amount: Uint128::zero(),
-                });
-            if !coin.amount.is_zero() {
-                if coin.amount > amount_to_rescue {
-                    coin.amount = amount_to_rescue;
-                }
-                msgs.push(CosmosMsg::Bank(BankMsg::Send {
-                    to_address: to.to_string(),
-                    amount: vec![coin],
-                }));
-            };
-        }
-        TokenInfo::Cw20(token_addr) => {
-            let token_balance: BalanceResponse = deps.querier.query_wasm_smart(
-                token_addr.clone(),
-                &cw20::Cw20QueryMsg::Balance {
-                    address: env.contract.address.to_string(),
-                },
-            )?;
-            if !token_balance.balance.is_zero() {
-                let amount = if token_balance.balance > amount_to_rescue {
-                    amount_to_rescue
-                } else {
-                    token_balance.balance
-                };
-                msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: token_addr,
-                    msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                        recipient: to.to_string(),
-                        amount,
-                    })
-                    .unwrap(),
-                    funds: vec![],
-                }));
+    // Validate the `token_address`
+    // Here, there are 2 options for `token_address` - native token denom or CW20 token address.
+    // If `token_address` is the native token denom, its length is no longer than 10 chars.
+    // If `token_address` is the CW20 token address, its length is 43 ~ 45 chars.
+    // The reason is that the cosmwasm contract address is the beche32 address - `chain-prefix`(5 ~ 7) + `address`(38 bytes)
+    if token_address.len() < 38 {
+        // Check the case of the `token_address` is the native token denomination.
+        let denom = token_address.to_string();
+        let mut coin = deps
+            .querier
+            .query_balance(env.contract.address.to_string(), &denom)
+            .unwrap_or(Coin {
+                denom,
+                amount: Uint128::zero(),
+            });
+        if !coin.amount.is_zero() {
+            if coin.amount > amount_to_rescue {
+                coin.amount = amount_to_rescue;
             }
+            msgs.push(CosmosMsg::Bank(BankMsg::Send {
+                to_address: to.to_string(),
+                amount: vec![coin],
+            }));
+        }
+    } else {
+        // Check the case of the `token_address` is the CW20 token address.
+        let token_balance: BalanceResponse = deps.querier.query_wasm_smart(
+            token_address.clone(),
+            &cw20::Cw20QueryMsg::Balance {
+                address: env.contract.address.to_string(),
+            },
+        )?;
+        if !token_balance.balance.is_zero() {
+            let amount = if token_balance.balance > amount_to_rescue {
+                amount_to_rescue
+            } else {
+                token_balance.balance
+            };
+            msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: token_address,
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: to.to_string(),
+                    amount,
+                })
+                .unwrap(),
+                funds: vec![],
+            }));
         }
     }
 

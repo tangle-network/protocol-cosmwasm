@@ -14,7 +14,7 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     /// Send the (native or cw20) tokens to destination address
     RescueTokens {
-        token_info: TokenInfo,
+        token_address: String,
         to: String,
         amount_to_rescue: Uint128,
         nonce: u32,
@@ -36,11 +36,4 @@ pub enum QueryMsg {
 pub struct ConfigResponse {
     pub treasury_handler: String,
     pub proposal_nonce: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum TokenInfo {
-    Native(String),
-    Cw20(String),
 }
