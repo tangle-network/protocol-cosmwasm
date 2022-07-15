@@ -67,27 +67,24 @@ export async function testSignatureBridgeAdminSetResWithSignature(
     const handler_addr = localjuno.contracts.anchorHandler;
     const execution_context_addr = localjuno.contracts.anchor;
 
-    const unsignedData = Buffer.concat([
-        resource_id,
-        function_sig,
-        nonce_buf,
-        new_resource_id,
-        Buffer.from(handler_addr),
-        Buffer.from(execution_context_addr),
-    ]); 
+    const data = Buffer.from(toEncodedBinary(
+      {
+        resource_id: Array.from(resource_id),
+        function_sig: Array.from(function_sig),
+        nonce: nonce,
+        new_resource_id: Array.from(new_resource_id),
+        handler_addr: handler_addr,
+        execution_context_addr: execution_context_addr,
+      }
+    ), 'base64');
 
     const privkey = localjuno.contractsConsts.testPrivKey;
-    const sig = signMessage(privkey, Array.from(unsignedData));
+    const sig = signMessage(privkey, Array.from(data));
     const sigLen = sig.length;
 
     const result = await junod.execute(localjuno.addresses.wallet1, signatureBridge, {
         admin_set_resource_with_sig: {  
-            resource_id: Array.from(resource_id),
-            function_sig: Array.from(function_sig),
-            nonce: nonce,
-            new_resource_id: Array.from(new_resource_id),
-            handler_addr: handler_addr,
-            execution_context_addr: execution_context_addr,
+            data: Array.from(data),
             sig: Array.from(Buffer.from(sig.substring(2, sigLen - 2), 'hex')),
         },
     },
