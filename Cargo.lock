@@ -697,7 +697,6 @@ dependencies = [
  "arkworks-setups 1.0.0",
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
  "cosmwasm-vm",
  "cw-storage-plus",
  "cw2",
@@ -707,7 +706,6 @@ dependencies = [
  "protocol-cosmwasm",
  "schemars",
  "serde",
- "thiserror",
  "wasm-utils",
 ]
 
@@ -717,14 +715,12 @@ version = "0.1.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
  "cw-storage-plus",
  "cw2",
  "getrandom 0.2.6",
  "protocol-cosmwasm",
  "schemars",
  "serde",
- "thiserror",
 ]
 
 [[package]]
@@ -764,7 +760,6 @@ dependencies = [
  "arkworks-setups 1.0.0",
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
  "cosmwasm-vm",
  "cw-storage-plus",
  "cw2",
@@ -794,14 +789,12 @@ dependencies = [
  "arkworks-setups 1.0.0",
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
  "cw-storage-plus",
  "cw2",
  "getrandom 0.2.6",
  "protocol-cosmwasm",
  "schemars",
  "serde",
- "thiserror",
 ]
 
 [[package]]
@@ -822,33 +815,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "cosmwasm-storage"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d18403b07304d15d304dad11040d45bbcaf78d603b4be3fb5e2685c16f9229b5"
-dependencies = [
- "cosmwasm-std",
- "serde",
-]
-
-[[package]]
 name = "cosmwasm-tokenwrapper"
 version = "0.1.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
  "cosmwasm-vm",
- "cw-controllers",
  "cw-storage-plus",
- "cw-utils",
  "cw2",
  "cw20",
  "cw20-base",
  "protocol-cosmwasm",
  "schemars",
  "serde",
- "thiserror",
 ]
 
 [[package]]
@@ -857,14 +836,12 @@ version = "0.1.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
  "cw-storage-plus",
  "cw2",
  "getrandom 0.2.6",
  "protocol-cosmwasm",
  "schemars",
  "serde",
- "thiserror",
 ]
 
 [[package]]
@@ -880,7 +857,6 @@ dependencies = [
  "protocol-cosmwasm",
  "schemars",
  "serde",
- "thiserror",
 ]
 
 [[package]]
@@ -889,14 +865,12 @@ version = "0.1.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
  "cw-storage-plus",
  "cw2",
  "getrandom 0.2.6",
  "protocol-cosmwasm",
  "schemars",
  "serde",
- "thiserror",
 ]
 
 [[package]]
@@ -914,7 +888,6 @@ dependencies = [
  "arkworks-setups 1.0.0",
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
  "cosmwasm-vm",
  "cw-storage-plus",
  "cw2",
@@ -924,7 +897,6 @@ dependencies = [
  "schemars",
  "serde",
  "sp-core",
- "thiserror",
  "wasm-utils",
 ]
 
@@ -1134,20 +1106,6 @@ dependencies = [
  "rand_core 0.5.1",
  "subtle",
  "zeroize",
-]
-
-[[package]]
-name = "cw-controllers"
-version = "0.13.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f0bc6019b4d3d81e11f5c384bcce7173e2210bd654d75c6c9668e12cca05dfa"
-dependencies = [
- "cosmwasm-std",
- "cw-storage-plus",
- "cw-utils",
- "schemars",
- "serde",
- "thiserror",
 ]
 
 [[package]]
@@ -2398,7 +2356,6 @@ dependencies = [
  "arkworks-native-gadgets 1.0.0",
  "arkworks-setups 1.0.0",
  "cosmwasm-std",
- "cosmwasm-storage",
  "cw20",
  "cw20-base",
  "schemars",

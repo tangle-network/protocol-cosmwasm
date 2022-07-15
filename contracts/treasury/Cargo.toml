@@ -28,7 +28,6 @@ cw2 = "0.13.4"
 cw20 = "0.13.4"
 schemars = "0.8.3"
 serde = { version = "1.0.127", default-features = false, features = ["derive"] }
-thiserror = { version = "1.0.26" }
 
 protocol-cosmwasm = { version = "0.1.0", path = "../../packages/protocol_cosmwasm"}
 

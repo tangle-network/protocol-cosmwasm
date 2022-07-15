@@ -24,7 +24,6 @@ library = []
 
 [dependencies]
 cosmwasm-std = "1.0.0"
-cosmwasm-storage = "1.0.0"
 cw-storage-plus = "0.13.4"
 cw2 = "0.13.4"
 cw20 = "0.13.4"
