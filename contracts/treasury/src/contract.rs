@@ -6,7 +6,7 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 
-use cw20::{BalanceResponse, Cw20ExecuteMsg};
+use cw20::{BalanceResponse, Cw20ExecuteMsg, TokenInfoResponse};
 use protocol_cosmwasm::error::ContractError;
 use protocol_cosmwasm::treasury::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 
@@ -84,13 +84,18 @@ fn rescue_tokens(
     }
 
     let mut msgs: Vec<CosmosMsg> = vec![];
-    // Validate the `token_address`
-    // Here, there are 2 options for `token_address` - native token denom or CW20 token address.
-    // If `token_address` is the native token denom, its length is no longer than 10 chars.
-    // If `token_address` is the CW20 token address, its length is 63 ~ 65 chars.
-    // The reason is that the cosmwasm contract address is the beche32 address - `chain-prefix`(5 ~ 7) + `address`(58 bytes)
-    if token_address.len() < 58 {
-        // Check the case of the `token_address` is the native token denomination.
+
+    // Validate the `token_address`.
+    // Here, there are 2 possibilities for `token_address` - native token denom or CW20 token address.
+    // For the validation, we try to query the `TokenInfo` from `token_address`.
+    // If the `token_address` represents the native token denom, then the query returns error.
+    // Otherwise, the query returns the result, which means it is CW20 token.
+    let cw20_token_info_query: Result<TokenInfoResponse, StdError> = deps
+        .querier
+        .query_wasm_smart(token_address.to_string(), &cw20::Cw20QueryMsg::TokenInfo {});
+
+    if cw20_token_info_query.is_err() {
+        // Handle the case of the `token_address` is the native token denomination.
         let denom = token_address;
         let mut coin = deps
             .querier
@@ -109,7 +114,7 @@ fn rescue_tokens(
             }));
         }
     } else {
-        // Check the case of the `token_address` is the CW20 token address.
+        // Handle the case of the `token_address` is the CW20 token address.
         let token_balance: BalanceResponse = deps.querier.query_wasm_smart(
             token_address.clone(),
             &cw20::Cw20QueryMsg::Balance {
