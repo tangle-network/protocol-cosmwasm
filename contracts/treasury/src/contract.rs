@@ -87,11 +87,11 @@ fn rescue_tokens(
     // Validate the `token_address`
     // Here, there are 2 options for `token_address` - native token denom or CW20 token address.
     // If `token_address` is the native token denom, its length is no longer than 10 chars.
-    // If `token_address` is the CW20 token address, its length is 43 ~ 45 chars.
-    // The reason is that the cosmwasm contract address is the beche32 address - `chain-prefix`(5 ~ 7) + `address`(38 bytes)
-    if token_address.len() < 38 {
+    // If `token_address` is the CW20 token address, its length is 63 ~ 65 chars.
+    // The reason is that the cosmwasm contract address is the beche32 address - `chain-prefix`(5 ~ 7) + `address`(58 bytes)
+    if token_address.len() < 58 {
         // Check the case of the `token_address` is the native token denomination.
-        let denom = token_address.to_string();
+        let denom = token_address;
         let mut coin = deps
             .querier
             .query_balance(env.contract.address.to_string(), &denom)
