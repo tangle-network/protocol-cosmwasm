@@ -5,9 +5,7 @@ use cosmwasm_std::testing::{
 use cosmwasm_std::{attr, coin, from_binary, Coin, OwnedDeps, Uint128};
 
 use protocol_cosmwasm::error::ContractError;
-use protocol_cosmwasm::treasury::{
-    ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, TokenInfo,
-};
+use protocol_cosmwasm::treasury::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 
 use crate::contract::{execute, instantiate, query};
 
@@ -109,7 +107,7 @@ fn test_treasury_rescue_tokens() {
     // Fails to "rescue tokens" since the caller is not "handler"
     let info = mock_info("anyone", &[]);
     let rescue_tokens_msg = ExecuteMsg::RescueTokens {
-        token_info: TokenInfo::Native("earth".to_string()),
+        token_address: "earth".to_string(),
         amount_to_rescue: Uint128::from(200_u128),
         to: to.clone(),
         nonce,
@@ -120,7 +118,7 @@ fn test_treasury_rescue_tokens() {
     // Fails to "rescue tokens" if "nonce" is too big or small
     let info = mock_info(TREASURY_HANDLER, &[]);
     let rescue_tokens_msg = ExecuteMsg::RescueTokens {
-        token_info: TokenInfo::Native("earth".to_string()),
+        token_address: "earth".to_string(),
         amount_to_rescue: Uint128::from(200_u128),
         to: to.clone(),
         nonce: nonce + 2000,
@@ -131,7 +129,7 @@ fn test_treasury_rescue_tokens() {
     // Fails to "rescue tokens" since "amount_to_rescue" is 0
     let info = mock_info(TREASURY_HANDLER, &[]);
     let rescue_tokens_msg = ExecuteMsg::RescueTokens {
-        token_info: TokenInfo::Native("earth".to_string()),
+        token_address: "earth".to_string(),
         amount_to_rescue: Uint128::zero(),
         to: to.clone(),
         nonce,
@@ -146,7 +144,7 @@ fn test_treasury_rescue_tokens() {
     // But, it does not send any tokens
     let info = mock_info(TREASURY_HANDLER, &[]);
     let rescue_tokens_msg = ExecuteMsg::RescueTokens {
-        token_info: TokenInfo::Native("sun".to_string()),
+        token_address: "sun".to_string(),
         amount_to_rescue: Uint128::from(100_u128),
         to: to.clone(),
         nonce,
@@ -157,7 +155,7 @@ fn test_treasury_rescue_tokens() {
     // Succeed to "rescue tokens"
     let info = mock_info(TREASURY_HANDLER, &[]);
     let rescue_token_msg = ExecuteMsg::RescueTokens {
-        token_info: TokenInfo::Native("earth".to_string()),
+        token_address: "earth".to_string(),
         amount_to_rescue: Uint128::from(200_u128),
         nonce: nonce + 1,
         to,

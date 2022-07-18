@@ -132,7 +132,9 @@ fn execute_proposal(
 ) -> Result<Response, ContractError> {
     // Parse the (proposal)`data`.
     let parsed_resource_id = element_encoder(&data[0..32]);
-    let base64_encoded_proposal = &data[32..];
+    let _func_sig = &data[32..36];
+    let _nonce = &data[36..40];
+    let base64_encoded_proposal = &data[40..];
 
     let bridge_addr = STATE.load(deps.storage)?.bridge_addr;
 

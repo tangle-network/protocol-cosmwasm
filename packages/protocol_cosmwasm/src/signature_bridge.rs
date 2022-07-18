@@ -19,13 +19,19 @@ pub enum ExecuteMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct SetResourceWithSigMsg {
+    pub data: Vec<u8>, // base64-encoded `ResourceIdUpdateData`
+    pub sig: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct ResourceIdUpdateData {
     pub resource_id: [u8; 32],
     pub function_sig: [u8; 4],
     pub nonce: u32,
     pub new_resource_id: [u8; 32],
     pub handler_addr: String,
     pub execution_context_addr: String,
-    pub sig: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

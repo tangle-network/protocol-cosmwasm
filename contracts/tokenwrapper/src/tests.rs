@@ -7,7 +7,7 @@ use cw20::{BalanceResponse, Cw20ReceiveMsg, TokenInfoResponse};
 
 use protocol_cosmwasm::token_wrapper::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, FeeFromAmountResponse, GetAmountToWrapResponse,
-    InstantiateMsg, QueryMsg, UpdateConfigMsg,
+    InstantiateMsg, QueryMsg,
 };
 
 use crate::contract::{execute, instantiate, query};
@@ -329,13 +329,9 @@ fn test_update_config() {
 
     // Update the config
     let info = mock_info("creator", &[]);
-    let update_config_msg = ExecuteMsg::UpdateConfig(UpdateConfigMsg {
+    let update_config_msg = ExecuteMsg::ConfigureGovernor {
         governor: Some("new_governor".to_string()),
-        is_native_allowed: None,
-        wrapping_limit: None,
-        fee_percentage: None,
-        fee_recipient: None,
-    });
+    };
 
     let res = execute(deps.as_mut(), mock_env(), info, update_config_msg).unwrap();
     assert_eq!(res.attributes, vec![attr("method", "update_config"),]);

@@ -52,8 +52,20 @@ pub enum ExecuteMsg {
     /* ----------------------------------- */
 
     /* ---  Governance functionality  --- */
-    /// Reset the config
-    UpdateConfig(UpdateConfigMsg),
+    /// Update the `governor`
+    ConfigureGovernor { governor: Option<String> },
+
+    /// Update the `is_native_allowed`
+    ConfigureNativeAllowed { is_native_allowed: Option<bool> },
+
+    /// Update the `wrapping_limit`
+    ConfigureWrappingLimit { wrapping_limit: Option<Uint128> },
+
+    /// Update the `fee_recipient`
+    ConfigureFeeRecipient { fee_recipient: Option<String> },
+
+    /// Update the `fee_percentage`
+    ConfigureFeePercentage { fee_percentage: Option<u8> },
 
     /// Add cw20 token address to wrapping list
     AddCw20TokenAddr { token: String, nonce: u64 },
@@ -138,16 +150,6 @@ pub enum Cw20HookMsg {
         sender: Option<String>,
         recipient: Option<String>,
     },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub struct UpdateConfigMsg {
-    pub governor: Option<String>,
-    pub is_native_allowed: Option<bool>,
-    pub wrapping_limit: Option<Uint128>,
-    pub fee_percentage: Option<u8>,
-    pub fee_recipient: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

@@ -65,7 +65,7 @@ export async function testExecute(
   console.log(chalk.yellow("\nStep 3. Running Tests"));
   // // SignatureBridge
   // await testSignatureBridgeInitialize(junod, signatureBridge);
-  // await testSignatureBridgeAdminSetResWithSignature(junod, wallet1, signatureBridge);
+  await testSignatureBridgeAdminSetResWithSignature(junod, wallet1, signatureBridge);
   // await testSignatureBridgeExecProposalWithSignature(junod, wallet1, signatureBridge);
 
   // // TokenWrapper
@@ -97,7 +97,7 @@ export async function testExecute(
   // await testMixerWithdrawNativeToken(junod, mixer, wallet1, wallet2, wallet3, "1000000");
 
   // Treasury
-  await testTreasuryInitialize(junod, treasury);
+  // await testTreasuryInitialize(junod, treasury);
   
   process.exit();
 }
