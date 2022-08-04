@@ -25,7 +25,7 @@ use crate::contract::{execute, instantiate};
 use crate::test_util::Element;
 
 const MAX_EDGES: u32 = 2;
-const CHAIN_ID: u64 = 2145598729; // chain_id: "cosmos-testnet-14002"
+const CHAIN_ID: u64 = 3620629146; // chain_id: "cosmos-testnet-14002"
 const LEVELS: u32 = 30;
 const TOKENWRAPPER_ADDR: &str = "terra1340t6lqq6jxhm8d6gtz0hzz5jzcszvm27urkn2"; // Cw20 token
 const DEPOSIT_SIZE: u128 = 1_000_000;

@@ -222,7 +222,6 @@ fn deposit_cw20(
 
         // No need to handle any cw20 token transfer
         // since "TokenWrapper" tokens are already sent to this contract
-        println!("commitment: {:?}", commitment);
         Ok(
             Response::new().add_event(Event::new("anchor-deposit").add_attributes(vec![
                 attr("action", "deposit_cw20"),

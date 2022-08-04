@@ -1,4 +1,4 @@
-use crate::keccak::Keccak256;
+use tiny_keccak::{Hasher, Keccak};
 
 /// Slice the length of the bytes array into 32bytes
 pub fn element_encoder(v: &[u8]) -> [u8; 32] {
@@ -37,8 +37,13 @@ pub fn compute_chain_id_type(chain_id: u64, chain_type: &[u8]) -> u64 {
 ///   2. Slice the last 4 bytes & convert it to `u32` numeric value
 ///       eg: 8a294d21(hex) -> 2317962529(decimal)
 pub fn compute_chain_id(chain_id_str: &str) -> u32 {
-    let hash_value = Keccak256::hash(chain_id_str.as_bytes()).expect("chain-id hashing error");
-    let last_4_bytes = &hash_value[28..];
+    let mut keccak = Keccak::v256();
+    keccak.update(chain_id_str.as_bytes());
+
+    let mut output = [0u8; 32];
+    keccak.finalize(&mut output);
+
+    let last_4_bytes = &output[28..];
 
     let mut buf = [0u8; 4];
     buf[0..4].copy_from_slice(last_4_bytes);

@@ -9,7 +9,7 @@ pub struct InstantiateMsg {
     pub treasury_handler: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     /// Send the (native or cw20) tokens to destination address
