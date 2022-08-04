@@ -63,41 +63,41 @@ export async function testExecute(
   treasuryHandler: string,
 ): Promise<void> {
   console.log(chalk.yellow("\nStep 3. Running Tests"));
-  // // SignatureBridge
-  // await testSignatureBridgeInitialize(junod, signatureBridge);
-  // await testSignatureBridgeAdminSetResWithSignature(junod, wallet1, signatureBridge);
-  // await testSignatureBridgeExecProposalWithSignature(junod, wallet1, signatureBridge);
+  // SignatureBridge
+  await testSignatureBridgeInitialize(junod, signatureBridge);
+  await testSignatureBridgeAdminSetResWithSignature(junod, wallet1, signatureBridge);
+  await testSignatureBridgeExecProposalWithSignature(junod, wallet1, signatureBridge);
 
-  // // TokenWrapper
-  // await testTokenWrapperInitialize(junod, tokenWrapper);
+  // TokenWrapper
+  await testTokenWrapperInitialize(junod, tokenWrapper);
 
-  // // TokenWrapperHandler
+  // TokenWrapperHandler
 
-  // // AnchorHandler
+  // AnchorHandler
 
-  // // Anchor
-  // await testAnchorInitialize(junod, anchor);
-  // await testAnchorDepositWithdraw(junod, anchor, wallet1, wallet2, wallet3, "1000000");
-  // await testAnchorWrapNative(junod, anchor, wallet3, "100000");
-  // await testAnchorUnwrapNative(junod, anchor, wallet3, "100");
-  // await testAnchorWrapCw20(junod, anchor, tokenWrapper, cw20, wallet3, "10000");
-  // await testAnchorUnwrapCw20(junod, anchor, tokenWrapper, cw20, wallet3, "100");
+  // Anchor
+  await testAnchorInitialize(junod, anchor);
+  await testAnchorDepositWithdraw(junod, anchor, wallet1, wallet2, wallet3, "1000000");
+  await testAnchorWrapNative(junod, anchor, wallet3, "100000");
+  await testAnchorUnwrapNative(junod, anchor, wallet3, "100");
+  await testAnchorWrapCw20(junod, anchor, tokenWrapper, cw20, wallet3, "10000");
+  await testAnchorUnwrapCw20(junod, anchor, tokenWrapper, cw20, wallet3, "100");
 
-  // // VAnchor
-  // await testVAnchorInitialize(junod, vanchor);
-  // await testVAnchorDepositWithdraw(junod, vanchor, cw20, wallet1, wallet2, wallet3, "10", "10", "0", "-7", "-5", "2");
-  // await testVAnchorWrapNative(junod, vanchor, wallet3, "100000");
-  // await testVAnchorUnwrapNative(junod, vanchor, wallet3, "100");
-  // await testVAnchorWrapCw20(junod, vanchor, tokenWrapper, cw20, wallet3, "10000");
-  // await testVAnchorUnwrapCw20(junod, vanchor, tokenWrapper, cw20, wallet3, "100");
+  // VAnchor
+  await testVAnchorInitialize(junod, vanchor);
+  await testVAnchorDepositWithdraw(junod, vanchor, cw20, wallet1, wallet2, wallet3, "10", "10", "0", "-7", "-5", "2");
+  await testVAnchorWrapNative(junod, vanchor, wallet3, "100000");
+  await testVAnchorUnwrapNative(junod, vanchor, wallet3, "100");
+  await testVAnchorWrapCw20(junod, vanchor, tokenWrapper, cw20, wallet3, "10000");
+  await testVAnchorUnwrapCw20(junod, vanchor, tokenWrapper, cw20, wallet3, "100");
 
-  // // Mixer
-  // await testMixerInitialize(junod, mixer);
-  // await testMixerDepositNativeToken(junod, mixer, wallet3, "1000000");
-  // await testMixerWithdrawNativeToken(junod, mixer, wallet1, wallet2, wallet3, "1000000");
+  // Mixer
+  await testMixerInitialize(junod, mixer);
+  await testMixerDepositNativeToken(junod, mixer, wallet3, "1000000");
+  await testMixerWithdrawNativeToken(junod, mixer, wallet1, wallet2, wallet3, "1000000");
 
-  // // Treasury
-  // await testTreasuryInitialize(junod, treasury);
+  // Treasury
+  await testTreasuryInitialize(junod, treasury);
   
   process.exit();
 }
