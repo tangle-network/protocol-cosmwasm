@@ -124,8 +124,13 @@ export async function testSignatureBridgeExecProposalWithSignature(
 
     // proposal of `set_handler`
     const resource_id: Buffer = genResourceId(localjuno.contracts.anchor);
+    const func_sig: Buffer = Buffer.from([0x00, 0x00, 0x00, 0x00]);
+    const nonce: Buffer =  Buffer.alloc(4);
+    nonce.writeUInt16BE(beforeNonce + 3, 0);
     const data = Buffer.concat([
         resource_id,
+        func_sig,
+        nonce,
         Buffer.from(toEncodedBinary({
           set_handler: {
             handler: localjuno.contracts.anchorHandler,

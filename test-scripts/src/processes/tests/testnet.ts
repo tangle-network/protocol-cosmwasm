@@ -96,7 +96,7 @@ export async function testExecute(
   // await testMixerDepositNativeToken(junod, mixer, wallet3, "1000000");
   // await testMixerWithdrawNativeToken(junod, mixer, wallet1, wallet2, wallet3, "1000000");
 
-  // Treasury
+  // // Treasury
   // await testTreasuryInitialize(junod, treasury);
   
   process.exit();
