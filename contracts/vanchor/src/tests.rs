@@ -15,7 +15,7 @@ use protocol_cosmwasm::vanchor::{
 use protocol_cosmwasm::zeroes::zeroes;
 
 const CHAIN_TYPE: [u8; 2] = [4, 0]; // 0x0400
-const CHAIN_ID: u64 = 2145598729; // chain_id: "cosmos-testnet-14002"
+const CHAIN_ID: u64 = 3620629146; // chain_id: "cosmos-testnet-14002"
 
 const MAX_EDGES: u32 = 2;
 const LEVELS: u32 = 30;
@@ -1477,9 +1477,6 @@ fn test_vanchor_withdraw_and_unwrap_native() {
         ext_data_hash.0,
     );
 
-    println!("proof_data:{:?}\n", proof_data);
-    println!("ext_data:{:?}", ext_data);
-
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);
     let deposit_cw20_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
@@ -1552,9 +1549,6 @@ fn test_vanchor_withdraw_and_unwrap_native() {
         commitments,
         ext_data_hash.0,
     );
-
-    println!("proof_data:{:?}\n", proof_data);
-    println!("ext_data:{:?}", ext_data);
 
     // Should "transact" with success.
     let info = mock_info(CW20_ADDRESS, &[]);

@@ -17,6 +17,7 @@ cosmwasm-std = "1.0.0"
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.26" }
+tiny-keccak = { version = "2.0.2", features = ["sha3"] }
 
 ark-ff = { version = "^0.3.0", default-features = false }
 ark-std = { version = "^0.3.0", default-features = false }

@@ -65,7 +65,7 @@ export async function testExecute(
   console.log(chalk.yellow("\nStep 3. Running Tests"));
   // // SignatureBridge
   // await testSignatureBridgeInitialize(junod, signatureBridge);
-  await testSignatureBridgeAdminSetResWithSignature(junod, wallet1, signatureBridge);
+  // await testSignatureBridgeAdminSetResWithSignature(junod, wallet1, signatureBridge);
   // await testSignatureBridgeExecProposalWithSignature(junod, wallet1, signatureBridge);
 
   // // TokenWrapper
