@@ -20,7 +20,7 @@ const FEE_PERCENTAGE: u8 = 1_u8;
 const NATIVE_TOKEN_DENOM: &str = "uusd";
 const CW20_TOKEN: &str = "cw20_token";
 const WRAPPING_LIMIT: u128 = 5000000;
-const IS_NATIVE_ALLOWED: u32 = 1;
+const IS_NATIVE_ALLOWED: bool = true;
 
 fn init_tokenwrapper(coins: Vec<Coin>) -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
     let mut deps = mock_dependencies_with_balance(&coins);

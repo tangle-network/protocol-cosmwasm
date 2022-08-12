@@ -23,7 +23,7 @@ pub struct InstantiateMsg {
     /// native token denom string to be wrapped
     pub native_token_denom: String,
     /// flag of is_native_allowed
-    pub is_native_allowed: u32,
+    pub is_native_allowed: bool,
     /// wrapping limit
     pub wrapping_limit: Uint128,
 }
