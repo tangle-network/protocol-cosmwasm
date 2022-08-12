@@ -229,7 +229,7 @@ export async function testAnchorInitialize(
   //  TEST: Anchor
   //  
   //  SCENARIO: 
-  //   1. Wallet3 "wrap"s some CW20 token(AUTO) in anchor
+  //   1. Wallet3 "wrap"s some CW20 token(ABCT) in anchor
   // ------------------------------------------------
   export async function testAnchorWrapCw20(
     junod: SigningCosmWasmClient,
@@ -239,7 +239,7 @@ export async function testAnchorInitialize(
     wallet3: DirectSecp256k1HdWallet,
     auto_amount: string,
   ): Promise<void> {
-    process.stdout.write(`Test - Wallet3 wrap ${auto_amount} AUTO in anchor`);
+    process.stdout.write(`Test - Wallet3 wrap ${auto_amount} ABCT in anchor`);
   
     let wallet3_client = await SigningCosmWasmClient.connectWithSigner(
       localjuno.networkInfo.url, 
@@ -286,7 +286,7 @@ export async function testAnchorInitialize(
   //  TEST: Anchor
   //  
   //  SCENARIO: 
-  //   1. Wallet3 "unwrap"s some WTW to Cw20 token(AUTO) in anchor
+  //   1. Wallet3 "unwrap"s some WTW to Cw20 token(ABCT) in anchor
   // ------------------------------------------------
   export async function testAnchorUnwrapCw20(
     junod: SigningCosmWasmClient,

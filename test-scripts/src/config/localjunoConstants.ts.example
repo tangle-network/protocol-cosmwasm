@@ -30,5 +30,42 @@ export const localjuno = {
     anchor: "juno...",
     vanchor: "juno...",
     mixer: "juno...",
+    treasuryHandler: "juno...",
+    treasury: "juno...",
   },
+
+  contractsConsts: {
+    chain_id: "3751615234", // "testing"
+
+    // Test Cw20 token
+    cw20TokenName: "ABC_TOKEN",
+    cw20TokenSymbol: "ABCT",
+    decimals: 6,
+
+    // "SignatureBridge"
+    testPubKey:  [],
+    testPrivKey: "0x...",
+
+    // "TokenWrapper"
+    tokenWrapperTokenName: "Webb_Wrap_Token",
+    tokenWrapperTokenSymbol: "WWRT",
+
+    feePercentage: 0,
+    nativeTokenDenom: "ucosm",
+    isNativeAllowed: true,
+    tokenWrapperWrappingLimit: "1000000",
+
+
+    // "TokenWrapperHandler"
+
+    // "Anchor", "VAnchor" & "Mixer"
+    maxEdges: 2,
+    levels: 30,
+    depositSize: "1000000",
+
+    maxDepositAmt: "1000000",
+    minWithdrawAmt: "0",
+    maxExtAmt: "1000000",
+    maxFee: "1000000",
+  }
 };

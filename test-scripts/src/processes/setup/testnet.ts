@@ -50,8 +50,8 @@ export async function setupContracts(
     wallet3 = wallets.wallet3;
 
     // Send some test tokens to test wallets
-    await junod.sendTokens(localjuno.addresses.wallet1, localjuno.addresses.wallet2, [coin("100000000", "ucosm"), coin("10000000", "ujunox")], "auto");
-    await junod.sendTokens(localjuno.addresses.wallet1, localjuno.addresses.wallet3, [coin("100000000", "ucosm"), coin("10000000", "ujunox")], "auto");
+    await junod.sendTokens(localjuno.addresses.wallet1, localjuno.addresses.wallet2, [coin("10000000", "ucosm"), coin("1000000", "ujunox")], "auto");
+    await junod.sendTokens(localjuno.addresses.wallet1, localjuno.addresses.wallet3, [coin("10000000", "ucosm"), coin("1000000", "ujunox")], "auto");
 
     await setup(junod, wallet1);
 
@@ -149,9 +149,9 @@ async function setup(
     // Step 2. Instantiate contracts
 
     // CW20 token 
-    process.stdout.write("Instantiating CW20(AUTO) token contract");
+    process.stdout.write("Instantiating CW20(ABC) token contract");
 
-    const autoTokenResult = await instantiateContract(
+    const cw20TokenResult = await instantiateContract(
         junod,
         wallet1,
         wallet1,
@@ -176,7 +176,7 @@ async function setup(
             ]   
         }
     );
-    cw20 = autoTokenResult.contractAddress;
+    cw20 = cw20TokenResult.contractAddress;
     console.log(chalk.green(" Done!"), `${chalk.blue("contractAddress")}=${cw20}`);
 
 
@@ -222,7 +222,7 @@ async function setup(
       );
     tokenWrapper = tokenWrapperResult.contractAddress;
 
-    // Register Cw20(AUTO) token in "TokenWrapper"
+    // Register Cw20(ABCT) token in "TokenWrapper"
     await junod.execute(localjuno.addresses.wallet1, tokenWrapper, {
         add_cw20_token_addr: {
             token: cw20,
