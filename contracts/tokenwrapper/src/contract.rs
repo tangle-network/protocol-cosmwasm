@@ -77,7 +77,7 @@ pub fn instantiate(
             fee_recipient,
             fee_percentage,
             native_token_denom: msg.native_token_denom,
-            is_native_allowed: msg.is_native_allowed != 0,
+            is_native_allowed: msg.is_native_allowed,
             wrapping_limit: msg.wrapping_limit,
             proposal_nonce: 0_u64,
         },
@@ -253,10 +253,13 @@ fn wrap_native(
     }
 
     // send "fee" to fee_recipient
-    let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Bank(BankMsg::Send {
-        to_address: config.fee_recipient.to_string(),
-        amount: coins(cost_to_wrap.u128(), config.native_token_denom),
-    })];
+    let mut msgs: Vec<CosmosMsg> = vec![];
+    if !cost_to_wrap.is_zero() {
+        msgs.push(CosmosMsg::Bank(BankMsg::Send {
+            to_address: config.fee_recipient.to_string(),
+            amount: coins(cost_to_wrap.u128(), config.native_token_denom),
+        }));
+    }
 
     Ok(Response::new().add_messages(msgs).add_attributes(vec![
         attr("action", "wrap_native"),
@@ -424,14 +427,17 @@ fn wrap_cw20(
             }
 
             // Send the "fee" to "fee_recipient".
-            let msgs: Vec<CosmosMsg> = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: cw20_address.to_string(),
-                funds: vec![],
-                msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                    recipient: config.fee_recipient.to_string(),
-                    amount: cost_to_wrap,
-                })?,
-            })];
+            let mut msgs: Vec<CosmosMsg> = vec![];
+            if !cost_to_wrap.is_zero() {
+                msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: cw20_address.to_string(),
+                    funds: vec![],
+                    msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                        recipient: config.fee_recipient.to_string(),
+                        amount: cost_to_wrap,
+                    })?,
+                }));
+            }
 
             Ok(Response::new().add_messages(msgs).add_attributes(vec![
                 attr("action", "wrap_cw20"),

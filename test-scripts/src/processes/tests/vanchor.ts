@@ -58,7 +58,7 @@ export async function testVAnchorInitialize(
     out_ext_amount: string,
     out_fee: string,
   ): Promise<void> {
-    process.stdout.write(`Test - Wallet3 deposit ${in_auto_public_amount} AUTO to vanchor`); 
+    process.stdout.write(`Test - Wallet3 deposit ${in_auto_public_amount} ABCT to vanchor`); 
 
     // Query the "amt_to_send" for "WrapAndDeposit" action
     const amt_to_send_query: any = await junod.queryContractSmart(localjuno.contracts.tokenWrapper, {
@@ -287,7 +287,7 @@ export async function testVAnchorInitialize(
   //  TEST: VAnchor
   //  
   //  SCENARIO: 
-  //   1. Wallet3 "wrap"s some CW20 token(AUTO) in anchor
+  //   1. Wallet3 "wrap"s some CW20 token(ABCT) in anchor
   // ------------------------------------------------
   export async function testVAnchorWrapCw20(
     junod: SigningCosmWasmClient,
@@ -297,7 +297,7 @@ export async function testVAnchorInitialize(
     wallet3: DirectSecp256k1HdWallet,
     auto_amount: string,
   ): Promise<void> {
-    process.stdout.write(`Test - Wallet3 wrap ${auto_amount} AUTO in vanchor`);
+    process.stdout.write(`Test - Wallet3 wrap ${auto_amount} ABCT in vanchor`);
   
     let wallet3_client = await SigningCosmWasmClient.connectWithSigner(
       localjuno.networkInfo.url, 
@@ -346,7 +346,7 @@ export async function testVAnchorInitialize(
   //  TEST: VAnchor
   //  
   //  SCENARIO: 
-  //   1. Wallet3 "unwrap"s some WTW to Cw20 token(AUTO) in vanchor
+  //   1. Wallet3 "unwrap"s some WTW to Cw20 token(ABCT) in vanchor
   // ------------------------------------------------
   export async function testVAnchorUnwrapCw20(
     junod: SigningCosmWasmClient,

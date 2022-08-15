@@ -63,7 +63,7 @@ async function initialize() {
     treasury = config.contracts.treasury;
     treasury = config.contracts.treasuryHandler;
 
-    console.log(`Use ${chalk.cyan(cw20)} as Cw20(AUTO) token`);
+    console.log(`Use ${chalk.cyan(cw20)} as Cw20(ABCT) token`);
     console.log(`Use ${chalk.cyan(signatureBridge)} as SignatureBridge`);
     console.log(`Use ${chalk.cyan(tokenWrapper)} as TokenWrapper`);
     console.log(`Use ${chalk.cyan(tokenWrapperHandler)} as TokenWrapperHandler`);
