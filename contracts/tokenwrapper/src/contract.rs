@@ -458,7 +458,7 @@ fn update_config(
     governor: Option<String>,
     is_native_allowed: Option<bool>,
     wrapping_limit: Option<Uint128>,
-    fee_percentage: Option<u8>,
+    fee_percentage: Option<u16>,
     fee_recipient: Option<String>,
 ) -> Result<Response, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;

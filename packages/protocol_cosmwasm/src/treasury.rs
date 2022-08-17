@@ -2,7 +2,6 @@ use cosmwasm_std::Uint128;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-pub const WRAP_FEE_CALC_DENOMINATOR: u8 = 100_u8;
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct InstantiateMsg {
     /// Address of "treasury_handler"

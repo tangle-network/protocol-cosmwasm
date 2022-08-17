@@ -11,7 +11,7 @@ pub struct Config {
     pub governor: Addr,
     pub native_token_denom: String,
     pub fee_recipient: Addr,
-    pub fee_percentage: u8,
+    pub fee_percentage: u16,
     pub is_native_allowed: bool,
     pub wrapping_limit: Uint128,
     pub proposal_nonce: u64,
