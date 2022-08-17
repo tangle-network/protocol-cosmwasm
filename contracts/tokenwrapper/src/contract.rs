@@ -66,7 +66,7 @@ pub fn instantiate(
     let fee_recipient = deps.api.addr_validate(msg.fee_recipient.as_str())?;
     if msg.fee_percentage > WRAP_FEE_CALC_DENOMINATOR {
         return Err(ContractError::Std(StdError::generic_err(
-            "Fee percenage cannot be greater than 100",
+            "Fee percenage cannot be greater than 10000",
         )));
     }
     let fee_percentage = msg.fee_percentage;
@@ -483,7 +483,7 @@ fn update_config(
     if let Some(fee_percentage) = fee_percentage {
         if fee_percentage > WRAP_FEE_CALC_DENOMINATOR {
             return Err(ContractError::Std(StdError::generic_err(
-                "Fee percenage cannot be greater than 100",
+                "Fee percenage cannot be greater than 10000",
             )));
         }
         config.fee_percentage = fee_percentage;
