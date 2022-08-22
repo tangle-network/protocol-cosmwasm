@@ -16,7 +16,7 @@ const NAME: &str = "Webb-WRAP";
 const SYMBOL: &str = "WWRP";
 const DECIMALS: u8 = 6;
 const FEE_RECIPIENT: &str = "terra1qca9hs2qk2w29gqduaq9k720k9293qt7q8nszl";
-const FEE_PERCENTAGE: u8 = 1_u8;
+const FEE_PERCENTAGE: u16 = 1_u16;
 const NATIVE_TOKEN_DENOM: &str = "uusd";
 const CW20_TOKEN: &str = "cw20_token";
 const WRAPPING_LIMIT: u128 = 5000000;
@@ -90,7 +90,7 @@ fn test_wrap_native() {
     let mut deps = init_tokenwrapper([].to_vec());
 
     // Try the wrapping the native token
-    let info = mock_info("anyone", &coins(100, "uusd"));
+    let info = mock_info("anyone", &coins(10000, "uusd"));
     let wrap_msg = ExecuteMsg::Wrap {
         sender: Some("owner".to_string()),
         recipient: Some("recipient".to_string()),
@@ -104,7 +104,7 @@ fn test_wrap_native() {
             attr("from", "anyone"),
             attr("owner", "owner"),
             attr("to", "recipient"),
-            attr("minted", "99"),
+            attr("minted", "9999"),
             attr("fee", "1"),
         ]
     );
@@ -121,7 +121,7 @@ fn test_wrap_native() {
     )
     .unwrap();
     let token_balance: BalanceResponse = from_binary(&query).unwrap();
-    assert_eq!(token_balance.balance.u128(), 99);
+    assert_eq!(token_balance.balance.u128(), 9999);
 }
 
 #[test]
@@ -130,7 +130,7 @@ fn test_unwrap_native() {
     let mut deps = init_tokenwrapper(ctx_coins);
 
     // Try the wrapping the native token
-    let info = mock_info("anyone", &coins(100, "uusd"));
+    let info = mock_info("anyone", &coins(10000, "uusd"));
     let wrap_msg = ExecuteMsg::Wrap {
         sender: None,
         recipient: None,
@@ -141,7 +141,7 @@ fn test_unwrap_native() {
     let info = mock_info("anyone", &[]);
     let unwrap_msg = ExecuteMsg::Unwrap {
         token: None,
-        amount: Uint128::from(80_u128),
+        amount: Uint128::from(8000_u128),
         sender: None,
         recipient: None,
     };
@@ -154,8 +154,8 @@ fn test_unwrap_native() {
             attr("from", "anyone"),
             attr("owner", "anyone"),
             attr("to", "anyone"),
-            attr("unwrap", "80"),
-            attr("refund", "80"),
+            attr("unwrap", "8000"),
+            attr("refund", "8000"),
         ]
     );
 
@@ -169,7 +169,7 @@ fn test_unwrap_native() {
     )
     .unwrap();
     let token_balance: BalanceResponse = from_binary(&query).unwrap();
-    assert_eq!(token_balance.balance.u128(), 19);
+    assert_eq!(token_balance.balance.u128(), 1999);
 }
 
 #[test]
@@ -188,7 +188,7 @@ fn test_wrap_cw20() {
     let info = mock_info(CW20_TOKEN, &[]);
     let wrap_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "anyone".to_string(),
-        amount: Uint128::from(100_u128),
+        amount: Uint128::from(10000_u128),
         msg: to_binary(&Cw20HookMsg::Wrap {
             sender: None,
             recipient: None,
@@ -204,7 +204,7 @@ fn test_wrap_cw20() {
             attr("from", "anyone"),
             attr("owner", "anyone"),
             attr("to", "anyone"),
-            attr("minted", "99"),
+            attr("minted", "9999"),
             attr("fee", "1")
         ]
     );
@@ -219,7 +219,7 @@ fn test_wrap_cw20() {
     )
     .unwrap();
     let token_balance: BalanceResponse = from_binary(&query).unwrap();
-    assert_eq!(token_balance.balance.u128(), 99);
+    assert_eq!(token_balance.balance.u128(), 9999);
 }
 
 #[test]
@@ -238,7 +238,7 @@ fn test_unwrap_cw20() {
     let info = mock_info(CW20_TOKEN, &[]);
     let wrap_msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
         sender: "anyone".to_string(),
-        amount: Uint128::from(100_u128),
+        amount: Uint128::from(10000_u128),
         msg: to_binary(&Cw20HookMsg::Wrap {
             sender: None,
             recipient: None,
@@ -251,7 +251,7 @@ fn test_unwrap_cw20() {
     let info = mock_info("anyone", &[]);
     let unwrap_msg = ExecuteMsg::Unwrap {
         token: Some(Addr::unchecked(CW20_TOKEN.to_string())),
-        amount: Uint128::from(80_u128),
+        amount: Uint128::from(8000_u128),
         sender: None,
         recipient: None,
     };
@@ -264,8 +264,8 @@ fn test_unwrap_cw20() {
             attr("from", "anyone"),
             attr("owner", "anyone"),
             attr("to", "anyone"),
-            attr("unwrap", "80"),
-            attr("refund", "80"),
+            attr("unwrap", "8000"),
+            attr("refund", "8000"),
         ]
     );
 
@@ -279,7 +279,7 @@ fn test_unwrap_cw20() {
     )
     .unwrap();
     let token_balance: BalanceResponse = from_binary(&res).unwrap();
-    assert_eq!(token_balance.balance.u128(), 19);
+    assert_eq!(token_balance.balance.u128(), 1999);
 }
 
 #[test]
@@ -291,13 +291,13 @@ fn test_query_fee_from_wrap_amt() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::FeeFromAmount {
-            amount_to_wrap: "222".to_string(),
+            amount_to_wrap: "10000".to_string(),
         },
     )
     .unwrap();
     let fee_response: FeeFromAmountResponse = from_binary(&query_bin).unwrap();
-    assert_eq!(fee_response.amount_to_wrap, "222".to_string());
-    assert_eq!(fee_response.fee_amt, "2".to_string());
+    assert_eq!(fee_response.amount_to_wrap, "10000".to_string());
+    assert_eq!(fee_response.fee_amt, "1".to_string());
 }
 
 #[test]
@@ -309,13 +309,13 @@ fn test_query_amt_to_wrap_from_target_amount() {
         deps.as_ref(),
         mock_env(),
         QueryMsg::GetAmountToWrap {
-            target_amount: "222".to_string(),
+            target_amount: "10000".to_string(),
         },
     )
     .unwrap();
     let fee_response: GetAmountToWrapResponse = from_binary(&query_bin).unwrap();
-    assert_eq!(fee_response.target_amount, "222".to_string());
-    assert_eq!(fee_response.amount_to_wrap, "224".to_string());
+    assert_eq!(fee_response.target_amount, "10000".to_string());
+    assert_eq!(fee_response.amount_to_wrap, "10001".to_string());
 }
 
 #[test]
