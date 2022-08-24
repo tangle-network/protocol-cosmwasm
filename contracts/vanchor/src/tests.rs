@@ -163,8 +163,8 @@ fn test_vanchor_should_complete_2x2_transaction_with_deposit_cw20() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -246,8 +246,8 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -319,8 +319,8 @@ fn test_vanchor_should_complete_2x2_transaction_with_withdraw_cw20() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -398,8 +398,8 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -471,8 +471,8 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1.clone(),
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -497,8 +497,8 @@ fn test_vanchor_should_not_complete_transaction_if_ext_data_is_invalid() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: [0u8; 32],
+        encrypted_output1: output1,
+        encrypted_output2: vec![0u8; 32],
     };
 
     // Constructing proof data
@@ -559,8 +559,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -632,8 +632,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_big() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -710,8 +710,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -783,8 +783,8 @@ fn test_vanchor_should_not_complete_withdraw_if_out_amount_sum_is_too_small() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -861,8 +861,8 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -934,8 +934,8 @@ fn test_vanchor_should_not_be_able_to_double_spend() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -1025,8 +1025,8 @@ fn test_vanchor_should_complete_16x2_transaction_with_deposit_cw20() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -1108,8 +1108,8 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -1181,8 +1181,8 @@ fn test_vanchor_should_complete_16x2_transaction_with_withdraw_cw20() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -1359,8 +1359,8 @@ fn test_vanchor_wrap_and_deposit_cw20() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -1443,8 +1443,8 @@ fn test_vanchor_withdraw_and_unwrap_native() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);
@@ -1516,8 +1516,8 @@ fn test_vanchor_withdraw_and_unwrap_native() {
         relayer: RELAYER.to_string(),
         ext_amount: ext_amount.to_string(),
         fee: Uint128::from(fee),
-        encrypted_output1: element_encoder(&output1),
-        encrypted_output2: element_encoder(&output2),
+        encrypted_output1: output1,
+        encrypted_output2: output2,
     };
 
     let ext_data_hash = hash_ext_data(ext_data.clone(), ext_amount, fee);

@@ -159,8 +159,8 @@ pub struct ExtData {
     pub relayer: String,
     pub ext_amount: String, // Still `String` since represents `i128` value
     pub fee: Uint128,
-    pub encrypted_output1: [u8; 32],
-    pub encrypted_output2: [u8; 32],
+    pub encrypted_output1: Vec<u8>,
+    pub encrypted_output2: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
