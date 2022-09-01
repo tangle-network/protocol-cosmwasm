@@ -23,10 +23,10 @@ pub mod vanchor_verifier {
     impl VAnchorVerifier {
         pub fn new(max_edges: u32, ins: u32, outs: u32) -> StdResult<Self> {
             let vk_bytes: &[u8] = match (max_edges, ins, outs) {
-                (2, 2, 2) =>  include_bytes!("../../../protocol-substrate-fixtures/vanchor/bn254/x5/2-2-2/verifying_key.bin"),
-                (2, 16, 2) => include_bytes!("../../../protocol-substrate-fixtures/vanchor/bn254/x5/2-16-2/verifying_key.bin"),
-                (32, 2, 2) =>  include_bytes!("../../../protocol-substrate-fixtures/vanchor/bn254/x5/32-2-2/verifying_key.bin"),
-                (32, 16, 2) => include_bytes!("../../../protocol-substrate-fixtures/vanchor/bn254/x5/32-16-2/verifying_key.bin"),
+                (2, 2, 2) =>  include_bytes!("../../../substrate-fixtures/vanchor/bn254/x5/2-2-2/verifying_key.bin"),
+                (2, 16, 2) => include_bytes!("../../../substrate-fixtures/vanchor/bn254/x5/2-16-2/verifying_key.bin"),
+                (32, 2, 2) =>  include_bytes!("../../../substrate-fixtures/vanchor/bn254/x5/32-2-2/verifying_key.bin"),
+                (32, 16, 2) => include_bytes!("../../../substrate-fixtures/vanchor/bn254/x5/32-16-2/verifying_key.bin"),
                 _ => return Err(StdError::GenericErr { msg: format!("Invalid ({}, {}, {}) group", max_edges, ins, outs) }),
             };
             Ok(Self {
