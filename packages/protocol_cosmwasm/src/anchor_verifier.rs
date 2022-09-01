@@ -23,9 +23,9 @@ pub mod anchor_verifier {
     impl AnchorVerifier {
         pub fn new(max_edges: u32) -> StdResult<Self> {
             let vk_bytes: &[u8] = match max_edges {
-                2 =>  include_bytes!("../../../protocol-substrate-fixtures/fixed-anchor/bn254/x5/2/verifying_key.bin"),
-                16 => include_bytes!("../../../protocol-substrate-fixtures/fixed-anchor/bn254/x5/16/verifying_key.bin"),
-                32 => include_bytes!("../../../protocol-substrate-fixtures/fixed-anchor/bn254/x5/32/verifying_key.bin"),
+                2 =>  include_bytes!("../../../substrate-fixtures/fixed-anchor/bn254/x5/2/verifying_key.bin"),
+                16 => include_bytes!("../../../substrate-fixtures/fixed-anchor/bn254/x5/16/verifying_key.bin"),
+                32 => include_bytes!("../../../substrate-fixtures/fixed-anchor/bn254/x5/32/verifying_key.bin"),
                 _ => return Err( StdError::GenericErr { msg: "Invalid max_edges".to_string() } ),
             };
             Ok(Self {
