@@ -20,3 +20,4 @@ test-scripts/src/config/wasms/*.wasm
 .DS_Store
 
 test-scripts/yarn.lock
+/substrate-fixtures
